@@ -1,0 +1,36 @@
+{
+  "created_at": 1768152494.360159,
+  "response": {
+    "cached": false,
+    "connections": [
+      "calls -> random (external)"
+    ],
+    "hook": "get_random hints at the next beat in the code story.",
+    "key_lines": [
+      {
+        "line": 82,
+        "text": "Signature"
+      },
+      {
+        "line": 83,
+        "text": "Body Start"
+      },
+      {
+        "line": 88,
+        "text": "Body End"
+      }
+    ],
+    "mode": "connections",
+    "model": "gpt-4o-mini",
+    "next_thread": "Follow the nearest referenced symbol to continue the thread.",
+    "prompt_version": "v1",
+    "source": "openai",
+    "summary": [
+      "get_random establishes a new step in the flow.",
+      "It wires together a small slice of behavior.",
+      "The shape suggests where the next chapter connects."
+    ],
+    "symbol_id": "symbol:Games.TicTacToe.tictactoe.get_random",
+    "symbol_name": "get_random"
+  }
+}

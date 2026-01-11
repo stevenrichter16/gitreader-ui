@@ -1,0 +1,40 @@
+{
+  "created_at": 1768151568.699863,
+  "response": {
+    "cached": false,
+    "connections": [
+      "calls -> flask.Flask (external)",
+      "calls -> app.register_blueprint (external)"
+    ],
+    "hook": "create_app",
+    "key_lines": [
+      {
+        "line": 6,
+        "text": "def create_app() -> Flask:"
+      },
+      {
+        "line": 7,
+        "text": "app = Flask(__name__)"
+      },
+      {
+        "line": 8,
+        "text": "app.register_blueprint(gitreader, url_prefix='/gitreader')"
+      },
+      {
+        "line": 9,
+        "text": "return app"
+      }
+    ],
+    "mode": "summary",
+    "model": "gpt-4o-mini",
+    "next_thread": "Follow the nearest referenced symbol to continue the thread.",
+    "prompt_version": "v1",
+    "source": "openai",
+    "summary": [
+      "The create_app function initializes a Flask application.",
+      "It registers the 'gitreader' blueprint with a specified URL prefix."
+    ],
+    "symbol_id": "symbol:server.create_app",
+    "symbol_name": "create_app"
+  }
+}

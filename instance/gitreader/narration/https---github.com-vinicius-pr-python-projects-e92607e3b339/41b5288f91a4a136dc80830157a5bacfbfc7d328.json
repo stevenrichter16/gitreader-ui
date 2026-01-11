@@ -1,0 +1,42 @@
+{
+  "created_at": 1768151960.4184692,
+  "response": {
+    "cached": false,
+    "connections": [
+      "calls -> print (external)",
+      "calls -> print (external)",
+      "calls -> print (external)",
+      "calls -> print (external)"
+    ],
+    "hook": "Function to greet users of the quadratic equation solver.",
+    "key_lines": [
+      {
+        "line": 10,
+        "text": "def welcome():"
+      },
+      {
+        "line": 11,
+        "text": "print(\"Welcome to quadratic equation solver\")"
+      },
+      {
+        "line": 12,
+        "text": "print(\"This resolve the equation of the type ax\u00b2 + bx + c = 0\")"
+      },
+      {
+        "line": 14,
+        "text": "print(\"ATTENTION: The a must be different of 0.\")"
+      }
+    ],
+    "mode": "summary",
+    "model": "gpt-4o-mini",
+    "next_thread": "Follow the nearest referenced symbol to continue the thread.",
+    "prompt_version": "v1",
+    "source": "openai",
+    "summary": [
+      "The 'welcome' function introduces the quadratic equation solver.",
+      "It explains the equation format and requests user input for coefficients."
+    ],
+    "symbol_id": "symbol:Numbers.Quadratic Equation.Quadratic Equation.welcome",
+    "symbol_name": "welcome"
+  }
+}

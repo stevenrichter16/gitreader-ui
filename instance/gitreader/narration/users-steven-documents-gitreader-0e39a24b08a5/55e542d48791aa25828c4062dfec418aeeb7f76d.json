@@ -1,0 +1,48 @@
+{
+  "created_at": 1768151643.646084,
+  "response": {
+    "cached": false,
+    "connections": [
+      "imports <- app/gitreader/routes.py (file)",
+      "contains -> narrate_symbol (function)",
+      "contains -> load_cached_narration (function)",
+      "contains -> _default_section (function)",
+      "contains -> _narration_cache_key (function)",
+      "contains -> _build_context (function)",
+      "contains -> _generate_narration (function)",
+      "contains -> _build_messages (function)",
+      "contains -> _format_snippet (function)"
+    ],
+    "hook": "The GitReader narrator generates detailed narrations for code symbols.",
+    "key_lines": [
+      {
+        "line": 18,
+        "text": "def narrate_symbol("
+      },
+      {
+        "line": 25,
+        "text": "index = get_repo_index(spec, cache_root=cache_root)"
+      },
+      {
+        "line": 40,
+        "text": "narration, source, model = _generate_narration(node, snippet, context, mode)"
+      },
+      {
+        "line": 167,
+        "text": "system = ("
+      }
+    ],
+    "mode": "summary",
+    "model": "gpt-4o-mini",
+    "next_thread": "Follow the nearest referenced symbol to continue the thread.",
+    "prompt_version": "v1",
+    "source": "openai",
+    "summary": [
+      "This module provides functions to narrate code symbols based on repository specifications.",
+      "It utilizes caching to optimize performance and reduce redundant computations.",
+      "The narration includes context about the symbol's usage and relationships within the code."
+    ],
+    "symbol_id": "file:app/gitreader/narrator.py",
+    "symbol_name": "app/gitreader/narrator.py"
+  }
+}

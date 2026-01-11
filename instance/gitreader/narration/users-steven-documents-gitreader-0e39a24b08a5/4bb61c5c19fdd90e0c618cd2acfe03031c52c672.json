@@ -1,0 +1,32 @@
+{
+  "created_at": 1768151704.6439118,
+  "response": {
+    "cached": false,
+    "connections": [
+      "Connections are still being mapped."
+    ],
+    "hook": "Node hints at the next beat in the code story.",
+    "key_lines": [
+      {
+        "line": 307,
+        "text": "Snippet Start"
+      },
+      {
+        "line": 339,
+        "text": "Snippet End"
+      }
+    ],
+    "mode": "hook",
+    "model": "gpt-4o-mini",
+    "next_thread": "Follow the nearest referenced symbol to continue the thread.",
+    "prompt_version": "v1",
+    "source": "openai",
+    "summary": [
+      "Node establishes a new step in the flow.",
+      "It wires together a small slice of behavior.",
+      "The shape suggests where the next chapter connects."
+    ],
+    "symbol_id": "symbol:app.gitreader.narrator._fallback_narration",
+    "symbol_name": "_fallback_narration"
+  }
+}

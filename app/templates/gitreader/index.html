@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+  <head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GitReader Prototype</title>
+  <link rel="stylesheet" href="{{ url_for('gitreader.static', filename='gitreader/styles.css') }}">
+  <link rel="stylesheet" href="https://unpkg.com/highlight.js@11.9.0/styles/atom-one-dark.min.css">
+  <link rel="icon" href="{{ url_for('gitreader.static', filename='favicon.ico') }}">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="app-header">
+      <div class="brand">
+        <span class="brand-mark">GitReader</span>
+        <span class="brand-tagline">Read code like a novel</span>
+      </div>
+      <div class="nav-actions">
+        <div class="nav-group" role="group" aria-label="Layout modes">
+          <button class="nav-btn" data-layout="reader">Reader</button>
+          <button class="nav-btn" data-layout="canvas">Canvas</button>
+          <button class="nav-btn is-active" data-layout="both">Both</button>
+        </div>
+        <div class="nav-group" role="group" aria-label="TOC mode">
+          <span class="nav-label">TOC</span>
+          <button class="nav-btn is-active" data-toc-mode="story">Story</button>
+          <button class="nav-btn" data-toc-mode="tree">File tree</button>
+        </div>
+        <div class="nav-group" role="group" aria-label="Panels">
+          <button class="nav-btn is-active" id="narrator-toggle" aria-pressed="true">Narrator</button>
+        </div>
+        <form class="nav-group repo-picker" id="repo-picker" aria-label="Repository selection">
+          <span class="nav-label">Repo</span>
+          <input
+            class="repo-input"
+            id="repo-input"
+            type="text"
+            placeholder="https://github.com/org/repo"
+            aria-label="Remote repository URL">
+          <input
+            class="repo-input"
+            id="local-input"
+            type="text"
+            placeholder="/path/to/repo"
+            aria-label="Local repository path">
+          <input
+            class="repo-input repo-input--short"
+            id="ref-input"
+            type="text"
+            placeholder="ref"
+            aria-label="Git ref">
+          <input
+            class="repo-input repo-input--short"
+            id="subdir-input"
+            type="text"
+            placeholder="subdir"
+            aria-label="Subdirectory">
+          <button class="nav-btn" type="submit">Load</button>
+        </form>
+      </div>
+    </header>
+
+    <main class="workspace" id="workspace" data-layout="both">
+      <section class="pane toc-pane" id="toc" aria-label="Table of contents">
+        <div class="pane-header">
+          <h2>Table of Contents</h2>
+          <span class="pill" id="toc-pill">story</span>
+        </div>
+        <p class="pane-subtitle" id="toc-subtitle">Follow the story arc of the repository.</p>
+        <ul class="toc-list" id="toc-list"></ul>
+      </section>
+
+      <section class="pane code-pane" id="code-view" aria-label="Reader mode">
+        <div class="pane-header">
+          <h2>Reader</h2>
+          <span class="pill">progressive disclosure</span>
+        </div>
+        <div class="reader-controls" role="group" aria-label="Reader controls">
+          <span class="nav-label">View</span>
+          <button class="ghost-btn is-active" data-snippet-mode="body">Body</button>
+          <button class="ghost-btn" data-snippet-mode="full">Full file</button>
+        </div>
+        <div class="code-surface" id="code-surface"></div>
+      </section>
+
+      <section class="pane canvas-pane" id="graph-canvas" aria-label="Canvas mode">
+        <div class="pane-header">
+          <h2>Canvas</h2>
+          <div class="canvas-controls" role="group" aria-label="Layout controls">
+            <button class="ghost-btn" data-layout-action="cluster">Group by package</button>
+            <button class="ghost-btn" data-layout-action="layer">Stack by layer</button>
+            <button class="ghost-btn" data-layout-action="free">Free</button>
+          </div>
+        </div>
+        <div class="canvas-controls canvas-controls--filters" role="group" aria-label="Graph filters">
+          <span class="canvas-label">Edges</span>
+          <button class="ghost-btn is-active" data-edge-filter="calls">Calls</button>
+          <button class="ghost-btn is-active" data-edge-filter="imports">Imports</button>
+          <button class="ghost-btn is-active" data-edge-filter="inherits">Inherits</button>
+          <button class="ghost-btn is-active" data-edge-filter="contains">Contains</button>
+          <button class="ghost-btn is-active" data-edge-filter="blueprint">Blueprints</button>
+          <span class="canvas-label">Nodes</span>
+          <button class="ghost-btn is-active" data-node-filter="external">Externals</button>
+          <span class="canvas-label">View</span>
+          <button class="ghost-btn" data-graph-action="focus">Focus</button>
+          <button class="ghost-btn" data-graph-action="reset">Reset</button>
+        </div>
+        <div class="canvas-legend" aria-label="Node legend">
+          <span class="legend-item"><span class="legend-swatch legend-file"></span>File</span>
+          <span class="legend-item"><span class="legend-swatch legend-class"></span>Class</span>
+          <span class="legend-item"><span class="legend-swatch legend-function"></span>Function</span>
+          <span class="legend-item"><span class="legend-swatch legend-method"></span>Method</span>
+          <span class="legend-item"><span class="legend-swatch legend-blueprint"></span>Blueprint</span>
+          <span class="legend-item"><span class="legend-swatch legend-external"></span>External</span>
+        </div>
+        <div class="canvas-surface" id="canvas-surface">
+          <div class="canvas-graph" id="canvas-graph"></div>
+          <div class="canvas-overlay" id="canvas-overlay" aria-live="polite"></div>
+        </div>
+      </section>
+
+      <section class="pane narrator-pane" id="narrator" aria-label="Narrator">
+        <div class="pane-header">
+          <h2>Narrator</h2>
+          <div class="mode-buttons" id="mode-buttons" role="group" aria-label="Narration modes">
+            <button class="mode-btn is-active" data-mode="hook">Hook</button>
+            <button class="mode-btn" data-mode="summary">What it does</button>
+            <button class="mode-btn" data-mode="key_lines">Key lines</button>
+            <button class="mode-btn" data-mode="connections">Connections</button>
+            <button class="mode-btn" data-mode="next">Next thread</button>
+          </div>
+        </div>
+        <div class="narrator-output" id="narrator-output">
+          <p class="eyebrow">Scene</p>
+          <h3>Waiting for your selection</h3>
+          <p>Choose a chapter to begin the narrative.</p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="https://unpkg.com/highlight.js@11.9.0/highlight.min.js"></script>
+  <script src="https://unpkg.com/cytoscape@3.28.1/dist/cytoscape.min.js"></script>
+  <script src="{{ url_for('gitreader.static', filename='gitreader/app.js') }}" defer></script>
+</body>
+</html>
