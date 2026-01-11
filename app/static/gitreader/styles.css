@@ -430,6 +430,12 @@ body {
     margin-right: 4px;
 }
 
+.canvas-count {
+    font-size: 11px;
+    color: var(--muted-ink);
+    margin-left: 6px;
+}
+
 .canvas-legend {
     display: flex;
     flex-wrap: wrap;
@@ -491,6 +497,11 @@ body {
     font-size: 12px;
 }
 
+.ghost-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
 .ghost-btn.is-active {
     border-color: var(--accent);
     color: var(--accent);
@@ -502,7 +513,22 @@ body {
     border-radius: 16px;
     border: 1px dashed rgba(35, 122, 120, 0.35);
     padding: 12px;
-    background: radial-gradient(circle at top right, rgba(35, 122, 120, 0.08), transparent 45%);
+    background:
+        repeating-linear-gradient(
+            0deg,
+            rgba(35, 122, 120, 0.06) 0,
+            rgba(35, 122, 120, 0.06) 1px,
+            transparent 1px,
+            transparent 28px
+        ),
+        repeating-linear-gradient(
+            90deg,
+            rgba(35, 122, 120, 0.04) 0,
+            rgba(35, 122, 120, 0.04) 1px,
+            transparent 1px,
+            transparent 28px
+        ),
+        radial-gradient(circle at top right, rgba(35, 122, 120, 0.08), transparent 45%);
     min-height: 240px;
     overflow: hidden;
     position: relative;
@@ -530,6 +556,58 @@ body {
 
 .canvas-overlay.is-visible {
     display: flex;
+}
+
+.canvas-tools {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    display: flex;
+    gap: 6px;
+    padding: 6px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.78);
+    border: 1px solid var(--line);
+    box-shadow: 0 10px 18px rgba(36, 26, 18, 0.12);
+    z-index: 5;
+}
+
+.canvas-tools .ghost-btn {
+    padding: 4px 8px;
+    font-size: 11px;
+}
+
+.graph-tooltip {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform: translate(-9999px, -9999px);
+    pointer-events: none;
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 8px 10px;
+    font-size: 12px;
+    color: var(--ink);
+    box-shadow: 0 12px 20px rgba(36, 26, 18, 0.12);
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    max-width: 240px;
+    z-index: 6;
+}
+
+.graph-tooltip.is-visible {
+    opacity: 1;
+}
+
+.graph-tooltip .tooltip-title {
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+
+.graph-tooltip .tooltip-meta {
+    color: var(--muted-ink);
+    font-size: 11px;
 }
 
 .mode-buttons {

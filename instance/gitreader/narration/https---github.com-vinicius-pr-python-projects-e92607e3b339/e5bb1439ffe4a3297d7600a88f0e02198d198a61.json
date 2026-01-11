@@ -1,0 +1,41 @@
+{
+  "created_at": 1768155695.228228,
+  "response": {
+    "cached": false,
+    "connections": [
+      "calls -> str (external)",
+      "calls -> input (external)",
+      "calls -> upper (external)"
+    ],
+    "hook": "play_again",
+    "key_lines": [
+      {
+        "line": 91,
+        "text": "def play_again():"
+      },
+      {
+        "line": 92,
+        "text": "\"\"\"Return true if want to play again.\"\"\""
+      },
+      {
+        "line": 94,
+        "text": "option = str(input(\"Do you want to play again?? (Yes or No): \"))"
+      },
+      {
+        "line": 97,
+        "text": "return option[0].upper() == 'Y'"
+      }
+    ],
+    "mode": "hook",
+    "model": "gpt-4o-mini",
+    "next_thread": "Follow the nearest referenced symbol to continue the thread.",
+    "prompt_version": "v1",
+    "source": "openai",
+    "summary": [
+      "Prompts the user to decide if they want to play again.",
+      "Validates user input to ensure it is either 'Yes' or 'No'."
+    ],
+    "symbol_id": "symbol:Games.TicTacToe.tictactoe.play_again",
+    "symbol_name": "play_again"
+  }
+}

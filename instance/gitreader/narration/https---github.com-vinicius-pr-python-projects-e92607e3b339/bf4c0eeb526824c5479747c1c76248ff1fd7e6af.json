@@ -1,0 +1,40 @@
+{
+  "created_at": 1768155748.05816,
+  "response": {
+    "cached": false,
+    "connections": [
+      "calls -> print (external)",
+      "calls -> print (external)"
+    ],
+    "hook": "welcome",
+    "key_lines": [
+      {
+        "line": 20,
+        "text": "def welcome():"
+      },
+      {
+        "line": 21,
+        "text": "\"\"\"A welcome message\"\"\""
+      },
+      {
+        "line": 22,
+        "text": "print('Welcome to Tic-Tac_toe. It is a game for two players')"
+      },
+      {
+        "line": 23,
+        "text": "print('The first to go will be chosen randomly')"
+      }
+    ],
+    "mode": "hook",
+    "model": "gpt-4o-mini",
+    "next_thread": "Follow the nearest referenced symbol to continue the thread.",
+    "prompt_version": "v1",
+    "source": "openai",
+    "summary": [
+      "Defines a function to display a welcoming message.",
+      "Informs players about the game and its rules."
+    ],
+    "symbol_id": "symbol:Games.TicTacToe.tictactoe.welcome",
+    "symbol_name": "welcome"
+  }
+}

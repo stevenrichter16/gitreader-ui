@@ -101,6 +101,8 @@
           <button class="ghost-btn is-active" data-edge-filter="blueprint">Blueprints</button>
           <span class="canvas-label">Nodes</span>
           <button class="ghost-btn is-active" data-node-filter="external">Externals</button>
+          <button class="ghost-btn" data-graph-action="reveal" id="graph-reveal">Show more</button>
+          <span class="canvas-count" id="graph-node-status"></span>
           <span class="canvas-label">View</span>
           <button class="ghost-btn" data-graph-action="focus">Focus</button>
           <button class="ghost-btn" data-graph-action="reset">Reset</button>
@@ -116,6 +118,12 @@
         <div class="canvas-surface" id="canvas-surface">
           <div class="canvas-graph" id="canvas-graph"></div>
           <div class="canvas-overlay" id="canvas-overlay" aria-live="polite"></div>
+          <div class="canvas-tools" id="canvas-tools" role="group" aria-label="Canvas zoom">
+            <button class="ghost-btn" data-graph-action="zoom-in" aria-label="Zoom in">+</button>
+            <button class="ghost-btn" data-graph-action="zoom-out" aria-label="Zoom out">-</button>
+            <button class="ghost-btn" data-graph-action="fit" aria-label="Fit to view">Fit</button>
+          </div>
+          <div class="graph-tooltip" id="graph-tooltip" role="status" aria-hidden="true"></div>
         </div>
       </section>
 

@@ -22,6 +22,7 @@
         this.tocList = getElement('toc-list');
         this.codeSurface = getElement('code-surface');
         this.canvasGraph = getElement('canvas-graph');
+        this.canvasSurface = getElement('canvas-surface');
         this.canvasOverlay = getElement('canvas-overlay');
         this.narratorOutput = getElement('narrator-output');
         this.modeButtons = document.querySelectorAll('.mode-btn');
@@ -36,6 +37,10 @@
         this.workspace = getElement('workspace');
         this.tocPill = getElement('toc-pill');
         this.tocSubtitle = getElement('toc-subtitle');
+        this.graphNodeStatus = getElement('graph-node-status');
+        this.graphRevealButton = getElement('graph-reveal');
+        this.graphTooltip = getElement('graph-tooltip');
+        this.graphRevealButton.disabled = true;
         this.repoForm = getElement('repo-picker');
         this.repoInput = getElement('repo-input');
         this.localInput = getElement('local-input');
@@ -54,16 +59,30 @@
         this.fileNodesByPath = new Map();
         this.snippetCache = new Map();
         this.graphCache = new Map();
+        this.graphLoadPromises = new Map();
         this.narratorCache = new Map();
+        this.graphNodeCapByScope = new Map();
         this.narratorRequestToken = 0;
+        this.chapterRequestToken = 0;
+        this.graphRequestToken = 0;
         this.narratorVisible = true;
         this.graphInstance = null;
         this.graphEventsBound = false;
         this.edgeFilters = new Set(['calls', 'imports', 'inherits', 'contains', 'blueprint']);
         this.showExternalNodes = true;
+        this.hoveredNodeId = null;
+        this.currentScope = 'full';
+        this.currentChapterId = null;
         this.focusedNodeId = null;
         this.currentSymbol = null;
         this.currentSnippetText = '';
+        this.tocDebounceTimer = null;
+        this.tocDebounceDelay = 200;
+        this.pendingChapterId = null;
+        this.graphNodeCap = 300;
+        this.graphNodeCapStep = 200;
+        this.labelZoomThreshold = 0.65;
+        this.labelLineLength = 18;
     }
 
     GitReaderApp.prototype.init = function () {
@@ -186,7 +205,7 @@
             }
             var chapterId = target.dataset.chapterId;
             if (chapterId) {
-                _this.loadChapter(chapterId);
+                _this.scheduleChapterLoad(chapterId);
             }
         });
 
@@ -244,6 +263,14 @@
                     _this.focusOnSelected();
                 } else if (action === 'reset') {
                     _this.resetGraphFocus();
+                } else if (action === 'reveal') {
+                    _this.revealMoreNodes();
+                } else if (action === 'zoom-in') {
+                    _this.zoomGraph(1.2);
+                } else if (action === 'zoom-out') {
+                    _this.zoomGraph(0.8);
+                } else if (action === 'fit') {
+                    _this.fitGraph();
                 }
             });
         });
@@ -298,6 +325,21 @@
             event.preventDefault();
             _this.applyRepoSelection();
         });
+    };
+
+    GitReaderApp.prototype.scheduleChapterLoad = function (chapterId) {
+        var _this = this;
+        this.pendingChapterId = chapterId;
+        this.setActiveToc(chapterId);
+        if (this.tocDebounceTimer !== null) {
+            window.clearTimeout(this.tocDebounceTimer);
+        }
+        this.tocDebounceTimer = window.setTimeout(function () {
+            _this.tocDebounceTimer = null;
+            if (_this.pendingChapterId) {
+                _this.loadChapter(_this.pendingChapterId);
+            }
+        }, this.tocDebounceDelay);
     };
 
     GitReaderApp.prototype.setTocMode = function (mode) {
@@ -357,15 +399,22 @@
 
     GitReaderApp.prototype.loadChapter = function (chapterId) {
         var _this = this;
+        var requestToken = ++this.chapterRequestToken;
+        this.currentChapterId = chapterId;
         this.setActiveToc(chapterId);
         var chapter = this.chapters.find(function (entry) { return entry.id === chapterId; });
         var scope = (chapter && chapter.scope) || this.getScopeForChapter(chapterId);
         this.focusedNodeId = null;
         return this.loadGraphForScope(scope).then(function () {
+            if (requestToken !== _this.chapterRequestToken) {
+                return;
+            }
             var nodes = _this.filterNodesForChapter(chapterId);
             var edges = _this.filterEdgesForNodes(nodes);
-            var focus = _this.pickFocusNode(nodes);
-            _this.renderGraph(nodes, edges);
+            var graphView = _this.buildGraphView(nodes, edges, scope);
+            var focus = _this.pickFocusNode(graphView.nodes);
+            _this.renderGraph(graphView.nodes, graphView.edges);
+            _this.updateGraphNodeStatus(graphView);
             _this.loadSymbolSnippet(focus).catch(function () {
                 _this.renderCode(focus);
                 _this.updateNarrator(focus);
@@ -382,15 +431,171 @@
 
     GitReaderApp.prototype.loadGraphForScope = function (scope) {
         var _this = this;
+        if (this.currentScope === scope && this.graphNodes.length > 0) {
+            return Promise.resolve();
+        }
+        var requestToken = ++this.graphRequestToken;
+        this.currentScope = scope;
         var cached = this.graphCache.get(scope);
         if (cached) {
             this.setGraphData(cached);
             return Promise.resolve();
         }
-        return this.fetchJson(this.buildApiUrl('/gitreader/api/graph', scope && scope !== 'full' ? { scope: scope } : undefined)).then(function (graphData) {
+        var graphPromise = this.graphLoadPromises.get(scope);
+        if (!graphPromise) {
+            graphPromise = this.fetchJson(this.buildApiUrl('/gitreader/api/graph', scope && scope !== 'full' ? { scope: scope } : undefined));
+            this.graphLoadPromises.set(scope, graphPromise);
+        }
+        return graphPromise.then(function (graphData) {
+            _this.graphLoadPromises.delete(scope);
+            if (requestToken !== _this.graphRequestToken) {
+                return;
+            }
             _this.graphCache.set(scope, graphData);
             _this.setGraphData(graphData);
         });
+    };
+
+    GitReaderApp.prototype.getNodeCapForScope = function (scope, totalNodes) {
+        var cap = this.graphNodeCapByScope.get(scope);
+        if (cap === undefined) {
+            cap = Math.min(this.graphNodeCap, totalNodes);
+            this.graphNodeCapByScope.set(scope, cap);
+        } else if (cap > totalNodes) {
+            cap = totalNodes;
+            this.graphNodeCapByScope.set(scope, cap);
+        }
+        return cap;
+    };
+
+    GitReaderApp.prototype.buildGraphView = function (nodes, edges, scope) {
+        var totalNodes = nodes.length;
+        var cap = this.getNodeCapForScope(scope, totalNodes);
+        if (cap >= totalNodes) {
+            return {
+                nodes: nodes,
+                edges: edges,
+                totalNodes: totalNodes,
+                visibleNodes: totalNodes,
+                isCapped: false
+            };
+        }
+        var nodeMap = new Map(nodes.map(function (node) { return [node.id, node]; }));
+        var degree = new Map();
+        edges.forEach(function (edge) {
+            if (nodeMap.has(edge.source)) {
+                degree.set(edge.source, (degree.get(edge.source) || 0) + 1);
+            }
+            if (nodeMap.has(edge.target)) {
+                degree.set(edge.target, (degree.get(edge.target) || 0) + 1);
+            }
+        });
+        var keepIds = new Set();
+        var selectedNodeId = this.getSelectedGraphNodeId();
+        if (selectedNodeId && nodeMap.has(selectedNodeId)) {
+            keepIds.add(selectedNodeId);
+        }
+        if (this.currentSymbol && nodeMap.has(this.currentSymbol.id)) {
+            keepIds.add(this.currentSymbol.id);
+            var fileNode = this.getFileNodeForSymbol(this.currentSymbol);
+            if (fileNode && nodeMap.has(fileNode.id)) {
+                keepIds.add(fileNode.id);
+            }
+        }
+        if (this.focusedNodeId && nodeMap.has(this.focusedNodeId)) {
+            keepIds.add(this.focusedNodeId);
+        }
+        var kindWeight = {
+            function: 0,
+            method: 1,
+            class: 2,
+            file: 3,
+            blueprint: 4,
+            external: 5
+        };
+        var sorted = nodes.slice().sort(function (a, b) {
+            var aDegree = degree.get(a.id) || 0;
+            var bDegree = degree.get(b.id) || 0;
+            if (aDegree !== bDegree) {
+                return bDegree - aDegree;
+            }
+            var aWeight = kindWeight[a.kind] !== undefined ? kindWeight[a.kind] : 10;
+            var bWeight = kindWeight[b.kind] !== undefined ? kindWeight[b.kind] : 10;
+            if (aWeight !== bWeight) {
+                return aWeight - bWeight;
+            }
+            return a.name.localeCompare(b.name);
+        });
+        var targetSize = Math.max(cap, keepIds.size);
+        var selectedNodes = [];
+        sorted.forEach(function (node) {
+            if (keepIds.has(node.id)) {
+                selectedNodes.push(node);
+            }
+        });
+        for (var i = 0; i < sorted.length; i += 1) {
+            if (selectedNodes.length >= targetSize) {
+                break;
+            }
+            var node = sorted[i];
+            if (keepIds.has(node.id)) {
+                continue;
+            }
+            selectedNodes.push(node);
+        }
+        var selectedIds = new Set(selectedNodes.map(function (node) { return node.id; }));
+        var trimmedEdges = edges.filter(function (edge) { return selectedIds.has(edge.source) && selectedIds.has(edge.target); });
+        return {
+            nodes: selectedNodes,
+            edges: trimmedEdges,
+            totalNodes: totalNodes,
+            visibleNodes: selectedNodes.length,
+            isCapped: totalNodes > selectedNodes.length
+        };
+    };
+
+    GitReaderApp.prototype.updateGraphNodeStatus = function (graphView) {
+        if (graphView.totalNodes === 0) {
+            this.graphNodeStatus.textContent = '';
+            this.graphRevealButton.disabled = true;
+            return;
+        }
+        if (!graphView.isCapped) {
+            this.graphNodeStatus.textContent = 'Showing ' + graphView.visibleNodes + ' nodes';
+            this.graphRevealButton.disabled = true;
+            this.graphRevealButton.textContent = 'Show more';
+            return;
+        }
+        this.graphNodeStatus.textContent = 'Showing ' + graphView.visibleNodes + ' of ' + graphView.totalNodes;
+        var nextCap = Math.min(graphView.totalNodes, graphView.visibleNodes + this.graphNodeCapStep);
+        this.graphRevealButton.textContent = nextCap >= graphView.totalNodes ? 'Show all' : 'Show more';
+        this.graphRevealButton.disabled = false;
+    };
+
+    GitReaderApp.prototype.revealMoreNodes = function () {
+        if (!this.currentChapterId) {
+            return;
+        }
+        var nodes = this.filterNodesForChapter(this.currentChapterId);
+        var total = nodes.length;
+        var cap = this.getNodeCapForScope(this.currentScope, total);
+        if (cap >= total) {
+            return;
+        }
+        var nextCap = Math.min(total, cap + this.graphNodeCapStep);
+        this.graphNodeCapByScope.set(this.currentScope, nextCap);
+        this.refreshGraphView();
+    };
+
+    GitReaderApp.prototype.refreshGraphView = function () {
+        if (!this.currentChapterId) {
+            return;
+        }
+        var nodes = this.filterNodesForChapter(this.currentChapterId);
+        var edges = this.filterEdgesForNodes(nodes);
+        var graphView = this.buildGraphView(nodes, edges, this.currentScope);
+        this.renderGraph(graphView.nodes, graphView.edges);
+        this.updateGraphNodeStatus(graphView);
     };
 
     GitReaderApp.prototype.setGraphData = function (graphData) {
@@ -734,9 +939,16 @@
         }
         this.setCanvasOverlay('', false);
         this.ensureGraph();
+        var selectedNodeId = this.getSelectedGraphNodeId();
         var elements = this.buildGraphElements(nodes, edges);
         this.graphInstance.elements().remove();
         this.graphInstance.add(elements);
+        if (selectedNodeId) {
+            var selected = this.graphInstance.$id(selectedNodeId);
+            if (selected) {
+                selected.select();
+            }
+        }
         this.runGraphLayout();
         this.applyGraphFilters();
     };
@@ -761,6 +973,7 @@
         if (this.graphInstance) {
             this.graphInstance.elements().remove();
         }
+        this.hideGraphTooltip();
     };
 
     GitReaderApp.prototype.bindGraphEvents = function () {
@@ -783,17 +996,50 @@
                 _this.updateNarrator(node);
             });
         });
+        this.graphInstance.on('select', 'node', function () {
+            _this.refreshEdgeHighlights();
+            _this.updateLabelVisibility();
+        });
+        this.graphInstance.on('unselect', 'node', function () {
+            _this.refreshEdgeHighlights();
+            _this.updateLabelVisibility();
+        });
+        this.graphInstance.on('mouseover', 'node', function (event) {
+            var nodeId = event.target.id();
+            event.target.addClass('is-hovered');
+            _this.setHoveredNode(nodeId);
+            _this.showGraphTooltip(event.target, event);
+            _this.updateLabelVisibility();
+        });
+        this.graphInstance.on('mouseout', 'node', function (event) {
+            event.target.removeClass('is-hovered');
+            _this.setHoveredNode(null);
+            _this.hideGraphTooltip();
+            _this.updateLabelVisibility();
+        });
+        this.graphInstance.on('mousemove', 'node', function (event) {
+            _this.updateTooltipPosition(event);
+        });
+        this.graphInstance.on('zoom', function () {
+            _this.updateLabelVisibility();
+        });
         this.graphEventsBound = true;
     };
 
     GitReaderApp.prototype.buildGraphElements = function (nodes, edges) {
+        var _this = this;
         var nodeElements = nodes.map(function (node) {
+            var labelData = _this.formatNodeLabel(node);
             return {
                 data: {
                     id: node.id,
-                    label: node.name,
+                    label: labelData.label,
+                    fullLabel: labelData.fullLabel,
+                    kindLabel: labelData.kindLabel,
                     kind: node.kind,
-                    summary: node.summary || ''
+                    summary: node.summary || '',
+                    path: labelData.path,
+                    labelVisible: 'true'
                 }
             };
         });
@@ -811,6 +1057,89 @@
         return nodeElements.concat(edgeElements);
     };
 
+    GitReaderApp.prototype.formatNodeLabel = function (node) {
+        var path = (node.location && node.location.path) || '';
+        var fullLabel = node.name || path;
+        var displayName = this.getDisplayName(node, fullLabel, path);
+        var badge = this.getKindBadge(node.kind);
+        var kindLabel = this.getKindLabel(node.kind);
+        var label = this.wrapLabel('[' + badge + ']', displayName);
+        return { label: label, fullLabel: fullLabel, path: path, kindLabel: kindLabel };
+    };
+
+    GitReaderApp.prototype.getDisplayName = function (node, fullLabel, path) {
+        if (node.kind === 'file') {
+            return this.getBasename(path || fullLabel);
+        }
+        return fullLabel || node.name;
+    };
+
+    GitReaderApp.prototype.getBasename = function (value) {
+        var normalized = value.replace(/\\/g, '/');
+        var parts = normalized.split('/');
+        return parts.length > 0 ? parts[parts.length - 1] : value;
+    };
+
+    GitReaderApp.prototype.wrapLabel = function (prefix, name) {
+        var normalized = name.replace(/\s+/g, ' ').trim();
+        if (!normalized) {
+            return prefix;
+        }
+        var lineLength = Math.max(8, this.labelLineLength);
+        var prefixText = prefix ? prefix + ' ' : '';
+        var firstLineLimit = Math.max(4, lineLength - prefixText.length);
+        var firstPart = normalized.slice(0, firstLineLimit);
+        var remaining = normalized.slice(firstPart.length).trimStart();
+        var label = '' + prefixText + firstPart;
+        if (remaining) {
+            var secondPart = remaining.slice(0, lineLength);
+            if (remaining.length > lineLength) {
+                var trimmed = secondPart.slice(0, Math.max(0, lineLength - 3));
+                secondPart = trimmed + '...';
+            }
+            label += '\n' + secondPart;
+        }
+        return label;
+    };
+
+    GitReaderApp.prototype.getKindBadge = function (kind) {
+        switch (kind) {
+            case 'file':
+                return 'F';
+            case 'class':
+                return 'C';
+            case 'function':
+                return 'fn';
+            case 'method':
+                return 'm';
+            case 'blueprint':
+                return 'bp';
+            case 'external':
+                return 'ext';
+            default:
+                return 'id';
+        }
+    };
+
+    GitReaderApp.prototype.getKindLabel = function (kind) {
+        switch (kind) {
+            case 'file':
+                return 'File';
+            case 'class':
+                return 'Class';
+            case 'function':
+                return 'Function';
+            case 'method':
+                return 'Method';
+            case 'blueprint':
+                return 'Blueprint';
+            case 'external':
+                return 'External';
+            default:
+                return 'Symbol';
+        }
+    };
+
     GitReaderApp.prototype.getGraphStyles = function () {
         return [
             {
@@ -818,17 +1147,24 @@
                 style: {
                     'background-color': '#e9dfcf',
                     'label': 'data(label)',
-                    'font-size': '11px',
+                    'font-size': '12px',
                     'font-family': 'Space Grotesk, sans-serif',
                     'text-wrap': 'wrap',
-                    'text-max-width': '110px',
+                    'text-max-width': '120px',
                     'text-valign': 'center',
                     'text-halign': 'center',
                     'color': '#1e1914',
                     'border-width': 1,
                     'border-color': '#d2c2ad',
-                    'padding': '8px',
+                    'padding': '10px',
                     'shape': 'round-rectangle'
+                }
+            },
+            {
+                selector: 'node[labelVisible = "false"]',
+                style: {
+                    'text-opacity': 0,
+                    'text-background-opacity': 0
                 }
             },
             {
@@ -860,11 +1196,22 @@
                 style: {
                     'border-width': 2,
                     'border-color': '#237a78',
-                    'shadow-blur': 12,
+                    'shadow-blur': 18,
                     'shadow-color': '#237a78',
-                    'shadow-opacity': 0.35,
+                    'shadow-opacity': 0.5,
                     'shadow-offset-x': 0,
                     'shadow-offset-y': 0
+                }
+            },
+            {
+                selector: 'node.is-hovered',
+                style: {
+                    'text-opacity': 1,
+                    'text-background-opacity': 1,
+                    'shadow-blur': 16,
+                    'shadow-color': '#237a78',
+                    'shadow-opacity': 0.45,
+                    'z-index': 10
                 }
             },
             {
@@ -872,10 +1219,19 @@
                 style: {
                     'line-color': '#bcae9c',
                     'width': 1,
-                    'curve-style': 'bezier',
+                    'curve-style': 'unbundled-bezier',
+                    'control-point-distances': 40,
+                    'control-point-weights': 0.5,
                     'target-arrow-shape': 'triangle',
                     'target-arrow-color': '#bcae9c',
-                    'opacity': 0.7
+                    'opacity': 0.2
+                }
+            },
+            {
+                selector: 'edge.is-active',
+                style: {
+                    'opacity': 0.75,
+                    'width': 2
                 }
             },
             {
@@ -900,9 +1256,83 @@
             },
             {
                 selector: 'edge[confidence = "low"]',
-                style: { 'line-style': 'dashed', 'opacity': 0.45 }
+                style: { 'line-style': 'dashed', 'opacity': 0.15 }
             }
         ];
+    };
+
+    GitReaderApp.prototype.refreshEdgeHighlights = function () {
+        if (!this.graphInstance) {
+            return;
+        }
+        var cy = this.graphInstance;
+        cy.edges().removeClass('is-active');
+        var selectedNodes = cy.$('node:selected');
+        selectedNodes.forEach(function (node) {
+            node.connectedEdges().addClass('is-active');
+        });
+        if (this.hoveredNodeId) {
+            var hovered = cy.getElementById(this.hoveredNodeId);
+            if (hovered && !hovered.empty()) {
+                hovered.connectedEdges().addClass('is-active');
+            }
+        }
+    };
+
+    GitReaderApp.prototype.updateLabelVisibility = function () {
+        if (!this.graphInstance) {
+            return;
+        }
+        var zoom = this.graphInstance.zoom();
+        var showAll = zoom >= this.labelZoomThreshold;
+        this.graphInstance.nodes().forEach(function (node) {
+            var shouldShow = showAll || node.selected() || node.hasClass('is-hovered');
+            node.data('labelVisible', shouldShow ? 'true' : 'false');
+        });
+    };
+
+    GitReaderApp.prototype.setHoveredNode = function (nodeId) {
+        this.hoveredNodeId = nodeId;
+        this.refreshEdgeHighlights();
+    };
+
+    GitReaderApp.prototype.showGraphTooltip = function (node, event) {
+        if (!this.graphTooltip) {
+            return;
+        }
+        var fullLabel = node.data('fullLabel') || node.data('label');
+        var kindLabel = node.data('kindLabel') || node.data('kind');
+        var path = node.data('path');
+        var details = path ? kindLabel + ' - ' + path : kindLabel;
+        this.graphTooltip.innerHTML =
+            '<div class="tooltip-title">' + escapeHtml(String(fullLabel)) + '</div>' +
+            '<div class="tooltip-meta">' + escapeHtml(String(details)) + '</div>';
+        this.graphTooltip.setAttribute('aria-hidden', 'false');
+        this.graphTooltip.classList.add('is-visible');
+        this.updateTooltipPosition(event);
+    };
+
+    GitReaderApp.prototype.hideGraphTooltip = function () {
+        if (!this.graphTooltip) {
+            return;
+        }
+        this.graphTooltip.classList.remove('is-visible');
+        this.graphTooltip.setAttribute('aria-hidden', 'true');
+    };
+
+    GitReaderApp.prototype.updateTooltipPosition = function (event) {
+        if (!this.graphTooltip || !this.canvasSurface) {
+            return;
+        }
+        var rendered = event.renderedPosition || event.position;
+        if (!rendered) {
+            return;
+        }
+        var offset = 12;
+        var surfaceRect = this.canvasSurface.getBoundingClientRect();
+        var x = Math.min(surfaceRect.width - 20, Math.max(0, rendered.x + offset));
+        var y = Math.min(surfaceRect.height - 20, Math.max(0, rendered.y + offset));
+        this.graphTooltip.style.transform = 'translate(' + x + 'px, ' + y + 'px)';
     };
 
     GitReaderApp.prototype.runGraphLayout = function () {
@@ -911,6 +1341,7 @@
         }
         var layout = this.graphInstance.layout(this.getLayoutOptions());
         layout.run();
+        this.updateLabelVisibility();
     };
 
     GitReaderApp.prototype.hasHighlightSupport = function () {
@@ -1045,6 +1476,8 @@
             }
         });
         this.applyFocus();
+        this.refreshEdgeHighlights();
+        this.updateLabelVisibility();
     };
 
     GitReaderApp.prototype.focusOnSelected = function () {
@@ -1083,6 +1516,31 @@
         cy.fit(focusElements, 40);
     };
 
+    GitReaderApp.prototype.zoomGraph = function (factor) {
+        if (!this.graphInstance) {
+            return;
+        }
+        var current = this.graphInstance.zoom();
+        var next = Math.min(2.5, Math.max(0.2, current * factor));
+        var rect = this.canvasGraph.getBoundingClientRect();
+        this.graphInstance.zoom({
+            level: next,
+            renderedPosition: {
+                x: rect.width / 2,
+                y: rect.height / 2
+            }
+        });
+        this.updateLabelVisibility();
+    };
+
+    GitReaderApp.prototype.fitGraph = function () {
+        if (!this.graphInstance) {
+            return;
+        }
+        this.graphInstance.fit(undefined, 40);
+        this.updateLabelVisibility();
+    };
+
     GitReaderApp.prototype.updateGraphControls = function () {
         var _this = this;
         this.graphLayoutButtons.forEach(function (button) {
@@ -1108,8 +1566,12 @@
                 name: 'breadthfirst',
                 animate: false,
                 fit: true,
-                padding: 24,
-                directed: true
+                padding: 36,
+                directed: true,
+                spacingFactor: 1.35,
+                avoidOverlap: true,
+                avoidOverlapPadding: 24,
+                nodeDimensionsIncludeLabels: true
             };
         }
         if (this.graphLayoutMode === 'free') {
@@ -1271,7 +1733,7 @@
         return active.dataset.chapterId || null;
     };
 
-    GitReaderApp.prototype.getSelectedGraphNode = function () {
+    GitReaderApp.prototype.getSelectedGraphNodeId = function () {
         if (!this.graphInstance) {
             return null;
         }
@@ -1279,7 +1741,14 @@
         if (!selected || selected.length === 0) {
             return null;
         }
-        var nodeId = selected[0].id();
+        return selected[0].id();
+    };
+
+    GitReaderApp.prototype.getSelectedGraphNode = function () {
+        var nodeId = this.getSelectedGraphNodeId();
+        if (!nodeId) {
+            return null;
+        }
         return this.nodeById.get(nodeId) || null;
     };
 
@@ -1300,6 +1769,7 @@
         }
         this.graphInstance.resize();
         this.graphInstance.fit();
+        this.updateLabelVisibility();
     };
 
     document.addEventListener('DOMContentLoaded', function () {

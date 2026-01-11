@@ -112,6 +112,14 @@ type SnippetMode = 'body' | 'full';
 
 type GraphLayoutMode = 'cluster' | 'layer' | 'free';
 
+interface GraphView {
+    nodes: SymbolNode[];
+    edges: GraphEdge[];
+    totalNodes: number;
+    visibleNodes: number;
+    isCapped: boolean;
+}
+
 declare const cytoscape: any;
 declare const hljs: any;
 
@@ -119,6 +127,7 @@ class GitReaderApp {
     private tocList: HTMLElement;
     private codeSurface: HTMLElement;
     private canvasGraph: HTMLElement;
+    private canvasSurface: HTMLElement;
     private canvasOverlay: HTMLElement;
     private narratorOutput: HTMLElement;
     private modeButtons: NodeListOf<HTMLButtonElement>;
@@ -133,6 +142,9 @@ class GitReaderApp {
     private workspace: HTMLElement;
     private tocPill: HTMLElement;
     private tocSubtitle: HTMLElement;
+    private graphNodeStatus: HTMLElement;
+    private graphRevealButton: HTMLButtonElement;
+    private graphTooltip: HTMLElement;
     private repoForm: HTMLFormElement;
     private repoInput: HTMLInputElement;
     private localInput: HTMLInputElement;
@@ -150,21 +162,36 @@ class GitReaderApp {
     private fileNodesByPath: Map<string, SymbolNode> = new Map();
     private snippetCache: Map<string, SymbolSnippetResponse> = new Map();
     private graphCache: Map<string, ApiGraphResponse> = new Map();
+    private graphLoadPromises: Map<string, Promise<ApiGraphResponse>> = new Map();
     private narratorCache: Map<string, NarrationResponse> = new Map();
+    private graphNodeCapByScope: Map<string, number> = new Map();
     private narratorRequestToken = 0;
+    private chapterRequestToken = 0;
+    private graphRequestToken = 0;
     private narratorVisible = true;
     private graphInstance: any | null = null;
     private graphEventsBound = false;
     private edgeFilters: Set<EdgeKind> = new Set(['calls', 'imports', 'inherits', 'contains', 'blueprint']);
     private showExternalNodes = true;
+    private hoveredNodeId: string | null = null;
+    private currentScope = 'full';
+    private currentChapterId: string | null = null;
     private focusedNodeId: string | null = null;
     private currentSymbol: SymbolNode | null = null;
     private currentSnippetText = '';
+    private tocDebounceTimer: number | null = null;
+    private tocDebounceDelay = 200;
+    private pendingChapterId: string | null = null;
+    private graphNodeCap = 300;
+    private graphNodeCapStep = 200;
+    private labelZoomThreshold = 0.65;
+    private labelLineLength = 18;
 
     constructor() {
         this.tocList = this.getElement('toc-list');
         this.codeSurface = this.getElement('code-surface');
         this.canvasGraph = this.getElement('canvas-graph');
+        this.canvasSurface = this.getElement('canvas-surface');
         this.canvasOverlay = this.getElement('canvas-overlay');
         this.narratorOutput = this.getElement('narrator-output');
         this.modeButtons = document.querySelectorAll<HTMLButtonElement>('.mode-btn');
@@ -179,6 +206,10 @@ class GitReaderApp {
         this.workspace = this.getElement('workspace');
         this.tocPill = this.getElement('toc-pill');
         this.tocSubtitle = this.getElement('toc-subtitle');
+        this.graphNodeStatus = this.getElement('graph-node-status');
+        this.graphRevealButton = this.getElement('graph-reveal') as HTMLButtonElement;
+        this.graphTooltip = this.getElement('graph-tooltip');
+        this.graphRevealButton.disabled = true;
         this.repoForm = this.getElement('repo-picker') as HTMLFormElement;
         this.repoInput = this.getElement('repo-input') as HTMLInputElement;
         this.localInput = this.getElement('local-input') as HTMLInputElement;
@@ -313,7 +344,7 @@ class GitReaderApp {
             }
             const chapterId = target.dataset.chapterId;
             if (chapterId) {
-                void this.loadChapter(chapterId);
+                this.scheduleChapterLoad(chapterId);
             }
         });
 
@@ -371,6 +402,14 @@ class GitReaderApp {
                     this.focusOnSelected();
                 } else if (action === 'reset') {
                     this.resetGraphFocus();
+                } else if (action === 'reveal') {
+                    this.revealMoreNodes();
+                } else if (action === 'zoom-in') {
+                    this.zoomGraph(1.2);
+                } else if (action === 'zoom-out') {
+                    this.zoomGraph(0.8);
+                } else if (action === 'fit') {
+                    this.fitGraph();
                 }
             });
         });
@@ -427,6 +466,20 @@ class GitReaderApp {
         });
     }
 
+    private scheduleChapterLoad(chapterId: string): void {
+        this.pendingChapterId = chapterId;
+        this.setActiveToc(chapterId);
+        if (this.tocDebounceTimer !== null) {
+            window.clearTimeout(this.tocDebounceTimer);
+        }
+        this.tocDebounceTimer = window.setTimeout(() => {
+            this.tocDebounceTimer = null;
+            if (this.pendingChapterId) {
+                void this.loadChapter(this.pendingChapterId);
+            }
+        }, this.tocDebounceDelay);
+    }
+
     private async setTocMode(mode: TocMode): Promise<void> {
         if (this.tocMode === mode) {
             return;
@@ -480,15 +533,22 @@ class GitReaderApp {
     }
 
     private async loadChapter(chapterId: string): Promise<void> {
+        const requestToken = ++this.chapterRequestToken;
+        this.currentChapterId = chapterId;
         this.setActiveToc(chapterId);
         const chapter = this.chapters.find((entry) => entry.id === chapterId);
         const scope = chapter?.scope ?? this.getScopeForChapter(chapterId);
         this.focusedNodeId = null;
         await this.loadGraphForScope(scope);
+        if (requestToken !== this.chapterRequestToken) {
+            return;
+        }
         const nodes = this.filterNodesForChapter(chapterId);
         const edges = this.filterEdgesForNodes(nodes);
-        const focus = this.pickFocusNode(nodes);
-        this.renderGraph(nodes, edges);
+        const graphView = this.buildGraphView(nodes, edges, scope);
+        const focus = this.pickFocusNode(graphView.nodes);
+        this.renderGraph(graphView.nodes, graphView.edges);
+        this.updateGraphNodeStatus(graphView);
         this.loadSymbolSnippet(focus).catch(() => {
             this.renderCode(focus);
             void this.updateNarrator(focus);
@@ -503,16 +563,171 @@ class GitReaderApp {
     }
 
     private async loadGraphForScope(scope: string): Promise<void> {
+        if (this.currentScope === scope && this.graphNodes.length > 0) {
+            return;
+        }
+        const requestToken = ++this.graphRequestToken;
+        this.currentScope = scope;
         const cached = this.graphCache.get(scope);
         if (cached) {
             this.setGraphData(cached);
             return;
         }
-        const graphData = await this.fetchJson<ApiGraphResponse>(
-            this.buildApiUrl('/gitreader/api/graph', scope && scope !== 'full' ? { scope } : undefined),
-        );
+        let graphPromise = this.graphLoadPromises.get(scope);
+        if (!graphPromise) {
+            graphPromise = this.fetchJson<ApiGraphResponse>(
+                this.buildApiUrl('/gitreader/api/graph', scope && scope !== 'full' ? { scope } : undefined),
+            );
+            this.graphLoadPromises.set(scope, graphPromise);
+        }
+        const graphData = await graphPromise;
+        this.graphLoadPromises.delete(scope);
+        if (requestToken !== this.graphRequestToken) {
+            return;
+        }
         this.graphCache.set(scope, graphData);
         this.setGraphData(graphData);
+    }
+
+    private getNodeCapForScope(scope: string, totalNodes: number): number {
+        let cap = this.graphNodeCapByScope.get(scope);
+        if (cap === undefined) {
+            cap = Math.min(this.graphNodeCap, totalNodes);
+            this.graphNodeCapByScope.set(scope, cap);
+        } else if (cap > totalNodes) {
+            cap = totalNodes;
+            this.graphNodeCapByScope.set(scope, cap);
+        }
+        return cap;
+    }
+
+    private buildGraphView(nodes: SymbolNode[], edges: GraphEdge[], scope: string): GraphView {
+        const totalNodes = nodes.length;
+        const cap = this.getNodeCapForScope(scope, totalNodes);
+        if (cap >= totalNodes) {
+            return {
+                nodes,
+                edges,
+                totalNodes,
+                visibleNodes: totalNodes,
+                isCapped: false,
+            };
+        }
+        const nodeMap = new Map(nodes.map((node) => [node.id, node]));
+        const degree = new Map<string, number>();
+        edges.forEach((edge) => {
+            if (nodeMap.has(edge.source)) {
+                degree.set(edge.source, (degree.get(edge.source) ?? 0) + 1);
+            }
+            if (nodeMap.has(edge.target)) {
+                degree.set(edge.target, (degree.get(edge.target) ?? 0) + 1);
+            }
+        });
+        const keepIds = new Set<string>();
+        const selectedNodeId = this.getSelectedGraphNodeId();
+        if (selectedNodeId && nodeMap.has(selectedNodeId)) {
+            keepIds.add(selectedNodeId);
+        }
+        if (this.currentSymbol && nodeMap.has(this.currentSymbol.id)) {
+            keepIds.add(this.currentSymbol.id);
+            const fileNode = this.getFileNodeForSymbol(this.currentSymbol);
+            if (fileNode && nodeMap.has(fileNode.id)) {
+                keepIds.add(fileNode.id);
+            }
+        }
+        if (this.focusedNodeId && nodeMap.has(this.focusedNodeId)) {
+            keepIds.add(this.focusedNodeId);
+        }
+        const kindWeight: Partial<Record<SymbolKind, number>> = {
+            function: 0,
+            method: 1,
+            class: 2,
+            file: 3,
+            blueprint: 4,
+            external: 5,
+        };
+        const sorted = nodes.slice().sort((a, b) => {
+            const aDegree = degree.get(a.id) ?? 0;
+            const bDegree = degree.get(b.id) ?? 0;
+            if (aDegree !== bDegree) {
+                return bDegree - aDegree;
+            }
+            const aWeight = kindWeight[a.kind] ?? 10;
+            const bWeight = kindWeight[b.kind] ?? 10;
+            if (aWeight !== bWeight) {
+                return aWeight - bWeight;
+            }
+            return a.name.localeCompare(b.name);
+        });
+        const targetSize = Math.max(cap, keepIds.size);
+        const selectedNodes: SymbolNode[] = [];
+        sorted.forEach((node) => {
+            if (keepIds.has(node.id)) {
+                selectedNodes.push(node);
+            }
+        });
+        for (const node of sorted) {
+            if (selectedNodes.length >= targetSize) {
+                break;
+            }
+            if (keepIds.has(node.id)) {
+                continue;
+            }
+            selectedNodes.push(node);
+        }
+        const selectedIds = new Set(selectedNodes.map((node) => node.id));
+        const trimmedEdges = edges.filter((edge) => selectedIds.has(edge.source) && selectedIds.has(edge.target));
+        return {
+            nodes: selectedNodes,
+            edges: trimmedEdges,
+            totalNodes,
+            visibleNodes: selectedNodes.length,
+            isCapped: totalNodes > selectedNodes.length,
+        };
+    }
+
+    private updateGraphNodeStatus(graphView: GraphView): void {
+        if (graphView.totalNodes === 0) {
+            this.graphNodeStatus.textContent = '';
+            this.graphRevealButton.disabled = true;
+            return;
+        }
+        if (!graphView.isCapped) {
+            this.graphNodeStatus.textContent = `Showing ${graphView.visibleNodes} nodes`;
+            this.graphRevealButton.disabled = true;
+            this.graphRevealButton.textContent = 'Show more';
+            return;
+        }
+        this.graphNodeStatus.textContent = `Showing ${graphView.visibleNodes} of ${graphView.totalNodes}`;
+        const nextCap = Math.min(graphView.totalNodes, graphView.visibleNodes + this.graphNodeCapStep);
+        this.graphRevealButton.textContent = nextCap >= graphView.totalNodes ? 'Show all' : 'Show more';
+        this.graphRevealButton.disabled = false;
+    }
+
+    private revealMoreNodes(): void {
+        if (!this.currentChapterId) {
+            return;
+        }
+        const nodes = this.filterNodesForChapter(this.currentChapterId);
+        const total = nodes.length;
+        const cap = this.getNodeCapForScope(this.currentScope, total);
+        if (cap >= total) {
+            return;
+        }
+        const nextCap = Math.min(total, cap + this.graphNodeCapStep);
+        this.graphNodeCapByScope.set(this.currentScope, nextCap);
+        this.refreshGraphView();
+    }
+
+    private refreshGraphView(): void {
+        if (!this.currentChapterId) {
+            return;
+        }
+        const nodes = this.filterNodesForChapter(this.currentChapterId);
+        const edges = this.filterEdgesForNodes(nodes);
+        const graphView = this.buildGraphView(nodes, edges, this.currentScope);
+        this.renderGraph(graphView.nodes, graphView.edges);
+        this.updateGraphNodeStatus(graphView);
     }
 
     private setGraphData(graphData: ApiGraphResponse): void {
@@ -855,9 +1070,16 @@ class GitReaderApp {
         }
         this.setCanvasOverlay('', false);
         this.ensureGraph();
+        const selectedNodeId = this.getSelectedGraphNodeId();
         const elements = this.buildGraphElements(nodes, edges);
         this.graphInstance.elements().remove();
         this.graphInstance.add(elements);
+        if (selectedNodeId) {
+            const selected = this.graphInstance.$id(selectedNodeId);
+            if (selected) {
+                selected.select();
+            }
+        }
         this.runGraphLayout();
         this.applyGraphFilters();
     }
@@ -882,13 +1104,14 @@ class GitReaderApp {
         if (this.graphInstance) {
             this.graphInstance.elements().remove();
         }
+        this.hideGraphTooltip();
     }
 
     private bindGraphEvents(): void {
         if (this.graphEventsBound || !this.graphInstance) {
             return;
         }
-        this.graphInstance.on('tap', 'node', (event: { target: { id: () => string }; originalEvent?: MouseEvent }) => {
+        this.graphInstance.on('tap', 'node', (event: { target: { id: () => string; select: () => void }; originalEvent?: MouseEvent }) => {
             const nodeId = event.target.id();
             const node = this.nodeById.get(nodeId);
             if (!node) {
@@ -903,18 +1126,52 @@ class GitReaderApp {
                 void this.updateNarrator(node);
             });
         });
+        this.graphInstance.on('select', 'node', () => {
+            this.refreshEdgeHighlights();
+            this.updateLabelVisibility();
+        });
+        this.graphInstance.on('unselect', 'node', () => {
+            this.refreshEdgeHighlights();
+            this.updateLabelVisibility();
+        });
+        this.graphInstance.on('mouseover', 'node', (event: any) => {
+            const nodeId = event.target.id();
+            event.target.addClass('is-hovered');
+            this.setHoveredNode(nodeId);
+            this.showGraphTooltip(event.target, event);
+            this.updateLabelVisibility();
+        });
+        this.graphInstance.on('mouseout', 'node', (event: any) => {
+            event.target.removeClass('is-hovered');
+            this.setHoveredNode(null);
+            this.hideGraphTooltip();
+            this.updateLabelVisibility();
+        });
+        this.graphInstance.on('mousemove', 'node', (event: any) => {
+            this.updateTooltipPosition(event);
+        });
+        this.graphInstance.on('zoom', () => {
+            this.updateLabelVisibility();
+        });
         this.graphEventsBound = true;
     }
 
     private buildGraphElements(nodes: SymbolNode[], edges: GraphEdge[]): Array<{ data: Record<string, unknown> }> {
-        const nodeElements = nodes.map((node) => ({
-            data: {
-                id: node.id,
-                label: node.name,
-                kind: node.kind,
-                summary: node.summary || '',
-            },
-        }));
+        const nodeElements = nodes.map((node) => {
+            const labelData = this.formatNodeLabel(node);
+            return {
+                data: {
+                    id: node.id,
+                    label: labelData.label,
+                    fullLabel: labelData.fullLabel,
+                    kindLabel: labelData.kindLabel,
+                    kind: node.kind,
+                    summary: node.summary || '',
+                    path: labelData.path,
+                    labelVisible: 'true',
+                },
+            };
+        });
         const edgeElements = edges.map((edge, index) => ({
             data: {
                 id: `edge:${edge.source}:${edge.target}:${edge.kind}:${index}`,
@@ -927,6 +1184,89 @@ class GitReaderApp {
         return [...nodeElements, ...edgeElements];
     }
 
+    private formatNodeLabel(node: SymbolNode): { label: string; fullLabel: string; path: string; kindLabel: string } {
+        const path = node.location?.path ?? '';
+        const fullLabel = node.name || path;
+        const displayName = this.getDisplayName(node, fullLabel, path);
+        const badge = this.getKindBadge(node.kind);
+        const kindLabel = this.getKindLabel(node.kind);
+        const label = this.wrapLabel(`[${badge}]`, displayName);
+        return { label, fullLabel, path, kindLabel };
+    }
+
+    private getDisplayName(node: SymbolNode, fullLabel: string, path: string): string {
+        if (node.kind === 'file') {
+            return this.getBasename(path || fullLabel);
+        }
+        return fullLabel || node.name;
+    }
+
+    private getBasename(value: string): string {
+        const normalized = value.replace(/\\/g, '/');
+        const parts = normalized.split('/');
+        return parts.length > 0 ? parts[parts.length - 1] : value;
+    }
+
+    private wrapLabel(prefix: string, name: string): string {
+        const normalized = name.replace(/\s+/g, ' ').trim();
+        if (!normalized) {
+            return prefix;
+        }
+        const lineLength = Math.max(8, this.labelLineLength);
+        const prefixText = prefix ? `${prefix} ` : '';
+        const firstLineLimit = Math.max(4, lineLength - prefixText.length);
+        const firstPart = normalized.slice(0, firstLineLimit);
+        let remaining = normalized.slice(firstPart.length).trimStart();
+        let label = `${prefixText}${firstPart}`;
+        if (remaining) {
+            let secondPart = remaining.slice(0, lineLength);
+            if (remaining.length > lineLength) {
+                const trimmed = secondPart.slice(0, Math.max(0, lineLength - 3));
+                secondPart = `${trimmed}...`;
+            }
+            label += `\n${secondPart}`;
+        }
+        return label;
+    }
+
+    private getKindBadge(kind: SymbolKind): string {
+        switch (kind) {
+            case 'file':
+                return 'F';
+            case 'class':
+                return 'C';
+            case 'function':
+                return 'fn';
+            case 'method':
+                return 'm';
+            case 'blueprint':
+                return 'bp';
+            case 'external':
+                return 'ext';
+            default:
+                return 'id';
+        }
+    }
+
+    private getKindLabel(kind: SymbolKind): string {
+        switch (kind) {
+            case 'file':
+                return 'File';
+            case 'class':
+                return 'Class';
+            case 'function':
+                return 'Function';
+            case 'method':
+                return 'Method';
+            case 'blueprint':
+                return 'Blueprint';
+            case 'external':
+                return 'External';
+            default:
+                return 'Symbol';
+        }
+    }
+
     private getGraphStyles(): Array<Record<string, object>> {
         return [
             {
@@ -934,17 +1274,24 @@ class GitReaderApp {
                 style: {
                     'background-color': '#e9dfcf',
                     'label': 'data(label)',
-                    'font-size': '11px',
+                    'font-size': '12px',
                     'font-family': 'Space Grotesk, sans-serif',
                     'text-wrap': 'wrap',
-                    'text-max-width': '110px',
+                    'text-max-width': '120px',
                     'text-valign': 'center',
                     'text-halign': 'center',
                     'color': '#1e1914',
                     'border-width': 1,
                     'border-color': '#d2c2ad',
-                    'padding': '8px',
+                    'padding': '10px',
                     'shape': 'round-rectangle',
+                },
+            },
+            {
+                selector: 'node[labelVisible = "false"]',
+                style: {
+                    'text-opacity': 0,
+                    'text-background-opacity': 0,
                 },
             },
             {
@@ -976,11 +1323,22 @@ class GitReaderApp {
                 style: {
                     'border-width': 2,
                     'border-color': '#237a78',
-                    'shadow-blur': 12,
+                    'shadow-blur': 18,
                     'shadow-color': '#237a78',
-                    'shadow-opacity': 0.35,
+                    'shadow-opacity': 0.5,
                     'shadow-offset-x': 0,
                     'shadow-offset-y': 0,
+                },
+            },
+            {
+                selector: 'node.is-hovered',
+                style: {
+                    'text-opacity': 1,
+                    'text-background-opacity': 1,
+                    'shadow-blur': 16,
+                    'shadow-color': '#237a78',
+                    'shadow-opacity': 0.45,
+                    'z-index': 10,
                 },
             },
             {
@@ -988,10 +1346,19 @@ class GitReaderApp {
                 style: {
                     'line-color': '#bcae9c',
                     'width': 1,
-                    'curve-style': 'bezier',
+                    'curve-style': 'unbundled-bezier',
+                    'control-point-distances': 40,
+                    'control-point-weights': 0.5,
                     'target-arrow-shape': 'triangle',
                     'target-arrow-color': '#bcae9c',
-                    'opacity': 0.7,
+                    'opacity': 0.2,
+                },
+            },
+            {
+                selector: 'edge.is-active',
+                style: {
+                    'opacity': 0.75,
+                    'width': 2,
                 },
             },
             {
@@ -1016,9 +1383,84 @@ class GitReaderApp {
             },
             {
                 selector: 'edge[confidence = "low"]',
-                style: { 'line-style': 'dashed', 'opacity': 0.45 },
+                style: { 'line-style': 'dashed', 'opacity': 0.15 },
             },
         ];
+    }
+
+    private refreshEdgeHighlights(): void {
+        if (!this.graphInstance) {
+            return;
+        }
+        const cy = this.graphInstance;
+        cy.edges().removeClass('is-active');
+        const selectedNodes = cy.$('node:selected');
+        selectedNodes.forEach((node: any) => {
+            node.connectedEdges().addClass('is-active');
+        });
+        if (this.hoveredNodeId) {
+            const hovered = cy.getElementById(this.hoveredNodeId);
+            if (hovered && !hovered.empty()) {
+                hovered.connectedEdges().addClass('is-active');
+            }
+        }
+    }
+
+    private updateLabelVisibility(): void {
+        if (!this.graphInstance) {
+            return;
+        }
+        const zoom = this.graphInstance.zoom();
+        const showAll = zoom >= this.labelZoomThreshold;
+        this.graphInstance.nodes().forEach((node: any) => {
+            const shouldShow = showAll || node.selected() || node.hasClass('is-hovered');
+            node.data('labelVisible', shouldShow ? 'true' : 'false');
+        });
+    }
+
+    private setHoveredNode(nodeId: string | null): void {
+        this.hoveredNodeId = nodeId;
+        this.refreshEdgeHighlights();
+    }
+
+    private showGraphTooltip(node: any, event: any): void {
+        if (!this.graphTooltip) {
+            return;
+        }
+        const fullLabel = node.data('fullLabel') || node.data('label');
+        const kindLabel = node.data('kindLabel') || node.data('kind');
+        const path = node.data('path');
+        const details = path ? `${kindLabel} - ${path}` : kindLabel;
+        this.graphTooltip.innerHTML = `
+            <div class="tooltip-title">${this.escapeHtml(String(fullLabel))}</div>
+            <div class="tooltip-meta">${this.escapeHtml(String(details))}</div>
+        `;
+        this.graphTooltip.setAttribute('aria-hidden', 'false');
+        this.graphTooltip.classList.add('is-visible');
+        this.updateTooltipPosition(event);
+    }
+
+    private hideGraphTooltip(): void {
+        if (!this.graphTooltip) {
+            return;
+        }
+        this.graphTooltip.classList.remove('is-visible');
+        this.graphTooltip.setAttribute('aria-hidden', 'true');
+    }
+
+    private updateTooltipPosition(event: any): void {
+        if (!this.graphTooltip || !this.canvasSurface) {
+            return;
+        }
+        const rendered = event.renderedPosition || event.position;
+        if (!rendered) {
+            return;
+        }
+        const offset = 12;
+        const surfaceRect = this.canvasSurface.getBoundingClientRect();
+        const x = Math.min(surfaceRect.width - 20, Math.max(0, rendered.x + offset));
+        const y = Math.min(surfaceRect.height - 20, Math.max(0, rendered.y + offset));
+        this.graphTooltip.style.transform = `translate(${x}px, ${y}px)`;
     }
 
     private runGraphLayout(): void {
@@ -1027,6 +1469,7 @@ class GitReaderApp {
         }
         const layout = this.graphInstance.layout(this.getLayoutOptions());
         layout.run();
+        this.updateLabelVisibility();
     }
 
     private async updateNarrator(symbol: SymbolNode): Promise<void> {
@@ -1179,7 +1622,7 @@ class GitReaderApp {
         return active.dataset.chapterId ?? null;
     }
 
-    private getSelectedGraphNode(): SymbolNode | null {
+    private getSelectedGraphNodeId(): string | null {
         if (!this.graphInstance) {
             return null;
         }
@@ -1187,7 +1630,14 @@ class GitReaderApp {
         if (!selected || selected.length === 0) {
             return null;
         }
-        const nodeId = selected[0].id();
+        return selected[0].id();
+    }
+
+    private getSelectedGraphNode(): SymbolNode | null {
+        const nodeId = this.getSelectedGraphNodeId();
+        if (!nodeId) {
+            return null;
+        }
         return this.nodeById.get(nodeId) ?? null;
     }
 
@@ -1217,6 +1667,7 @@ class GitReaderApp {
         }
         this.graphInstance.resize();
         this.graphInstance.fit();
+        this.updateLabelVisibility();
     }
 
     private hasHighlightSupport(): boolean {
@@ -1346,6 +1797,8 @@ class GitReaderApp {
             }
         });
         this.applyFocus();
+        this.refreshEdgeHighlights();
+        this.updateLabelVisibility();
     }
 
     private focusOnSelected(): void {
@@ -1384,6 +1837,31 @@ class GitReaderApp {
         cy.fit(focusElements, 40);
     }
 
+    private zoomGraph(factor: number): void {
+        if (!this.graphInstance) {
+            return;
+        }
+        const current = this.graphInstance.zoom();
+        const next = Math.min(2.5, Math.max(0.2, current * factor));
+        const rect = this.canvasGraph.getBoundingClientRect();
+        this.graphInstance.zoom({
+            level: next,
+            renderedPosition: {
+                x: rect.width / 2,
+                y: rect.height / 2,
+            },
+        });
+        this.updateLabelVisibility();
+    }
+
+    private fitGraph(): void {
+        if (!this.graphInstance) {
+            return;
+        }
+        this.graphInstance.fit(undefined, 40);
+        this.updateLabelVisibility();
+    }
+
     private updateGraphControls(): void {
         this.graphLayoutButtons.forEach((button) => {
             button.classList.toggle('is-active', button.dataset.layoutAction === this.graphLayoutMode);
@@ -1402,14 +1880,28 @@ class GitReaderApp {
         });
     }
 
-    private getLayoutOptions(): { name: string; animate: boolean; fit: boolean; padding: number; directed?: boolean } {
+    private getLayoutOptions(): {
+        name: string;
+        animate: boolean;
+        fit: boolean;
+        padding: number;
+        directed?: boolean;
+        spacingFactor?: number;
+        avoidOverlap?: boolean;
+        avoidOverlapPadding?: number;
+        nodeDimensionsIncludeLabels?: boolean;
+    } {
         if (this.graphLayoutMode === 'layer') {
             return {
                 name: 'breadthfirst',
                 animate: false,
                 fit: true,
-                padding: 24,
+                padding: 36,
                 directed: true,
+                spacingFactor: 1.35,
+                avoidOverlap: true,
+                avoidOverlapPadding: 24,
+                nodeDimensionsIncludeLabels: true,
             };
         }
         if (this.graphLayoutMode === 'free') {
