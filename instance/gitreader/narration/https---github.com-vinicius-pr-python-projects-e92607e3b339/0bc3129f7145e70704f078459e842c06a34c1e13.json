@@ -1,0 +1,43 @@
+{
+  "created_at": 1768157959.523913,
+  "response": {
+    "cached": false,
+    "connections": [
+      "contains <- Numbers/Quadratic Equation/Quadratic Equation.py"
+    ],
+    "hook": "Function to determine the nature of a quadratic equation based on its leading coefficient.",
+    "key_lines": [
+      {
+        "line": 57,
+        "text": "def check_route(a):"
+      },
+      {
+        "line": 58,
+        "text": "if a > 0:"
+      },
+      {
+        "line": 59,
+        "text": "return \"This quadratic equation is Ascending\""
+      },
+      {
+        "line": 60,
+        "text": "else:"
+      },
+      {
+        "line": 61,
+        "text": "return \"This quadratic equation is Descending\""
+      }
+    ],
+    "mode": "summary",
+    "model": "gpt-4o-mini",
+    "next_thread": "Follow the nearest referenced symbol to continue the thread.",
+    "prompt_version": "v1",
+    "source": "openai",
+    "summary": [
+      "The function 'check_route' evaluates the coefficient 'a' of a quadratic equation.",
+      "It returns a string indicating whether the equation is ascending or descending."
+    ],
+    "symbol_id": "symbol:Numbers.Quadratic Equation.Quadratic Equation.check_route",
+    "symbol_name": "check_route"
+  }
+}

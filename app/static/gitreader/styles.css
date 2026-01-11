@@ -141,16 +141,16 @@ body {
 .workspace {
     flex: 1;
     display: grid;
-    grid-template-columns: minmax(220px, 0.8fr) minmax(320px, 1.2fr) minmax(320px, 1fr) minmax(260px, 0.9fr);
-    grid-template-areas: "toc code canvas narrator";
+    grid-template-columns: minmax(320px, 1.4fr) minmax(320px, 1fr);
+    grid-template-areas: "code canvas";
     gap: 16px;
-    padding: 20px 24px 28px;
+    padding: 2px 24px 24px;
     min-height: 0;
 }
 
 .workspace[data-layout="reader"] {
-    grid-template-columns: minmax(220px, 0.9fr) minmax(320px, 1.4fr) minmax(260px, 0.9fr);
-    grid-template-areas: "toc code narrator";
+    grid-template-columns: 1fr;
+    grid-template-areas: "code";
 }
 
 .workspace[data-layout="reader"] .canvas-pane {
@@ -158,32 +158,14 @@ body {
 }
 
 .workspace[data-layout="canvas"] {
-    grid-template-columns: minmax(220px, 0.9fr) minmax(320px, 1.4fr) minmax(260px, 0.9fr);
-    grid-template-areas: "toc canvas narrator";
+    grid-template-columns: 1fr;
+    grid-template-areas: "canvas";
 }
 
 .workspace[data-layout="canvas"] .code-pane {
     display: none;
 }
 
-.workspace.is-narrator-hidden {
-    grid-template-columns: minmax(220px, 0.8fr) minmax(320px, 1.2fr) minmax(320px, 1fr);
-    grid-template-areas: "toc code canvas";
-}
-
-.workspace.is-narrator-hidden .narrator-pane {
-    display: none;
-}
-
-.workspace[data-layout="reader"].is-narrator-hidden {
-    grid-template-columns: minmax(220px, 0.9fr) minmax(320px, 1.4fr);
-    grid-template-areas: "toc code";
-}
-
-.workspace[data-layout="canvas"].is-narrator-hidden {
-    grid-template-columns: minmax(220px, 0.9fr) minmax(320px, 1.4fr);
-    grid-template-areas: "toc canvas";
-}
 
 .pane {
     background: var(--panel);
@@ -199,9 +181,20 @@ body {
     animation-delay: var(--delay, 0s);
 }
 
-.toc-pane {
-    grid-area: toc;
+.toc-header {
+    margin: 0 24px 12px;
     --delay: 0.05s;
+}
+
+.narrator-header {
+    margin: 0 24px 6px;
+    --delay: 0.1s;
+    padding: 8px 12px;
+    gap: 6px;
+}
+
+.narrator-header.is-hidden {
+    display: none;
 }
 
 .code-pane {
@@ -214,10 +207,6 @@ body {
     --delay: 0.18s;
 }
 
-.narrator-pane {
-    grid-area: narrator;
-    --delay: 0.24s;
-}
 
 .pane-header {
     display: flex;
@@ -250,9 +239,12 @@ body {
 .toc-list {
     list-style: none;
     margin: 0;
-    padding: 0;
-    display: grid;
-    gap: 10px;
+    padding: 0 0 6px;
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x proximity;
 }
 
 .toc-item {
@@ -262,6 +254,10 @@ body {
     border-radius: 12px;
     cursor: pointer;
     transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+    min-width: 220px;
+    max-width: 260px;
+    flex: 0 0 auto;
+    scroll-snap-align: start;
 }
 
 .toc-item:hover {
@@ -284,6 +280,10 @@ body {
     margin: 0;
     color: var(--muted-ink);
     font-size: 13px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 
 .code-surface {
@@ -636,10 +636,10 @@ body {
     background: #fffdf8;
     border: 1px solid var(--line);
     border-radius: 16px;
-    padding: 16px;
-    min-height: 220px;
+    padding: 8px 10px;
+    min-height: 160px;
     display: grid;
-    gap: 10px;
+    gap: 8px;
 }
 
 .narrator-output h3 {
@@ -668,69 +668,48 @@ body {
 
 @media (max-width: 1100px) {
     .workspace {
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: 1fr;
         grid-template-areas:
-            "toc toc"
-            "code code"
-            "canvas narrator";
+            "code"
+            "canvas";
     }
 
     .workspace[data-layout="reader"] {
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: 1fr;
         grid-template-areas:
-            "toc toc"
-            "code code"
-            "narrator narrator";
+            "code";
     }
 
     .workspace[data-layout="canvas"] {
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: 1fr;
         grid-template-areas:
-            "toc toc"
-            "canvas canvas"
-            "narrator narrator";
+            "canvas";
     }
 
-    .workspace.is-narrator-hidden {
-        grid-template-areas:
-            "toc toc"
-            "code code"
-            "canvas canvas";
-    }
-
-    .workspace[data-layout="reader"].is-narrator-hidden {
-        grid-template-areas:
-            "toc toc"
-            "code code";
-    }
-
-    .workspace[data-layout="canvas"].is-narrator-hidden {
-        grid-template-areas:
-            "toc toc"
-            "canvas canvas";
+    .narrator-header {
+        margin: 0 16px 6px;
     }
 }
 
 @media (max-width: 820px) {
+    .toc-header {
+        margin: 0 16px 12px;
+    }
+
+    .narrator-header {
+        margin: 0 16px 6px;
+    }
+
     .workspace {
         grid-template-columns: 1fr;
         grid-template-areas:
-            "toc"
             "code"
-            "canvas"
-            "narrator";
+            "canvas";
     }
 
     .workspace[data-layout="reader"],
     .workspace[data-layout="canvas"] {
         grid-template-columns: 1fr;
-    }
-
-    .workspace.is-narrator-hidden {
-        grid-template-areas:
-            "toc"
-            "code"
-            "canvas";
     }
 
     .nav-actions {

@@ -145,6 +145,7 @@ class GitReaderApp {
     private graphNodeStatus: HTMLElement;
     private graphRevealButton: HTMLButtonElement;
     private graphTooltip: HTMLElement;
+    private narratorPane: HTMLElement;
     private repoForm: HTMLFormElement;
     private repoInput: HTMLInputElement;
     private localInput: HTMLInputElement;
@@ -209,6 +210,7 @@ class GitReaderApp {
         this.graphNodeStatus = this.getElement('graph-node-status');
         this.graphRevealButton = this.getElement('graph-reveal') as HTMLButtonElement;
         this.graphTooltip = this.getElement('graph-tooltip');
+        this.narratorPane = this.getElement('narrator');
         this.graphRevealButton.disabled = true;
         this.repoForm = this.getElement('repo-picker') as HTMLFormElement;
         this.repoInput = this.getElement('repo-input') as HTMLInputElement;
@@ -434,7 +436,7 @@ class GitReaderApp {
 
         this.narratorToggle.addEventListener('click', () => {
             this.narratorVisible = !this.narratorVisible;
-            this.workspace.classList.toggle('is-narrator-hidden', !this.narratorVisible);
+            this.narratorPane.classList.toggle('is-hidden', !this.narratorVisible);
             this.updateNarratorToggle();
             this.refreshGraphViewport();
         });

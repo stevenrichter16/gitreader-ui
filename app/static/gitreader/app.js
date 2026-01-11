@@ -40,6 +40,7 @@
         this.graphNodeStatus = getElement('graph-node-status');
         this.graphRevealButton = getElement('graph-reveal');
         this.graphTooltip = getElement('graph-tooltip');
+        this.narratorPane = getElement('narrator');
         this.graphRevealButton.disabled = true;
         this.repoForm = getElement('repo-picker');
         this.repoInput = getElement('repo-input');
@@ -295,7 +296,7 @@
 
         this.narratorToggle.addEventListener('click', function () {
             _this.narratorVisible = !_this.narratorVisible;
-            _this.workspace.classList.toggle('is-narrator-hidden', !_this.narratorVisible);
+            _this.narratorPane.classList.toggle('is-hidden', !_this.narratorVisible);
             _this.updateNarratorToggle();
             _this.refreshGraphViewport();
         });

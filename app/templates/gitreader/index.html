@@ -60,15 +60,34 @@
       </div>
     </header>
 
-    <main class="workspace" id="workspace" data-layout="both">
-      <section class="pane toc-pane" id="toc" aria-label="Table of contents">
-        <div class="pane-header">
-          <h2>Table of Contents</h2>
-          <span class="pill" id="toc-pill">story</span>
+    <section class="pane toc-header" id="toc" aria-label="Table of contents">
+      <div class="pane-header">
+        <h2>Table of Contents</h2>
+        <span class="pill" id="toc-pill">story</span>
+      </div>
+      <p class="pane-subtitle" id="toc-subtitle">Follow the story arc of the repository.</p>
+      <ul class="toc-list" id="toc-list"></ul>
+    </section>
+
+    <section class="pane narrator-header" id="narrator" aria-label="Narrator">
+      <div class="pane-header">
+        <h2>Narrator</h2>
+        <div class="mode-buttons" id="mode-buttons" role="group" aria-label="Narration modes">
+          <button class="mode-btn is-active" data-mode="hook">Hook</button>
+          <button class="mode-btn" data-mode="summary">What it does</button>
+          <button class="mode-btn" data-mode="key_lines">Key lines</button>
+          <button class="mode-btn" data-mode="connections">Connections</button>
+          <button class="mode-btn" data-mode="next">Next thread</button>
         </div>
-        <p class="pane-subtitle" id="toc-subtitle">Follow the story arc of the repository.</p>
-        <ul class="toc-list" id="toc-list"></ul>
-      </section>
+      </div>
+      <div class="narrator-output" id="narrator-output">
+        <p class="eyebrow">Scene</p>
+        <h3>Waiting for your selection</h3>
+        <p>Choose a chapter to begin the narrative.</p>
+      </div>
+    </section>
+
+    <main class="workspace" id="workspace" data-layout="both">
 
       <section class="pane code-pane" id="code-view" aria-label="Reader mode">
         <div class="pane-header">
@@ -127,23 +146,6 @@
         </div>
       </section>
 
-      <section class="pane narrator-pane" id="narrator" aria-label="Narrator">
-        <div class="pane-header">
-          <h2>Narrator</h2>
-          <div class="mode-buttons" id="mode-buttons" role="group" aria-label="Narration modes">
-            <button class="mode-btn is-active" data-mode="hook">Hook</button>
-            <button class="mode-btn" data-mode="summary">What it does</button>
-            <button class="mode-btn" data-mode="key_lines">Key lines</button>
-            <button class="mode-btn" data-mode="connections">Connections</button>
-            <button class="mode-btn" data-mode="next">Next thread</button>
-          </div>
-        </div>
-        <div class="narrator-output" id="narrator-output">
-          <p class="eyebrow">Scene</p>
-          <h3>Waiting for your selection</h3>
-          <p>Choose a chapter to begin the narrative.</p>
-        </div>
-      </section>
     </main>
   </div>
 
