@@ -1,0 +1,36 @@
+{
+  "created_at": 1768186747.3081129,
+  "response": {
+    "cached": false,
+    "connections": [
+      "calls -> app.route (external)"
+    ],
+    "hook": "hello hints at the next beat in the code story.",
+    "key_lines": [
+      {
+        "line": 9,
+        "text": "Decorators"
+      },
+      {
+        "line": 10,
+        "text": "Signature"
+      },
+      {
+        "line": 11,
+        "text": "Body Start"
+      }
+    ],
+    "mode": "summary",
+    "model": "gpt-4o-mini",
+    "next_thread": "Follow the nearest referenced symbol to continue the thread.",
+    "prompt_version": "v1",
+    "source": "fallback",
+    "summary": [
+      "hello establishes a new step in the flow.",
+      "It wires together a small slice of behavior.",
+      "The shape suggests where the next chapter connects."
+    ],
+    "symbol_id": "symbol:app.hello",
+    "symbol_name": "hello"
+  }
+}

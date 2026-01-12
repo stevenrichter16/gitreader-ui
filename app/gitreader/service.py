@@ -6,8 +6,9 @@ from typing import Optional
 
 from . import ingest, scan, storage
 from .graph import build_graph
-from .models import RepoIndex, RepoSpec
+from .models import ParseWarning, RepoIndex, RepoSpec
 from .parse_python import parse_files
+from .story import build_story_arcs
 
 
 DEFAULT_MAX_FILE_SIZE = 512 * 1024
@@ -133,6 +134,20 @@ def get_symbol_snippet(
     payload['warnings'] = [warning.to_dict() for warning in index.warnings]
     payload['stats'] = dict(index.stats)
     return payload
+
+
+def get_story_arcs(
+    spec: RepoSpec,
+    cache_root: str,
+    max_file_size: int = DEFAULT_MAX_FILE_SIZE,
+    max_files: Optional[int] = DEFAULT_MAX_FILES,
+) -> tuple[RepoIndex, list[dict[str, object]], list[ParseWarning]]:
+    index = get_repo_index(spec, cache_root=cache_root, max_file_size=max_file_size, max_files=max_files)
+    scan_result = scan.scan_repo(index.root_path, max_file_size=max_file_size, max_files=max_files)
+    parsed = parse_files(index.root_path, scan_result.python_files)
+    arcs = build_story_arcs(index, parsed.files)
+    warnings = scan_result.warnings + parsed.warnings
+    return index, arcs, warnings
 
 
 def build_symbol_snippet(

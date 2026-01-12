@@ -1,0 +1,35 @@
+{
+  "created_at": 1768186774.874511,
+  "response": {
+    "cached": false,
+    "connections": [
+      "contains -> main (function)",
+      "contains -> hello (function)",
+      "imports -> os (external)",
+      "imports -> flask (external)"
+    ],
+    "hook": "app.py hints at the next beat in the code story.",
+    "key_lines": [
+      {
+        "line": 1,
+        "text": "Snippet Start"
+      },
+      {
+        "line": 14,
+        "text": "Snippet End"
+      }
+    ],
+    "mode": "key_lines",
+    "model": "gpt-4o-mini",
+    "next_thread": "Follow the nearest referenced symbol to continue the thread.",
+    "prompt_version": "v1",
+    "source": "fallback",
+    "summary": [
+      "app.py establishes a new step in the flow.",
+      "It wires together a small slice of behavior.",
+      "The shape suggests where the next chapter connects."
+    ],
+    "symbol_id": "file:app.py",
+    "symbol_name": "app.py"
+  }
+}

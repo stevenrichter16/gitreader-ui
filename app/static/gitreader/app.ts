@@ -1,6 +1,6 @@
 type NarrationMode = 'hook' | 'summary' | 'key_lines' | 'connections' | 'next';
 
-type TocMode = 'story' | 'tree';
+type TocMode = 'story' | 'tree' | 'routes';
 
 type SymbolKind = 'file' | 'class' | 'function' | 'method' | 'external' | 'blueprint';
 
@@ -41,6 +41,35 @@ interface ChapterSummary {
     scope?: string;
 }
 
+interface StoryRouteInfo {
+    path: string;
+    methods: string[];
+    handler_id: string;
+    handler_name: string;
+    module: string;
+    file_path: string;
+    line: number;
+}
+
+interface StoryScene {
+    id: string;
+    name: string;
+    kind: SymbolKind;
+    file_path: string;
+    line: number;
+    role: string;
+}
+
+interface StoryArc {
+    id: string;
+    title: string;
+    summary: string;
+    entry_id: string;
+    route: StoryRouteInfo;
+    scenes: StoryScene[];
+    scene_count: number;
+}
+
 interface ApiWarning {
     code: string;
     message: string;
@@ -59,6 +88,12 @@ interface ApiGraphResponse {
     nodes: SymbolNode[];
     edges: GraphEdge[];
     scope?: string;
+    stats?: Record<string, number>;
+    warnings?: ApiWarning[];
+}
+
+interface ApiStoryResponse {
+    arcs: StoryArc[];
     stats?: Record<string, number>;
     warnings?: ApiWarning[];
 }
@@ -146,6 +181,9 @@ class GitReaderApp {
     private graphRevealButton: HTMLButtonElement;
     private graphTooltip: HTMLElement;
     private narratorPane: HTMLElement;
+    private routePicker: HTMLElement;
+    private routeSelect: HTMLSelectElement;
+    private routeJump: HTMLButtonElement;
     private repoForm: HTMLFormElement;
     private repoInput: HTMLInputElement;
     private localInput: HTMLInputElement;
@@ -157,6 +195,9 @@ class GitReaderApp {
     private snippetMode: SnippetMode = 'body';
     private graphLayoutMode: GraphLayoutMode = 'cluster';
     private chapters: ChapterSummary[] = [];
+    private storyArcs: StoryArc[] = [];
+    private storyArcsById: Map<string, StoryArc> = new Map();
+    private activeStoryArc: StoryArc | null = null;
     private graphNodes: SymbolNode[] = [];
     private graphEdges: GraphEdge[] = [];
     private nodeById: Map<string, SymbolNode> = new Map();
@@ -211,7 +252,12 @@ class GitReaderApp {
         this.graphRevealButton = this.getElement('graph-reveal') as HTMLButtonElement;
         this.graphTooltip = this.getElement('graph-tooltip');
         this.narratorPane = this.getElement('narrator');
+        this.routePicker = this.getElement('route-picker');
+        this.routeSelect = this.getElement('route-select') as HTMLSelectElement;
+        this.routeJump = this.getElement('route-jump') as HTMLButtonElement;
         this.graphRevealButton.disabled = true;
+        this.routeSelect.disabled = true;
+        this.routeJump.disabled = true;
         this.repoForm = this.getElement('repo-picker') as HTMLFormElement;
         this.repoInput = this.getElement('repo-input') as HTMLInputElement;
         this.localInput = this.getElement('local-input') as HTMLInputElement;
@@ -425,6 +471,22 @@ class GitReaderApp {
             });
         });
 
+        this.routeSelect.addEventListener('change', () => {
+            const arcId = this.routeSelect.value;
+            if (!arcId) {
+                return;
+            }
+            void this.setTocMode('routes', arcId);
+        });
+
+        this.routeJump.addEventListener('click', () => {
+            const arcId = this.routeSelect.value;
+            if (!arcId) {
+                return;
+            }
+            void this.setTocMode('routes', arcId);
+        });
+
         this.layoutButtons.forEach((button) => {
             button.addEventListener('click', () => {
                 const layout = button.dataset.layout;
@@ -482,24 +544,46 @@ class GitReaderApp {
         }, this.tocDebounceDelay);
     }
 
-    private async setTocMode(mode: TocMode): Promise<void> {
+    private async setTocMode(mode: TocMode, targetChapterId?: string): Promise<void> {
         if (this.tocMode === mode) {
+            if (targetChapterId) {
+                await this.loadChapter(targetChapterId);
+            }
             return;
         }
         this.tocList.innerHTML = '<li class="toc-item"><div class="toc-title">Loading chapters</div><p class="toc-summary">Switching TOC view...</p></li>';
         await this.loadToc(mode);
-        const defaultChapterId = this.chapters.length > 0 ? this.chapters[0].id : '';
+        const defaultChapterId = targetChapterId ?? (this.chapters.length > 0 ? this.chapters[0].id : '');
         await this.loadChapter(defaultChapterId);
     }
 
     private async loadToc(mode: TocMode): Promise<void> {
+        if (mode === 'routes') {
+            await this.loadRouteToc();
+            return;
+        }
         const tocData = await this.fetchJson<ApiTocResponse>(
             this.buildApiUrl('/gitreader/api/toc', { mode }),
         );
         this.chapters = Array.isArray(tocData.chapters) ? tocData.chapters : [];
         this.tocMode = tocData.mode ?? mode;
+        this.activeStoryArc = null;
         this.updateTocModeUi();
         this.renderToc();
+    }
+
+    private async loadRouteToc(): Promise<void> {
+        const storyData = await this.fetchJson<ApiStoryResponse>(
+            this.buildApiUrl('/gitreader/api/story'),
+        );
+        this.storyArcs = Array.isArray(storyData.arcs) ? storyData.arcs : [];
+        this.storyArcsById = new Map(this.storyArcs.map((arc) => [arc.id, arc]));
+        this.chapters = this.storyArcs.map((arc) => this.buildArcChapter(arc));
+        this.tocMode = 'routes';
+        this.activeStoryArc = null;
+        this.updateTocModeUi();
+        this.renderToc();
+        this.populateRoutePicker(this.storyArcs);
     }
 
     private updateTocModeUi(): void {
@@ -507,10 +591,64 @@ class GitReaderApp {
             button.classList.toggle('is-active', button.dataset.tocMode === this.tocMode);
         });
         const isStory = this.tocMode === 'story';
-        this.tocPill.textContent = isStory ? 'story' : 'file tree';
-        this.tocSubtitle.textContent = isStory
-            ? 'Follow the story arc of the repository.'
-            : 'Browse the repository by folder.';
+        const isRoutes = this.tocMode === 'routes';
+        if (isRoutes) {
+            this.tocPill.textContent = 'routes';
+            this.tocSubtitle.textContent = 'Trace Flask routes into their primary flow.';
+        } else {
+            this.tocPill.textContent = isStory ? 'story' : 'file tree';
+            this.tocSubtitle.textContent = isStory
+                ? 'Follow the story arc of the repository.'
+                : 'Browse the repository by folder.';
+        }
+        this.routePicker.classList.toggle('is-hidden', !isRoutes);
+    }
+
+    private buildArcChapter(arc: StoryArc): ChapterSummary {
+        const handler = arc.route?.handler_name ? `Handler ${arc.route.handler_name}` : '';
+        const summary = [handler, arc.summary].filter(Boolean).join(' - ') || 'Route arc';
+        return {
+            id: arc.id,
+            title: arc.title || handler || 'Route',
+            summary,
+        };
+    }
+
+    private populateRoutePicker(arcs: StoryArc[]): void {
+        this.routeSelect.innerHTML = '';
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = arcs.length > 0 ? 'Select a route' : 'No routes found';
+        this.routeSelect.appendChild(placeholder);
+        arcs.forEach((arc) => {
+            const option = document.createElement('option');
+            option.value = arc.id;
+            option.textContent = this.formatArcOptionLabel(arc);
+            this.routeSelect.appendChild(option);
+        });
+        const hasRoutes = arcs.length > 0;
+        this.routeSelect.disabled = !hasRoutes;
+        this.routeJump.disabled = !hasRoutes;
+        if (!hasRoutes) {
+            this.routeSelect.value = '';
+        } else if (this.currentChapterId && this.storyArcsById.has(this.currentChapterId)) {
+            this.routeSelect.value = this.currentChapterId;
+        }
+    }
+
+    private formatArcOptionLabel(arc: StoryArc): string {
+        const routeLabel = this.formatRouteLabel(arc);
+        const handler = arc.route?.handler_name ? ` - ${arc.route.handler_name}` : '';
+        return `${routeLabel}${handler}`.trim();
+    }
+
+    private formatRouteLabel(arc: StoryArc): string {
+        if (arc.title) {
+            return arc.title;
+        }
+        const methods = arc.route?.methods?.length ? arc.route.methods.join('|') : 'ANY';
+        const target = arc.route?.path || arc.route?.handler_name || 'route';
+        return `${methods} ${target}`.trim();
     }
 
     private renderToc(): void {
@@ -535,9 +673,14 @@ class GitReaderApp {
     }
 
     private async loadChapter(chapterId: string): Promise<void> {
+        if (this.tocMode === 'routes') {
+            await this.loadStoryArc(chapterId);
+            return;
+        }
         const requestToken = ++this.chapterRequestToken;
         this.currentChapterId = chapterId;
         this.setActiveToc(chapterId);
+        this.activeStoryArc = null;
         const chapter = this.chapters.find((entry) => entry.id === chapterId);
         const scope = chapter?.scope ?? this.getScopeForChapter(chapterId);
         this.focusedNodeId = null;
@@ -555,6 +698,59 @@ class GitReaderApp {
             this.renderCode(focus);
             void this.updateNarrator(focus);
         });
+    }
+
+    private async loadStoryArc(arcId: string): Promise<void> {
+        const requestToken = ++this.chapterRequestToken;
+        this.currentChapterId = arcId;
+        this.setActiveToc(arcId);
+        this.activeStoryArc = null;
+        if (!arcId) {
+            this.renderStoryArcEmpty();
+            return;
+        }
+        let arc = this.storyArcsById.get(arcId);
+        if (!arc) {
+            const response = await this.fetchJson<ApiStoryResponse>(
+                this.buildApiUrl('/gitreader/api/story', { id: arcId }),
+            );
+            arc = Array.isArray(response.arcs) ? response.arcs[0] : undefined;
+        }
+        if (requestToken !== this.chapterRequestToken) {
+            return;
+        }
+        if (!arc) {
+            this.renderStoryArcMissing();
+            return;
+        }
+        this.activeStoryArc = arc;
+        this.syncRoutePickerSelection(arcId);
+        this.focusedNodeId = arc.entry_id;
+        await this.loadGraphForScope('full');
+        if (requestToken !== this.chapterRequestToken) {
+            return;
+        }
+        const nodes = this.graphNodes;
+        const edges = this.filterEdgesForNodes(nodes);
+        const graphView = this.buildGraphView(nodes, edges, 'full');
+        this.renderGraph(graphView.nodes, graphView.edges);
+        this.updateGraphNodeStatus(graphView);
+        const entryNode = this.nodeById.get(arc.entry_id) ?? this.pickFocusNode(graphView.nodes);
+        if (entryNode) {
+            if (this.graphInstance) {
+                this.graphInstance.$('node:selected').unselect();
+                const element = this.graphInstance.$id(entryNode.id);
+                if (element && typeof element.select === 'function') {
+                    element.select();
+                }
+            }
+            try {
+                await this.loadSymbolSnippet(entryNode, false);
+            } catch {
+                this.renderCode(entryNode);
+            }
+        }
+        this.renderStoryArc(arc);
     }
 
     private getScopeForChapter(chapterId: string): string {
@@ -745,10 +941,15 @@ class GitReaderApp {
         });
     }
 
-    private async loadSymbolSnippet(symbol: SymbolNode): Promise<void> {
+    private async loadSymbolSnippet(symbol: SymbolNode, shouldNarrate: boolean = true): Promise<void> {
+        if (shouldNarrate) {
+            this.activeStoryArc = null;
+        }
         if (!this.canFetchSnippet(symbol)) {
             this.renderCode(symbol);
-            void this.updateNarrator(symbol);
+            if (shouldNarrate) {
+                void this.updateNarrator(symbol);
+            }
             return;
         }
         const section = this.getSnippetSection(symbol);
@@ -756,7 +957,9 @@ class GitReaderApp {
         const cached = this.snippetCache.get(cacheKey);
         if (cached) {
             this.renderCode(symbol, cached);
-            void this.updateNarrator(symbol);
+            if (shouldNarrate) {
+                void this.updateNarrator(symbol);
+            }
             return;
         }
         const response = await this.fetchJson<SymbolSnippetResponse>(
@@ -764,7 +967,9 @@ class GitReaderApp {
         );
         this.snippetCache.set(cacheKey, response);
         this.renderCode(symbol, response);
-        void this.updateNarrator(symbol);
+        if (shouldNarrate) {
+            void this.updateNarrator(symbol);
+        }
     }
 
     private getSnippetSection(symbol: SymbolNode): string {
@@ -951,6 +1156,19 @@ class GitReaderApp {
             const isActive = element.dataset.chapterId === chapterId;
             element.classList.toggle('is-active', isActive);
         });
+        if (this.tocMode === 'routes') {
+            this.syncRoutePickerSelection(chapterId);
+        } else {
+            this.syncRoutePickerSelection('');
+        }
+    }
+
+    private syncRoutePickerSelection(arcId: string): void {
+        if (!this.storyArcsById.has(arcId)) {
+            this.routeSelect.value = '';
+            return;
+        }
+        this.routeSelect.value = arcId;
     }
 
     private formatLocation(location?: SourceLocation, startLine?: number, endLine?: number): string {
@@ -1597,11 +1815,130 @@ class GitReaderApp {
         };
     }
 
+    private renderStoryArc(arc: StoryArc): void {
+        const formatted = this.formatStoryArc(arc, this.currentMode);
+        this.narratorOutput.innerHTML = `
+            <p class="eyebrow">${formatted.eyebrow}</p>
+            <h3>${formatted.title}</h3>
+            ${formatted.body}
+        `;
+    }
+
+    private renderStoryArcEmpty(): void {
+        this.narratorOutput.innerHTML = `
+            <p class="eyebrow">Routes</p>
+            <h3>No route selected</h3>
+            <p>Pick a route to see its primary flow.</p>
+        `;
+    }
+
+    private renderStoryArcMissing(): void {
+        this.narratorOutput.innerHTML = `
+            <p class="eyebrow">Routes</p>
+            <h3>Route not found</h3>
+            <p>Choose another route to continue.</p>
+        `;
+    }
+
+    private formatStoryArc(arc: StoryArc, mode: NarrationMode): { eyebrow: string; title: string; body: string } {
+        const routeLabel = this.escapeHtml(this.formatRouteLabel(arc));
+        const scenes = Array.isArray(arc.scenes) ? arc.scenes : [];
+        if (mode === 'summary') {
+            const items = scenes.map((scene, index) => {
+                const label = this.formatStorySceneLabel(scene, index, true);
+                return `<li>${this.escapeHtml(label)}</li>`;
+            });
+            const body = items.length > 0
+                ? `<ol>${items.join('')}</ol>`
+                : '<p>No flow steps captured yet.</p>';
+            return {
+                eyebrow: 'Scenes',
+                title: `Primary flow for ${routeLabel}`,
+                body,
+            };
+        }
+        if (mode === 'key_lines') {
+            const items = scenes.map((scene) => {
+                const location = this.formatStorySceneLocation(scene);
+                const label = `${scene.name} - ${location}`;
+                return `<li>${this.escapeHtml(label)}</li>`;
+            });
+            const body = items.length > 0
+                ? `<ul>${items.join('')}</ul>`
+                : '<p>No locations captured yet.</p>';
+            return {
+                eyebrow: 'Key lines',
+                title: `Entry points for ${routeLabel}`,
+                body,
+            };
+        }
+        if (mode === 'connections') {
+            const paths = scenes
+                .map((scene) => scene.file_path)
+                .filter((path): path is string => Boolean(path));
+            const unique = Array.from(new Set(paths));
+            const items = unique.map((path) => `<li>${this.escapeHtml(path)}</li>`);
+            const body = items.length > 0
+                ? `<ul>${items.join('')}</ul>`
+                : '<p>No file connections yet.</p>';
+            return {
+                eyebrow: 'Connections',
+                title: `Files touched by ${routeLabel}`,
+                body,
+            };
+        }
+        if (mode === 'next') {
+            const last = scenes[scenes.length - 1];
+            const location = last ? this.formatStorySceneLocation(last) : '';
+            const label = last
+                ? `Continue at ${last.name}${location ? ` (${location})` : ''}.`
+                : 'No next thread yet.';
+            return {
+                eyebrow: 'Next thread',
+                title: 'Where to go next',
+                body: `<p>${this.escapeHtml(label)}</p>`,
+            };
+        }
+        const handler = arc.route?.handler_name ? `Handler ${arc.route.handler_name}.` : '';
+        const summary = arc.summary ? arc.summary : `Route ${this.formatRouteLabel(arc)} begins the journey.`;
+        const hook = `${summary}${handler ? ` ${handler}` : ''}`.trim();
+        return {
+            eyebrow: 'Route',
+            title: routeLabel,
+            body: `<p>${this.escapeHtml(hook)}</p>`,
+        };
+    }
+
+    private formatStorySceneLabel(scene: StoryScene, index: number, includeLocation: boolean): string {
+        const roleLabel = scene.role === 'entry' ? 'Entry' : `Step ${index + 1}`;
+        const kindLabel = this.getKindLabel(scene.kind);
+        const base = `${roleLabel}: ${scene.name} (${kindLabel})`;
+        if (!includeLocation) {
+            return base;
+        }
+        const location = this.formatStorySceneLocation(scene);
+        return `${base} - ${location}`;
+    }
+
+    private formatStorySceneLocation(scene: StoryScene): string {
+        if (!scene.file_path) {
+            return 'location unknown';
+        }
+        if (scene.line && scene.line > 0) {
+            return `${scene.file_path}:${scene.line}`;
+        }
+        return scene.file_path;
+    }
+
     private setMode(mode: NarrationMode): void {
         this.currentMode = mode;
         this.modeButtons.forEach((button) => {
             button.classList.toggle('is-active', button.dataset.mode === mode);
         });
+        if (this.activeStoryArc) {
+            this.renderStoryArc(this.activeStoryArc);
+            return;
+        }
         const chapterId = this.getActiveChapterId();
         const nodes = this.filterNodesForChapter(chapterId ?? '');
         const focus = this.getSelectedGraphNode() ?? this.currentSymbol ?? this.pickFocusNode(nodes);
@@ -1695,7 +2032,11 @@ class GitReaderApp {
         this.snippetCache.clear();
         this.updateSnippetModeUi();
         if (this.currentSymbol) {
-            await this.loadSymbolSnippet(this.currentSymbol);
+            const narrate = !this.activeStoryArc;
+            await this.loadSymbolSnippet(this.currentSymbol, narrate);
+            if (this.activeStoryArc) {
+                this.renderStoryArc(this.activeStoryArc);
+            }
         }
     }
 

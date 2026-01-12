@@ -616,6 +616,34 @@ body {
     gap: 6px;
 }
 
+.route-picker {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.route-picker.is-hidden {
+    display: none;
+}
+
+.route-select {
+    border: 1px solid var(--line);
+    background: #fff;
+    color: var(--ink);
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    min-width: 220px;
+    max-width: 100%;
+    font-family: "IBM Plex Mono", "Space Grotesk", sans-serif;
+}
+
+.route-select:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 .mode-btn {
     border: 1px solid var(--line);
     background: #fff;

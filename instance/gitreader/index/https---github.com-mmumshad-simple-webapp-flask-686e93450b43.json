@@ -1,0 +1,126 @@
+{
+  "commit_sha": "9dd6dffed105743ffac923b3ddee51ce6179614b",
+  "content_signature": "44877298d4b869aacf35de1ca7a21d9805e61a0c",
+  "edges": [
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:app.py",
+      "target": "symbol:app.main"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:app.py",
+      "target": "symbol:app.hello"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:app.py",
+      "target": "external:os"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:app.py",
+      "target": "external:flask"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:app.main",
+      "target": "external:app.route"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:app.hello",
+      "target": "external:app.route"
+    }
+  ],
+  "generated_at": 1768166007.208881,
+  "nodes": [
+    {
+      "id": "file:app.py",
+      "kind": "file",
+      "location": {
+        "end_col": 0,
+        "end_line": 0,
+        "path": "app.py",
+        "start_col": 0,
+        "start_line": 0
+      },
+      "module": "app",
+      "name": "app.py",
+      "summary": ""
+    },
+    {
+      "id": "symbol:app.main",
+      "kind": "function",
+      "location": {
+        "end_col": 21,
+        "end_line": 7,
+        "path": "app.py",
+        "start_col": 0,
+        "start_line": 6
+      },
+      "module": "app",
+      "name": "main",
+      "signature": "def main()",
+      "summary": ""
+    },
+    {
+      "id": "symbol:app.hello",
+      "kind": "function",
+      "location": {
+        "end_col": 38,
+        "end_line": 11,
+        "path": "app.py",
+        "start_col": 0,
+        "start_line": 10
+      },
+      "module": "app",
+      "name": "hello",
+      "signature": "def hello()",
+      "summary": ""
+    },
+    {
+      "id": "external:os",
+      "kind": "external",
+      "name": "os",
+      "summary": ""
+    },
+    {
+      "id": "external:flask",
+      "kind": "external",
+      "name": "flask",
+      "summary": ""
+    },
+    {
+      "id": "external:app.route",
+      "kind": "external",
+      "name": "app.route",
+      "summary": ""
+    }
+  ],
+  "repo_id": "https---github.com-mmumshad-simple-webapp-flask-686e93450b43",
+  "root_path": "/Users/steven/Documents/gitreader/instance/gitreader/repos/https---github.com-mmumshad-simple-webapp-flask-686e93450b43",
+  "stats": {
+    "edges": 6,
+    "nodes": 6,
+    "python_files": 1,
+    "skipped_files": 0,
+    "total_bytes": 2661,
+    "total_files": 5,
+    "warnings": 0
+  },
+  "toc": [
+    {
+      "id": "group:root",
+      "summary": "1 files",
+      "title": "Root files"
+    }
+  ],
+  "warnings": []
+}

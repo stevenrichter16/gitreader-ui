@@ -24,6 +24,7 @@
         <div class="nav-group" role="group" aria-label="TOC mode">
           <span class="nav-label">TOC</span>
           <button class="nav-btn is-active" data-toc-mode="story">Story</button>
+          <button class="nav-btn" data-toc-mode="routes">Routes</button>
           <button class="nav-btn" data-toc-mode="tree">File tree</button>
         </div>
         <div class="nav-group" role="group" aria-label="Panels">
@@ -79,6 +80,13 @@
           <button class="mode-btn" data-mode="connections">Connections</button>
           <button class="mode-btn" data-mode="next">Next thread</button>
         </div>
+      </div>
+      <div class="route-picker" id="route-picker">
+        <label class="nav-label" for="route-select">Route</label>
+        <select class="route-select" id="route-select">
+          <option value="">Select a route</option>
+        </select>
+        <button class="ghost-btn" type="button" id="route-jump">Jump</button>
       </div>
       <div class="narrator-output" id="narrator-output">
         <p class="eyebrow">Scene</p>

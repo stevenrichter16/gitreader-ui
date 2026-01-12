@@ -41,7 +41,12 @@
         this.graphRevealButton = getElement('graph-reveal');
         this.graphTooltip = getElement('graph-tooltip');
         this.narratorPane = getElement('narrator');
+        this.routePicker = getElement('route-picker');
+        this.routeSelect = getElement('route-select');
+        this.routeJump = getElement('route-jump');
         this.graphRevealButton.disabled = true;
+        this.routeSelect.disabled = true;
+        this.routeJump.disabled = true;
         this.repoForm = getElement('repo-picker');
         this.repoInput = getElement('repo-input');
         this.localInput = getElement('local-input');
@@ -54,6 +59,9 @@
         this.snippetMode = 'body';
         this.graphLayoutMode = 'cluster';
         this.chapters = [];
+        this.storyArcs = [];
+        this.storyArcsById = new Map();
+        this.activeStoryArc = null;
         this.graphNodes = [];
         this.graphEdges = [];
         this.nodeById = new Map();
@@ -285,6 +293,22 @@
             });
         });
 
+        this.routeSelect.addEventListener('change', function () {
+            var arcId = _this.routeSelect.value;
+            if (!arcId) {
+                return;
+            }
+            _this.setTocMode('routes', arcId);
+        });
+
+        this.routeJump.addEventListener('click', function () {
+            var arcId = _this.routeSelect.value;
+            if (!arcId) {
+                return;
+            }
+            _this.setTocMode('routes', arcId);
+        });
+
         this.layoutButtons.forEach(function (button) {
             button.addEventListener('click', function () {
                 var layout = button.dataset.layout;
@@ -343,25 +367,46 @@
         }, this.tocDebounceDelay);
     };
 
-    GitReaderApp.prototype.setTocMode = function (mode) {
+    GitReaderApp.prototype.setTocMode = function (mode, targetChapterId) {
         var _this = this;
         if (this.tocMode === mode) {
+            if (targetChapterId) {
+                return this.loadChapter(targetChapterId);
+            }
             return Promise.resolve();
         }
         this.tocList.innerHTML = '<li class="toc-item"><div class="toc-title">Loading chapters</div><p class="toc-summary">Switching TOC view...</p></li>';
         return this.loadToc(mode).then(function () {
-            var defaultChapterId = _this.chapters.length > 0 ? _this.chapters[0].id : '';
+            var defaultChapterId = targetChapterId || (_this.chapters.length > 0 ? _this.chapters[0].id : '');
             return _this.loadChapter(defaultChapterId);
         });
     };
 
     GitReaderApp.prototype.loadToc = function (mode) {
         var _this = this;
+        if (mode === 'routes') {
+            return this.loadRouteToc();
+        }
         return this.fetchJson(this.buildApiUrl('/gitreader/api/toc', { mode: mode })).then(function (tocData) {
             _this.chapters = Array.isArray(tocData.chapters) ? tocData.chapters : [];
             _this.tocMode = tocData.mode || mode;
+            _this.activeStoryArc = null;
             _this.updateTocModeUi();
             _this.renderToc();
+        });
+    };
+
+    GitReaderApp.prototype.loadRouteToc = function () {
+        var _this = this;
+        return this.fetchJson(this.buildApiUrl('/gitreader/api/story')).then(function (storyData) {
+            _this.storyArcs = Array.isArray(storyData.arcs) ? storyData.arcs : [];
+            _this.storyArcsById = new Map(_this.storyArcs.map(function (arc) { return [arc.id, arc]; }));
+            _this.chapters = _this.storyArcs.map(function (arc) { return _this.buildArcChapter(arc); });
+            _this.tocMode = 'routes';
+            _this.activeStoryArc = null;
+            _this.updateTocModeUi();
+            _this.renderToc();
+            _this.populateRoutePicker(_this.storyArcs);
         });
     };
 
@@ -371,10 +416,65 @@
             button.classList.toggle('is-active', button.dataset.tocMode === _this.tocMode);
         });
         var isStory = this.tocMode === 'story';
-        this.tocPill.textContent = isStory ? 'story' : 'file tree';
-        this.tocSubtitle.textContent = isStory
-            ? 'Follow the story arc of the repository.'
-            : 'Browse the repository by folder.';
+        var isRoutes = this.tocMode === 'routes';
+        if (isRoutes) {
+            this.tocPill.textContent = 'routes';
+            this.tocSubtitle.textContent = 'Trace Flask routes into their primary flow.';
+        } else {
+            this.tocPill.textContent = isStory ? 'story' : 'file tree';
+            this.tocSubtitle.textContent = isStory
+                ? 'Follow the story arc of the repository.'
+                : 'Browse the repository by folder.';
+        }
+        this.routePicker.classList.toggle('is-hidden', !isRoutes);
+    };
+
+    GitReaderApp.prototype.buildArcChapter = function (arc) {
+        var handler = arc.route && arc.route.handler_name ? 'Handler ' + arc.route.handler_name : '';
+        var summary = [handler, arc.summary].filter(Boolean).join(' - ') || 'Route arc';
+        return {
+            id: arc.id,
+            title: arc.title || handler || 'Route',
+            summary: summary,
+        };
+    };
+
+    GitReaderApp.prototype.populateRoutePicker = function (arcs) {
+        var _this = this;
+        this.routeSelect.innerHTML = '';
+        var placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = arcs.length > 0 ? 'Select a route' : 'No routes found';
+        this.routeSelect.appendChild(placeholder);
+        arcs.forEach(function (arc) {
+            var option = document.createElement('option');
+            option.value = arc.id;
+            option.textContent = _this.formatArcOptionLabel(arc);
+            _this.routeSelect.appendChild(option);
+        });
+        var hasRoutes = arcs.length > 0;
+        this.routeSelect.disabled = !hasRoutes;
+        this.routeJump.disabled = !hasRoutes;
+        if (!hasRoutes) {
+            this.routeSelect.value = '';
+        } else if (this.currentChapterId && this.storyArcsById.has(this.currentChapterId)) {
+            this.routeSelect.value = this.currentChapterId;
+        }
+    };
+
+    GitReaderApp.prototype.formatArcOptionLabel = function (arc) {
+        var routeLabel = this.formatRouteLabel(arc);
+        var handler = arc.route && arc.route.handler_name ? ' - ' + arc.route.handler_name : '';
+        return (routeLabel + handler).trim();
+    };
+
+    GitReaderApp.prototype.formatRouteLabel = function (arc) {
+        if (arc.title) {
+            return arc.title;
+        }
+        var methods = arc.route && arc.route.methods && arc.route.methods.length ? arc.route.methods.join('|') : 'ANY';
+        var target = (arc.route && arc.route.path) || (arc.route && arc.route.handler_name) || 'route';
+        return (methods + ' ' + target).trim();
     };
 
     GitReaderApp.prototype.renderToc = function () {
@@ -400,9 +500,13 @@
 
     GitReaderApp.prototype.loadChapter = function (chapterId) {
         var _this = this;
+        if (this.tocMode === 'routes') {
+            return this.loadStoryArc(chapterId);
+        }
         var requestToken = ++this.chapterRequestToken;
         this.currentChapterId = chapterId;
         this.setActiveToc(chapterId);
+        this.activeStoryArc = null;
         var chapter = this.chapters.find(function (entry) { return entry.id === chapterId; });
         var scope = (chapter && chapter.scope) || this.getScopeForChapter(chapterId);
         this.focusedNodeId = null;
@@ -419,6 +523,63 @@
             _this.loadSymbolSnippet(focus).catch(function () {
                 _this.renderCode(focus);
                 _this.updateNarrator(focus);
+            });
+        });
+    };
+
+    GitReaderApp.prototype.loadStoryArc = function (arcId) {
+        var _this = this;
+        var requestToken = ++this.chapterRequestToken;
+        this.currentChapterId = arcId;
+        this.setActiveToc(arcId);
+        this.activeStoryArc = null;
+        if (!arcId) {
+            this.renderStoryArcEmpty();
+            return Promise.resolve();
+        }
+        var arc = this.storyArcsById.get(arcId);
+        var arcPromise = arc
+            ? Promise.resolve(arc)
+            : this.fetchJson(this.buildApiUrl('/gitreader/api/story', { id: arcId })).then(function (response) {
+                return Array.isArray(response.arcs) ? response.arcs[0] : null;
+            });
+        return arcPromise.then(function (resolved) {
+            if (requestToken !== _this.chapterRequestToken) {
+                return;
+            }
+            if (!resolved) {
+                _this.renderStoryArcMissing();
+                return;
+            }
+            arc = resolved;
+            _this.activeStoryArc = arc;
+            _this.syncRoutePickerSelection(arcId);
+            _this.focusedNodeId = arc.entry_id;
+            return _this.loadGraphForScope('full').then(function () {
+                if (requestToken !== _this.chapterRequestToken) {
+                    return;
+                }
+                var nodes = _this.graphNodes;
+                var edges = _this.filterEdgesForNodes(nodes);
+                var graphView = _this.buildGraphView(nodes, edges, 'full');
+                _this.renderGraph(graphView.nodes, graphView.edges);
+                _this.updateGraphNodeStatus(graphView);
+                var entryNode = _this.nodeById.get(arc.entry_id) || _this.pickFocusNode(graphView.nodes);
+                if (entryNode) {
+                    if (_this.graphInstance) {
+                        _this.graphInstance.$('node:selected').unselect();
+                        var element = _this.graphInstance.$id(entryNode.id);
+                        if (element && typeof element.select === 'function') {
+                            element.select();
+                        }
+                    }
+                    return _this.loadSymbolSnippet(entryNode, false).catch(function () {
+                        _this.renderCode(entryNode);
+                    }).then(function () {
+                        _this.renderStoryArc(arc);
+                    });
+                }
+                _this.renderStoryArc(arc);
             });
         });
     };
@@ -613,11 +774,17 @@
         });
     };
 
-    GitReaderApp.prototype.loadSymbolSnippet = function (symbol) {
+    GitReaderApp.prototype.loadSymbolSnippet = function (symbol, shouldNarrate) {
         var _this = this;
+        if (shouldNarrate === void 0) { shouldNarrate = true; }
+        if (shouldNarrate) {
+            this.activeStoryArc = null;
+        }
         if (!this.canFetchSnippet(symbol)) {
             this.renderCode(symbol);
-            this.updateNarrator(symbol);
+            if (shouldNarrate) {
+                this.updateNarrator(symbol);
+            }
             return Promise.resolve();
         }
         var section = this.getSnippetSection(symbol);
@@ -625,14 +792,18 @@
         var cached = this.snippetCache.get(cacheKey);
         if (cached) {
             this.renderCode(symbol, cached);
-            this.updateNarrator(symbol);
+            if (shouldNarrate) {
+                this.updateNarrator(symbol);
+            }
             return Promise.resolve();
         }
         return this.fetchJson(this.buildApiUrl('/gitreader/api/symbol', { id: symbol.id, section: section }))
             .then(function (response) {
                 _this.snippetCache.set(cacheKey, response);
                 _this.renderCode(symbol, response);
-                _this.updateNarrator(symbol);
+                if (shouldNarrate) {
+                    _this.updateNarrator(symbol);
+                }
             });
     };
 
@@ -824,6 +995,19 @@
             var isActive = element.dataset.chapterId === chapterId;
             element.classList.toggle('is-active', isActive);
         });
+        if (this.tocMode === 'routes') {
+            this.syncRoutePickerSelection(chapterId);
+        } else {
+            this.syncRoutePickerSelection('');
+        }
+    };
+
+    GitReaderApp.prototype.syncRoutePickerSelection = function (arcId) {
+        if (!this.storyArcsById.has(arcId)) {
+            this.routeSelect.value = '';
+            return;
+        }
+        this.routeSelect.value = arcId;
     };
 
     GitReaderApp.prototype.formatLocation = function (location, startLine, endLine) {
@@ -1369,7 +1553,12 @@
         this.snippetCache.clear();
         this.updateSnippetModeUi();
         if (this.currentSymbol) {
-            return this.loadSymbolSnippet(this.currentSymbol);
+            var narrate = !this.activeStoryArc;
+            return this.loadSymbolSnippet(this.currentSymbol, narrate).then(function () {
+                if (_this.activeStoryArc) {
+                    _this.renderStoryArc(_this.activeStoryArc);
+                }
+            });
         }
         return Promise.resolve();
     };
@@ -1707,11 +1896,127 @@
         };
     };
 
+    GitReaderApp.prototype.renderStoryArc = function (arc) {
+        var formatted = this.formatStoryArc(arc, this.currentMode);
+        this.narratorOutput.innerHTML =
+            '<p class="eyebrow">' + formatted.eyebrow + '</p>' +
+            '<h3>' + formatted.title + '</h3>' +
+            formatted.body;
+    };
+
+    GitReaderApp.prototype.renderStoryArcEmpty = function () {
+        this.narratorOutput.innerHTML =
+            '<p class="eyebrow">Routes</p>' +
+            '<h3>No route selected</h3>' +
+            '<p>Pick a route to see its primary flow.</p>';
+    };
+
+    GitReaderApp.prototype.renderStoryArcMissing = function () {
+        this.narratorOutput.innerHTML =
+            '<p class="eyebrow">Routes</p>' +
+            '<h3>Route not found</h3>' +
+            '<p>Choose another route to continue.</p>';
+    };
+
+    GitReaderApp.prototype.formatStoryArc = function (arc, mode) {
+        var routeLabel = escapeHtml(this.formatRouteLabel(arc));
+        var scenes = Array.isArray(arc.scenes) ? arc.scenes : [];
+        if (mode === 'summary') {
+            var items = scenes.map(function (scene, index) {
+                var label = this.formatStorySceneLabel(scene, index, true);
+                return '<li>' + escapeHtml(label) + '</li>';
+            }, this);
+            var body = items.length > 0
+                ? '<ol>' + items.join('') + '</ol>'
+                : '<p>No flow steps captured yet.</p>';
+            return {
+                eyebrow: 'Scenes',
+                title: 'Primary flow for ' + routeLabel,
+                body: body
+            };
+        }
+        if (mode === 'key_lines') {
+            var lineItems = scenes.map(function (scene) {
+                var location = this.formatStorySceneLocation(scene);
+                var label = scene.name + ' - ' + location;
+                return '<li>' + escapeHtml(label) + '</li>';
+            }, this);
+            var lineBody = lineItems.length > 0
+                ? '<ul>' + lineItems.join('') + '</ul>'
+                : '<p>No locations captured yet.</p>';
+            return {
+                eyebrow: 'Key lines',
+                title: 'Entry points for ' + routeLabel,
+                body: lineBody
+            };
+        }
+        if (mode === 'connections') {
+            var paths = scenes
+                .map(function (scene) { return scene.file_path; })
+                .filter(function (path) { return Boolean(path); });
+            var unique = Array.from(new Set(paths));
+            var pathItems = unique.map(function (path) { return '<li>' + escapeHtml(path) + '</li>'; });
+            var pathBody = pathItems.length > 0
+                ? '<ul>' + pathItems.join('') + '</ul>'
+                : '<p>No file connections yet.</p>';
+            return {
+                eyebrow: 'Connections',
+                title: 'Files touched by ' + routeLabel,
+                body: pathBody
+            };
+        }
+        if (mode === 'next') {
+            var last = scenes[scenes.length - 1];
+            var location = last ? this.formatStorySceneLocation(last) : '';
+            var label = last
+                ? 'Continue at ' + last.name + (location ? ' (' + location + ')' : '') + '.'
+                : 'No next thread yet.';
+            return {
+                eyebrow: 'Next thread',
+                title: 'Where to go next',
+                body: '<p>' + escapeHtml(label) + '</p>'
+            };
+        }
+        var handler = arc.route && arc.route.handler_name ? 'Handler ' + arc.route.handler_name + '.' : '';
+        var summary = arc.summary ? arc.summary : 'Route ' + this.formatRouteLabel(arc) + ' begins the journey.';
+        var hook = (summary + (handler ? ' ' + handler : '')).trim();
+        return {
+            eyebrow: 'Route',
+            title: routeLabel,
+            body: '<p>' + escapeHtml(hook) + '</p>'
+        };
+    };
+
+    GitReaderApp.prototype.formatStorySceneLabel = function (scene, index, includeLocation) {
+        var roleLabel = scene.role === 'entry' ? 'Entry' : 'Step ' + (index + 1);
+        var kindLabel = this.getKindLabel(scene.kind);
+        var base = roleLabel + ': ' + scene.name + ' (' + kindLabel + ')';
+        if (!includeLocation) {
+            return base;
+        }
+        var location = this.formatStorySceneLocation(scene);
+        return base + ' - ' + location;
+    };
+
+    GitReaderApp.prototype.formatStorySceneLocation = function (scene) {
+        if (!scene.file_path) {
+            return 'location unknown';
+        }
+        if (scene.line && scene.line > 0) {
+            return scene.file_path + ':' + scene.line;
+        }
+        return scene.file_path;
+    };
+
     GitReaderApp.prototype.setMode = function (mode) {
         this.currentMode = mode;
         this.modeButtons.forEach(function (button) {
             button.classList.toggle('is-active', button.dataset.mode === mode);
         });
+        if (this.activeStoryArc) {
+            this.renderStoryArc(this.activeStoryArc);
+            return;
+        }
         var chapterId = this.getActiveChapterId();
         var nodes = this.filterNodesForChapter(chapterId || '');
         var focus = this.getSelectedGraphNode() || this.currentSymbol || this.pickFocusNode(nodes);

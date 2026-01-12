@@ -5,7 +5,7 @@ from flask import current_app, jsonify, render_template, request
 from . import gitreader
 from .models import GraphEdge, RepoSpec, SourceLocation, SymbolNode
 from .narrator import load_cached_narration, narrate_symbol
-from .service import get_repo_index, get_symbol_snippet
+from .service import get_repo_index, get_story_arcs, get_symbol_snippet
 
 
 @gitreader.route('/')
@@ -92,6 +92,35 @@ def narrate():
         current_app.logger.exception('gitreader narrate failed')
         return _error_response('server_error', 'Failed to narrate symbol', status=500)
     return jsonify(narration)
+
+
+@gitreader.route('/api/story')
+def story():
+    spec = _repo_spec_from_request()
+    arc_id = request.args.get('id')
+    try:
+        cache_root = os.path.join(current_app.instance_path, 'gitreader')
+        repo_index, arcs, warnings = get_story_arcs(spec, cache_root=cache_root)
+    except ValueError as exc:
+        return _error_response('bad_request', str(exc), status=400)
+    except Exception:
+        current_app.logger.exception('gitreader story failed')
+        return _error_response('server_error', 'Failed to build story arcs', status=500)
+
+    total_arcs = len(arcs)
+    if arc_id:
+        arc = next((item for item in arcs if item.get('id') == arc_id), None)
+        if not arc:
+            return _error_response('story_not_found', 'Story arc not found', status=404)
+        arcs = [arc]
+
+    stats = dict(repo_index.stats)
+    stats['story_arcs'] = total_arcs
+    return jsonify({
+        'arcs': arcs,
+        'stats': stats,
+        'warnings': [warning.to_dict() for warning in warnings],
+    })
 
 
 @gitreader.route('/api/symbol')

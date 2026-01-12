@@ -1,0 +1,1079 @@
+{
+  "commit_sha": "32c1a283489c1f4a76e34545101336ad9d9c927e",
+  "content_signature": "77567f4674902211cd7b1aa9da078bdfbb0350ba",
+  "edges": [
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:app/models.py",
+      "target": "symbol:app.models.User"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "symbol:app.models.User",
+      "target": "symbol:app.models.User.__repr__"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:app/__init__.py",
+      "target": "symbol:app.create_app"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:app/forms.py",
+      "target": "symbol:app.forms.LoginForm"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:app/forms.py",
+      "target": "symbol:app.forms.RegistrationForm"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "symbol:app.forms.RegistrationForm",
+      "target": "symbol:app.forms.RegistrationForm.validate_email"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "symbol:app.forms.RegistrationForm",
+      "target": "symbol:app.forms.RegistrationForm.validate_password"
+    },
+    {
+      "confidence": "medium",
+      "kind": "contains",
+      "source": "file:app/routes.py",
+      "target": "blueprint:routes_bp"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:app/routes.py",
+      "target": "symbol:app.routes.load_user"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:app/routes.py",
+      "target": "symbol:app.routes.home"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:app/routes.py",
+      "target": "symbol:app.routes.login"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:app/routes.py",
+      "target": "symbol:app.routes.register"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:app/routes.py",
+      "target": "symbol:app.routes.logout"
+    },
+    {
+      "confidence": "high",
+      "kind": "imports",
+      "source": "file:main.py",
+      "target": "file:app/__init__.py"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:app/models.py",
+      "target": "external:flask_login"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:app/models.py",
+      "target": "external:datetime"
+    },
+    {
+      "confidence": "high",
+      "kind": "imports",
+      "source": "file:app/models.py",
+      "target": "file:app/extensions.py"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:app/__init__.py",
+      "target": "external:flask"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:app/forms.py",
+      "target": "external:flask_wtf"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:app/forms.py",
+      "target": "external:wtforms.validators"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:app/forms.py",
+      "target": "external:wtforms"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:app/forms.py",
+      "target": "external:wtforms.validators"
+    },
+    {
+      "confidence": "high",
+      "kind": "imports",
+      "source": "file:app/forms.py",
+      "target": "file:app/models.py"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:app/extensions.py",
+      "target": "external:flask_bcrypt"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:app/extensions.py",
+      "target": "external:flask_sqlalchemy"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:app/extensions.py",
+      "target": "external:flask_wtf.csrf"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:app/extensions.py",
+      "target": "external:flask_login"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:app/routes.py",
+      "target": "external:flask"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:app/routes.py",
+      "target": "external:flask_login"
+    },
+    {
+      "confidence": "high",
+      "kind": "imports",
+      "source": "file:app/routes.py",
+      "target": "file:app/models.py"
+    },
+    {
+      "confidence": "high",
+      "kind": "imports",
+      "source": "file:app/routes.py",
+      "target": "file:app/extensions.py"
+    },
+    {
+      "confidence": "high",
+      "kind": "imports",
+      "source": "file:app/routes.py",
+      "target": "file:app/forms.py"
+    },
+    {
+      "confidence": "low",
+      "kind": "inherits",
+      "source": "symbol:app.models.User",
+      "target": "external:Model"
+    },
+    {
+      "confidence": "low",
+      "kind": "inherits",
+      "source": "symbol:app.models.User",
+      "target": "external:UserMixin"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:app.create_app",
+      "target": "external:flask.Flask"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:app.create_app",
+      "target": "external:db.init_app"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:app.create_app",
+      "target": "external:csrf.init_app"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:app.create_app",
+      "target": "external:bcrypt.init_app"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:app.create_app",
+      "target": "external:login_manager.init_app"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:app.create_app",
+      "target": "external:app.register_blueprint"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:app.create_app",
+      "target": "external:app.app_context"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:app.create_app",
+      "target": "external:db.create_all"
+    },
+    {
+      "confidence": "low",
+      "kind": "inherits",
+      "source": "symbol:app.forms.LoginForm",
+      "target": "external:FlaskForm"
+    },
+    {
+      "confidence": "low",
+      "kind": "inherits",
+      "source": "symbol:app.forms.RegistrationForm",
+      "target": "external:FlaskForm"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:app.forms.RegistrationForm.validate_email",
+      "target": "external:one_or_none"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:app.forms.RegistrationForm.validate_email",
+      "target": "external:wtforms.validators.ValidationError"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:app.forms.RegistrationForm.validate_email",
+      "target": "external:filter_by"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:app.forms.RegistrationForm.validate_password",
+      "target": "external:wtforms.validators.ValidationError"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:app.forms.RegistrationForm.validate_password",
+      "target": "external:any"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:app.forms.RegistrationForm.validate_password",
+      "target": "external:any"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:app.forms.RegistrationForm.validate_password",
+      "target": "external:c.isalpha"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:app.forms.RegistrationForm.validate_password",
+      "target": "external:c.isdigit"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:app.routes.load_user",
+      "target": "external:one_or_none"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:app.routes.load_user",
+      "target": "external:filter_by"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:app.routes.home",
+      "target": "external:routes_bp.route"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:app.routes.home",
+      "target": "external:flask.render_template"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:app.routes.login",
+      "target": "external:routes_bp.route"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:app.routes.login",
+      "target": "external:app.forms.LoginForm"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:app.routes.login",
+      "target": "external:form.validate_on_submit"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:app.routes.login",
+      "target": "external:flask.render_template"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:app.routes.login",
+      "target": "external:flask.redirect"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:app.routes.login",
+      "target": "external:one_or_none"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:app.routes.login",
+      "target": "external:flask.url_for"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:app.routes.login",
+      "target": "external:app.extensions.bcrypt"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:app.routes.login",
+      "target": "external:flask_login.login_user"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:app.routes.login",
+      "target": "external:flask.flash"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:app.routes.login",
+      "target": "external:flask.redirect"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:app.routes.login",
+      "target": "external:flask.flash"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:app.routes.login",
+      "target": "external:filter_by"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:app.routes.login",
+      "target": "external:flask.url_for"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:app.routes.register",
+      "target": "external:routes_bp.route"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:app.routes.register",
+      "target": "external:app.forms.RegistrationForm"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:app.routes.register",
+      "target": "external:form.validate_on_submit"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:app.routes.register",
+      "target": "external:flask.render_template"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:app.routes.register",
+      "target": "external:flask.redirect"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:app.routes.register",
+      "target": "external:app.extensions.bcrypt"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:app.routes.register",
+      "target": "external:app.models.User"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:app.routes.register",
+      "target": "external:add"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:app.routes.register",
+      "target": "external:commit"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:app.routes.register",
+      "target": "external:flask_login.login_user"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:app.routes.register",
+      "target": "external:flask.flash"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:app.routes.register",
+      "target": "external:flask.redirect"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:app.routes.register",
+      "target": "external:flask.url_for"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:app.routes.register",
+      "target": "external:flask.url_for"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:app.routes.logout",
+      "target": "external:routes_bp.route"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:app.routes.logout",
+      "target": "external:flask_login.logout_user"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:app.routes.logout",
+      "target": "external:flask.redirect"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:app.routes.logout",
+      "target": "external:flask.url_for"
+    }
+  ],
+  "generated_at": 1768186915.719496,
+  "nodes": [
+    {
+      "id": "file:main.py",
+      "kind": "file",
+      "location": {
+        "end_col": 0,
+        "end_line": 0,
+        "path": "main.py",
+        "start_col": 0,
+        "start_line": 0
+      },
+      "module": "main",
+      "name": "main.py",
+      "summary": ""
+    },
+    {
+      "id": "file:app/models.py",
+      "kind": "file",
+      "location": {
+        "end_col": 0,
+        "end_line": 0,
+        "path": "app/models.py",
+        "start_col": 0,
+        "start_line": 0
+      },
+      "module": "app.models",
+      "name": "app/models.py",
+      "summary": ""
+    },
+    {
+      "id": "file:app/__init__.py",
+      "kind": "file",
+      "location": {
+        "end_col": 0,
+        "end_line": 0,
+        "path": "app/__init__.py",
+        "start_col": 0,
+        "start_line": 0
+      },
+      "module": "app",
+      "name": "app/__init__.py",
+      "summary": ""
+    },
+    {
+      "id": "file:app/forms.py",
+      "kind": "file",
+      "location": {
+        "end_col": 0,
+        "end_line": 0,
+        "path": "app/forms.py",
+        "start_col": 0,
+        "start_line": 0
+      },
+      "module": "app.forms",
+      "name": "app/forms.py",
+      "summary": ""
+    },
+    {
+      "id": "file:app/extensions.py",
+      "kind": "file",
+      "location": {
+        "end_col": 0,
+        "end_line": 0,
+        "path": "app/extensions.py",
+        "start_col": 0,
+        "start_line": 0
+      },
+      "module": "app.extensions",
+      "name": "app/extensions.py",
+      "summary": ""
+    },
+    {
+      "id": "file:app/routes.py",
+      "kind": "file",
+      "location": {
+        "end_col": 0,
+        "end_line": 0,
+        "path": "app/routes.py",
+        "start_col": 0,
+        "start_line": 0
+      },
+      "module": "app.routes",
+      "name": "app/routes.py",
+      "summary": ""
+    },
+    {
+      "id": "symbol:app.models.User",
+      "kind": "class",
+      "location": {
+        "end_col": 36,
+        "end_line": 19,
+        "path": "app/models.py",
+        "start_col": 0,
+        "start_line": 11
+      },
+      "module": "app.models",
+      "name": "User",
+      "signature": "class User(db.Model, UserMixin)",
+      "summary": ""
+    },
+    {
+      "id": "symbol:app.models.User.__repr__",
+      "kind": "method",
+      "location": {
+        "end_col": 36,
+        "end_line": 19,
+        "path": "app/models.py",
+        "start_col": 4,
+        "start_line": 18
+      },
+      "module": "app.models",
+      "name": "__repr__",
+      "signature": "def __repr__(self)",
+      "summary": ""
+    },
+    {
+      "id": "symbol:app.create_app",
+      "kind": "function",
+      "location": {
+        "end_col": 14,
+        "end_line": 30,
+        "path": "app/__init__.py",
+        "start_col": 0,
+        "start_line": 5
+      },
+      "module": "app",
+      "name": "create_app",
+      "signature": "def create_app(debug: bool = False) -> Flask",
+      "summary": ""
+    },
+    {
+      "id": "symbol:app.forms.LoginForm",
+      "kind": "class",
+      "location": {
+        "end_col": 34,
+        "end_line": 15,
+        "path": "app/forms.py",
+        "start_col": 0,
+        "start_line": 11
+      },
+      "module": "app.forms",
+      "name": "LoginForm",
+      "signature": "class LoginForm(FlaskForm)",
+      "summary": ""
+    },
+    {
+      "id": "symbol:app.forms.RegistrationForm",
+      "kind": "class",
+      "location": {
+        "end_col": 93,
+        "end_line": 46,
+        "path": "app/forms.py",
+        "start_col": 0,
+        "start_line": 18
+      },
+      "module": "app.forms",
+      "name": "RegistrationForm",
+      "signature": "class RegistrationForm(FlaskForm)",
+      "summary": ""
+    },
+    {
+      "id": "symbol:app.forms.RegistrationForm.validate_email",
+      "kind": "method",
+      "location": {
+        "end_col": 70,
+        "end_line": 42,
+        "path": "app/forms.py",
+        "start_col": 4,
+        "start_line": 39
+      },
+      "module": "app.forms",
+      "name": "validate_email",
+      "signature": "def validate_email(self, email)",
+      "summary": ""
+    },
+    {
+      "id": "symbol:app.forms.RegistrationForm.validate_password",
+      "kind": "method",
+      "location": {
+        "end_col": 93,
+        "end_line": 46,
+        "path": "app/forms.py",
+        "start_col": 4,
+        "start_line": 44
+      },
+      "module": "app.forms",
+      "name": "validate_password",
+      "signature": "def validate_password(self, password)",
+      "summary": ""
+    },
+    {
+      "id": "blueprint:routes_bp",
+      "kind": "blueprint",
+      "location": {
+        "end_col": 57,
+        "end_line": 10,
+        "path": "app/routes.py",
+        "start_col": 0,
+        "start_line": 10
+      },
+      "module": "app.routes",
+      "name": "routes_bp",
+      "summary": ""
+    },
+    {
+      "id": "symbol:app.routes.load_user",
+      "kind": "function",
+      "location": {
+        "end_col": 57,
+        "end_line": 15,
+        "path": "app/routes.py",
+        "start_col": 0,
+        "start_line": 14
+      },
+      "module": "app.routes",
+      "name": "load_user",
+      "signature": "def load_user(user_id)",
+      "summary": ""
+    },
+    {
+      "id": "symbol:app.routes.home",
+      "kind": "function",
+      "location": {
+        "end_col": 40,
+        "end_line": 21,
+        "path": "app/routes.py",
+        "start_col": 0,
+        "start_line": 20
+      },
+      "module": "app.routes",
+      "name": "home",
+      "signature": "def home()",
+      "summary": ""
+    },
+    {
+      "id": "symbol:app.routes.login",
+      "kind": "function",
+      "location": {
+        "end_col": 56,
+        "end_line": 44,
+        "path": "app/routes.py",
+        "start_col": 0,
+        "start_line": 25
+      },
+      "module": "app.routes",
+      "name": "login",
+      "signature": "def login()",
+      "summary": ""
+    },
+    {
+      "id": "symbol:app.routes.register",
+      "kind": "function",
+      "location": {
+        "end_col": 59,
+        "end_line": 72,
+        "path": "app/routes.py",
+        "start_col": 0,
+        "start_line": 48
+      },
+      "module": "app.routes",
+      "name": "register",
+      "signature": "def register()",
+      "summary": ""
+    },
+    {
+      "id": "symbol:app.routes.logout",
+      "kind": "function",
+      "location": {
+        "end_col": 44,
+        "end_line": 79,
+        "path": "app/routes.py",
+        "start_col": 0,
+        "start_line": 77
+      },
+      "module": "app.routes",
+      "name": "logout",
+      "signature": "def logout()",
+      "summary": ""
+    },
+    {
+      "id": "external:flask_login",
+      "kind": "external",
+      "name": "flask_login",
+      "summary": ""
+    },
+    {
+      "id": "external:datetime",
+      "kind": "external",
+      "name": "datetime",
+      "summary": ""
+    },
+    {
+      "id": "external:flask",
+      "kind": "external",
+      "name": "flask",
+      "summary": ""
+    },
+    {
+      "id": "external:flask_wtf",
+      "kind": "external",
+      "name": "flask_wtf",
+      "summary": ""
+    },
+    {
+      "id": "external:wtforms.validators",
+      "kind": "external",
+      "name": "wtforms.validators",
+      "summary": ""
+    },
+    {
+      "id": "external:wtforms",
+      "kind": "external",
+      "name": "wtforms",
+      "summary": ""
+    },
+    {
+      "id": "external:flask_bcrypt",
+      "kind": "external",
+      "name": "flask_bcrypt",
+      "summary": ""
+    },
+    {
+      "id": "external:flask_sqlalchemy",
+      "kind": "external",
+      "name": "flask_sqlalchemy",
+      "summary": ""
+    },
+    {
+      "id": "external:flask_wtf.csrf",
+      "kind": "external",
+      "name": "flask_wtf.csrf",
+      "summary": ""
+    },
+    {
+      "id": "external:Model",
+      "kind": "external",
+      "name": "Model",
+      "summary": ""
+    },
+    {
+      "id": "external:UserMixin",
+      "kind": "external",
+      "name": "UserMixin",
+      "summary": ""
+    },
+    {
+      "id": "external:flask.Flask",
+      "kind": "external",
+      "name": "flask.Flask",
+      "summary": ""
+    },
+    {
+      "id": "external:db.init_app",
+      "kind": "external",
+      "name": "db.init_app",
+      "summary": ""
+    },
+    {
+      "id": "external:csrf.init_app",
+      "kind": "external",
+      "name": "csrf.init_app",
+      "summary": ""
+    },
+    {
+      "id": "external:bcrypt.init_app",
+      "kind": "external",
+      "name": "bcrypt.init_app",
+      "summary": ""
+    },
+    {
+      "id": "external:login_manager.init_app",
+      "kind": "external",
+      "name": "login_manager.init_app",
+      "summary": ""
+    },
+    {
+      "id": "external:app.register_blueprint",
+      "kind": "external",
+      "name": "app.register_blueprint",
+      "summary": ""
+    },
+    {
+      "id": "external:app.app_context",
+      "kind": "external",
+      "name": "app.app_context",
+      "summary": ""
+    },
+    {
+      "id": "external:db.create_all",
+      "kind": "external",
+      "name": "db.create_all",
+      "summary": ""
+    },
+    {
+      "id": "external:FlaskForm",
+      "kind": "external",
+      "name": "FlaskForm",
+      "summary": ""
+    },
+    {
+      "id": "external:one_or_none",
+      "kind": "external",
+      "name": "one_or_none",
+      "summary": ""
+    },
+    {
+      "id": "external:wtforms.validators.ValidationError",
+      "kind": "external",
+      "name": "wtforms.validators.ValidationError",
+      "summary": ""
+    },
+    {
+      "id": "external:filter_by",
+      "kind": "external",
+      "name": "filter_by",
+      "summary": ""
+    },
+    {
+      "id": "external:any",
+      "kind": "external",
+      "name": "any",
+      "summary": ""
+    },
+    {
+      "id": "external:c.isalpha",
+      "kind": "external",
+      "name": "c.isalpha",
+      "summary": ""
+    },
+    {
+      "id": "external:c.isdigit",
+      "kind": "external",
+      "name": "c.isdigit",
+      "summary": ""
+    },
+    {
+      "id": "external:routes_bp.route",
+      "kind": "external",
+      "name": "routes_bp.route",
+      "summary": ""
+    },
+    {
+      "id": "external:flask.render_template",
+      "kind": "external",
+      "name": "flask.render_template",
+      "summary": ""
+    },
+    {
+      "id": "external:app.forms.LoginForm",
+      "kind": "external",
+      "name": "app.forms.LoginForm",
+      "summary": ""
+    },
+    {
+      "id": "external:form.validate_on_submit",
+      "kind": "external",
+      "name": "form.validate_on_submit",
+      "summary": ""
+    },
+    {
+      "id": "external:flask.redirect",
+      "kind": "external",
+      "name": "flask.redirect",
+      "summary": ""
+    },
+    {
+      "id": "external:flask.url_for",
+      "kind": "external",
+      "name": "flask.url_for",
+      "summary": ""
+    },
+    {
+      "id": "external:app.extensions.bcrypt",
+      "kind": "external",
+      "name": "app.extensions.bcrypt",
+      "summary": ""
+    },
+    {
+      "id": "external:flask_login.login_user",
+      "kind": "external",
+      "name": "flask_login.login_user",
+      "summary": ""
+    },
+    {
+      "id": "external:flask.flash",
+      "kind": "external",
+      "name": "flask.flash",
+      "summary": ""
+    },
+    {
+      "id": "external:app.forms.RegistrationForm",
+      "kind": "external",
+      "name": "app.forms.RegistrationForm",
+      "summary": ""
+    },
+    {
+      "id": "external:app.models.User",
+      "kind": "external",
+      "name": "app.models.User",
+      "summary": ""
+    },
+    {
+      "id": "external:add",
+      "kind": "external",
+      "name": "add",
+      "summary": ""
+    },
+    {
+      "id": "external:commit",
+      "kind": "external",
+      "name": "commit",
+      "summary": ""
+    },
+    {
+      "id": "external:flask_login.logout_user",
+      "kind": "external",
+      "name": "flask_login.logout_user",
+      "summary": ""
+    }
+  ],
+  "repo_id": "https---github.com-riad-azz-flask-auth-example-c55278f4ecc3",
+  "root_path": "/Users/steven/Documents/gitreader/instance/gitreader/repos/https---github.com-riad-azz-flask-auth-example-c55278f4ecc3",
+  "stats": {
+    "edges": 88,
+    "nodes": 59,
+    "python_files": 6,
+    "skipped_files": 0,
+    "total_bytes": 13225,
+    "total_files": 15,
+    "warnings": 0
+  },
+  "toc": [
+    {
+      "id": "group:root",
+      "summary": "1 files",
+      "title": "Root files"
+    },
+    {
+      "id": "group:app",
+      "summary": "5 files",
+      "title": "Package: app"
+    }
+  ],
+  "warnings": []
+}
