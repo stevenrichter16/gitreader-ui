@@ -1,0 +1,456 @@
+{
+  "arcs": [
+    {
+      "calls": {
+        "external": [
+          "pypi_portal.blueprints.home_index",
+          "flask.render_template"
+        ],
+        "internal": []
+      },
+      "entry_id": "symbol:pypi_portal.views.home.index.index",
+      "id": "arc:76caa1d40af3",
+      "parent_id": null,
+      "related_ids": [],
+      "route": {
+        "file_path": "pypi_portal/views/home/index.py",
+        "handler_id": "symbol:pypi_portal.views.home.index.index",
+        "handler_name": "index",
+        "line": 7,
+        "methods": [],
+        "module": "pypi_portal.views.home.index",
+        "path": "/"
+      },
+      "scene_count": 1,
+      "scenes": [
+        {
+          "confidence": "high",
+          "file_path": "pypi_portal/views/home/index.py",
+          "id": "symbol:pypi_portal.views.home.index.index",
+          "kind": "function",
+          "line": 7,
+          "name": "index",
+          "role": "entry"
+        }
+      ],
+      "summary": "ANY / starts here.",
+      "thread": "main",
+      "thread_index": 0,
+      "title": "ANY /"
+    },
+    {
+      "calls": {
+        "external": [
+          "pypi_portal.blueprints.pypi_packages",
+          "paginate",
+          "flask.render_template",
+          "dict",
+          "order_by"
+        ],
+        "internal": []
+      },
+      "entry_id": "symbol:pypi_portal.views.pypi.packages.index",
+      "id": "arc:209347d49cd0",
+      "parent_id": null,
+      "related_ids": [],
+      "route": {
+        "file_path": "pypi_portal/views/pypi/packages.py",
+        "handler_id": "symbol:pypi_portal.views.pypi.packages.index",
+        "handler_name": "index",
+        "line": 18,
+        "methods": [],
+        "module": "pypi_portal.views.pypi.packages",
+        "path": "/"
+      },
+      "scene_count": 1,
+      "scenes": [
+        {
+          "confidence": "high",
+          "file_path": "pypi_portal/views/pypi/packages.py",
+          "id": "symbol:pypi_portal.views.pypi.packages.index",
+          "kind": "function",
+          "line": 18,
+          "name": "index",
+          "role": "entry"
+        }
+      ],
+      "summary": "ANY / starts here.",
+      "thread": "main",
+      "thread_index": 0,
+      "title": "ANY /"
+    },
+    {
+      "calls": {
+        "external": [
+          "pypi_portal.blueprints.examples_alerts",
+          "flask.render_template"
+        ],
+        "internal": []
+      },
+      "entry_id": "symbol:pypi_portal.views.examples.alerts.index",
+      "id": "arc:a7018c1d95b1",
+      "parent_id": null,
+      "related_ids": [],
+      "route": {
+        "file_path": "pypi_portal/views/examples/alerts.py",
+        "handler_id": "symbol:pypi_portal.views.examples.alerts.index",
+        "handler_name": "index",
+        "line": 10,
+        "methods": [],
+        "module": "pypi_portal.views.examples.alerts",
+        "path": "/"
+      },
+      "scene_count": 1,
+      "scenes": [
+        {
+          "confidence": "high",
+          "file_path": "pypi_portal/views/examples/alerts.py",
+          "id": "symbol:pypi_portal.views.examples.alerts.index",
+          "kind": "function",
+          "line": 10,
+          "name": "index",
+          "role": "entry"
+        }
+      ],
+      "summary": "ANY / starts here.",
+      "thread": "main",
+      "thread_index": 0,
+      "title": "ANY /"
+    },
+    {
+      "calls": {
+        "external": [
+          "pypi_portal.blueprints.examples_exception",
+          "RuntimeError"
+        ],
+        "internal": []
+      },
+      "entry_id": "symbol:pypi_portal.views.examples.exception.index",
+      "id": "arc:a8aa2dbbbcb0",
+      "parent_id": null,
+      "related_ids": [],
+      "route": {
+        "file_path": "pypi_portal/views/examples/exception.py",
+        "handler_id": "symbol:pypi_portal.views.examples.exception.index",
+        "handler_name": "index",
+        "line": 5,
+        "methods": [],
+        "module": "pypi_portal.views.examples.exception",
+        "path": "/"
+      },
+      "scene_count": 1,
+      "scenes": [
+        {
+          "confidence": "high",
+          "file_path": "pypi_portal/views/examples/exception.py",
+          "id": "symbol:pypi_portal.views.examples.exception.index",
+          "kind": "function",
+          "line": 5,
+          "name": "index",
+          "role": "entry"
+        }
+      ],
+      "summary": "ANY / starts here.",
+      "thread": "main",
+      "thread_index": 0,
+      "title": "ANY /"
+    },
+    {
+      "calls": {
+        "external": [
+          "pypi_portal.blueprints.examples_alerts",
+          "get",
+          "getattr",
+          "range",
+          "flask.redirect",
+          "flask.abort"
+        ],
+        "internal": []
+      },
+      "entry_id": "symbol:pypi_portal.views.examples.alerts.modal",
+      "id": "arc:2980d22479ed",
+      "parent_id": null,
+      "related_ids": [],
+      "route": {
+        "file_path": "pypi_portal/views/examples/alerts.py",
+        "handler_id": "symbol:pypi_portal.views.examples.alerts.modal",
+        "handler_name": "modal",
+        "line": 15,
+        "methods": [],
+        "module": "pypi_portal.views.examples.alerts",
+        "path": "/modal"
+      },
+      "scene_count": 1,
+      "scenes": [
+        {
+          "confidence": "high",
+          "file_path": "pypi_portal/views/examples/alerts.py",
+          "id": "symbol:pypi_portal.views.examples.alerts.modal",
+          "kind": "function",
+          "line": 15,
+          "name": "modal",
+          "role": "entry"
+        }
+      ],
+      "summary": "ANY /modal starts here.",
+      "thread": "main",
+      "thread_index": 0,
+      "title": "ANY /modal"
+    },
+    {
+      "calls": {
+        "external": [
+          "pypi_portal.blueprints.pypi_packages",
+          "paginate",
+          "flask.render_template",
+          "dict",
+          "order_by"
+        ],
+        "internal": []
+      },
+      "entry_id": "symbol:pypi_portal.views.pypi.packages.index",
+      "id": "arc:ec915bf6b07e",
+      "parent_id": null,
+      "related_ids": [],
+      "route": {
+        "file_path": "pypi_portal/views/pypi/packages.py",
+        "handler_id": "symbol:pypi_portal.views.pypi.packages.index",
+        "handler_name": "index",
+        "line": 18,
+        "methods": [],
+        "module": "pypi_portal.views.pypi.packages",
+        "path": "/page/<int:page>"
+      },
+      "scene_count": 1,
+      "scenes": [
+        {
+          "confidence": "high",
+          "file_path": "pypi_portal/views/pypi/packages.py",
+          "id": "symbol:pypi_portal.views.pypi.packages.index",
+          "kind": "function",
+          "line": 18,
+          "name": "index",
+          "role": "entry"
+        }
+      ],
+      "summary": "ANY /page/<int:page> starts here.",
+      "thread": "main",
+      "thread_index": 0,
+      "title": "ANY /page/<int:page>"
+    },
+    {
+      "calls": {
+        "external": [
+          "pypi_portal.blueprints.pypi_packages",
+          "pypi_portal.extensions.redis",
+          "range",
+          "flask.redirect",
+          "int",
+          "time"
+        ],
+        "internal": [
+          "update_package_list",
+          "info",
+          "warning",
+          "modal"
+        ]
+      },
+      "entry_id": "symbol:pypi_portal.views.pypi.packages.sync",
+      "id": "arc:6eb1bd350f3a",
+      "parent_id": null,
+      "related_ids": [
+        "arc:ed1dcf3c9564",
+        "arc:e7b9ac67c2c1"
+      ],
+      "route": {
+        "file_path": "pypi_portal/views/pypi/packages.py",
+        "handler_id": "symbol:pypi_portal.views.pypi.packages.sync",
+        "handler_name": "sync",
+        "line": 24,
+        "methods": [],
+        "module": "pypi_portal.views.pypi.packages",
+        "path": "/sync"
+      },
+      "scene_count": 3,
+      "scenes": [
+        {
+          "confidence": "high",
+          "file_path": "pypi_portal/views/pypi/packages.py",
+          "id": "symbol:pypi_portal.views.pypi.packages.sync",
+          "kind": "function",
+          "line": 24,
+          "name": "sync",
+          "role": "entry"
+        },
+        {
+          "confidence": "medium",
+          "file_path": "pypi_portal/tasks/pypi.py",
+          "id": "symbol:pypi_portal.tasks.pypi.update_package_list",
+          "kind": "function",
+          "line": 19,
+          "name": "update_package_list",
+          "role": "step"
+        },
+        {
+          "confidence": "medium",
+          "file_path": "pypi_portal/models/pypi.py",
+          "id": "symbol:pypi_portal.models.pypi.Package",
+          "kind": "class",
+          "line": 8,
+          "name": "Package",
+          "role": "step"
+        }
+      ],
+      "summary": "ANY /sync calls update_package_list, Package.",
+      "thread": "main",
+      "thread_index": 0,
+      "title": "ANY /sync"
+    },
+    {
+      "calls": {
+        "external": [
+          "pypi_portal.blueprints.pypi_packages",
+          "pypi_portal.extensions.redis",
+          "range",
+          "flask.redirect",
+          "int",
+          "time"
+        ],
+        "internal": [
+          "update_package_list",
+          "info",
+          "warning",
+          "modal"
+        ]
+      },
+      "entry_id": "symbol:pypi_portal.views.pypi.packages.sync",
+      "id": "arc:ed1dcf3c9564",
+      "parent_id": "arc:6eb1bd350f3a",
+      "related_ids": [
+        "arc:6eb1bd350f3a",
+        "arc:e7b9ac67c2c1"
+      ],
+      "route": {
+        "file_path": "pypi_portal/views/pypi/packages.py",
+        "handler_id": "symbol:pypi_portal.views.pypi.packages.sync",
+        "handler_name": "sync",
+        "line": 24,
+        "methods": [],
+        "module": "pypi_portal.views.pypi.packages",
+        "path": "/sync"
+      },
+      "scene_count": 3,
+      "scenes": [
+        {
+          "confidence": "high",
+          "file_path": "pypi_portal/views/pypi/packages.py",
+          "id": "symbol:pypi_portal.views.pypi.packages.sync",
+          "kind": "function",
+          "line": 24,
+          "name": "sync",
+          "role": "entry"
+        },
+        {
+          "confidence": "medium",
+          "file_path": "pypi_portal/core/flash.py",
+          "id": "symbol:pypi_portal.core.flash.info",
+          "kind": "function",
+          "line": 40,
+          "name": "info",
+          "role": "step"
+        },
+        {
+          "confidence": "high",
+          "file_path": "pypi_portal/core/flash.py",
+          "id": "symbol:pypi_portal.core.flash._escape",
+          "kind": "function",
+          "line": 11,
+          "name": "_escape",
+          "role": "step"
+        }
+      ],
+      "summary": "ANY /sync calls info, _escape.",
+      "thread": "branch",
+      "thread_index": 1,
+      "title": "ANY /sync (branch 1)"
+    },
+    {
+      "calls": {
+        "external": [
+          "pypi_portal.blueprints.pypi_packages",
+          "pypi_portal.extensions.redis",
+          "range",
+          "flask.redirect",
+          "int",
+          "time"
+        ],
+        "internal": [
+          "update_package_list",
+          "info",
+          "warning",
+          "modal"
+        ]
+      },
+      "entry_id": "symbol:pypi_portal.views.pypi.packages.sync",
+      "id": "arc:e7b9ac67c2c1",
+      "parent_id": "arc:6eb1bd350f3a",
+      "related_ids": [
+        "arc:6eb1bd350f3a",
+        "arc:ed1dcf3c9564"
+      ],
+      "route": {
+        "file_path": "pypi_portal/views/pypi/packages.py",
+        "handler_id": "symbol:pypi_portal.views.pypi.packages.sync",
+        "handler_name": "sync",
+        "line": 24,
+        "methods": [],
+        "module": "pypi_portal.views.pypi.packages",
+        "path": "/sync"
+      },
+      "scene_count": 3,
+      "scenes": [
+        {
+          "confidence": "high",
+          "file_path": "pypi_portal/views/pypi/packages.py",
+          "id": "symbol:pypi_portal.views.pypi.packages.sync",
+          "kind": "function",
+          "line": 24,
+          "name": "sync",
+          "role": "entry"
+        },
+        {
+          "confidence": "medium",
+          "file_path": "pypi_portal/core/flash.py",
+          "id": "symbol:pypi_portal.core.flash.info",
+          "kind": "function",
+          "line": 40,
+          "name": "info",
+          "role": "step"
+        },
+        {
+          "confidence": "high",
+          "file_path": "pypi_portal/core/flash.py",
+          "id": "symbol:pypi_portal.core.flash._escape",
+          "kind": "function",
+          "line": 11,
+          "name": "_escape",
+          "role": "step"
+        }
+      ],
+      "summary": "ANY /sync calls info, _escape.",
+      "thread": "branch",
+      "thread_index": 2,
+      "title": "ANY /sync (branch 2)"
+    }
+  ],
+  "content_signature": "915995cd8e06369b00f7c226720084902877e719",
+  "generated_at": 1768190807.783733,
+  "story_version": "v2",
+  "warnings": [
+    {
+      "code": "binary_file",
+      "message": "Skipped binary file",
+      "path": "pypi_portal/static/favicon.ico"
+    }
+  ]
+}

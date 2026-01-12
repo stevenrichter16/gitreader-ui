@@ -310,12 +310,12 @@ def _fallback_narration(
     context: Dict[str, List[str]],
 ) -> Dict[str, object]:
     name = node.name
-    hook = f'{name} hints at the next beat in the code story.'
-    summary = [
-        f'{name} establishes a new step in the flow.',
-        'It wires together a small slice of behavior.',
-        'The shape suggests where the next chapter connects.',
-    ]
+    kind_label = _kind_label(node.kind)
+    location_label = _format_location(node, snippet)
+    signature = node.signature or ''
+    doc_line = node.summary or ''
+    hook = _build_hook(name, kind_label, location_label, signature, doc_line)
+    summary = _build_summary(node, location_label, signature, doc_line, context)
     key_lines = []
     for highlight in snippet.get('highlights', []) or []:
         if not isinstance(highlight, dict):
@@ -329,7 +329,7 @@ def _fallback_narration(
     connections = context.get('outgoing') or context.get('incoming') or [
         'Connections are still being mapped.',
     ]
-    next_thread = 'Follow the nearest referenced symbol to continue the thread.'
+    next_thread = _build_next_thread(context)
     return {
         'hook': hook,
         'summary': summary,
@@ -337,6 +337,140 @@ def _fallback_narration(
         'connections': connections[:4],
         'next_thread': next_thread,
     }
+
+
+def _kind_label(kind: str) -> str:
+    labels = {
+        'file': 'File',
+        'class': 'Class',
+        'function': 'Function',
+        'method': 'Method',
+        'blueprint': 'Blueprint',
+        'external': 'External symbol',
+    }
+    return labels.get(kind, 'Symbol')
+
+
+def _format_location(node: SymbolNode, snippet: Dict[str, object]) -> str:
+    path = node.location.path if node.location and node.location.path else ''
+    start_line = snippet.get('start_line') if isinstance(snippet.get('start_line'), int) else None
+    end_line = snippet.get('end_line') if isinstance(snippet.get('end_line'), int) else None
+    if start_line is None and node.location:
+        start_line = node.location.start_line or None
+    if end_line is None and node.location:
+        end_line = node.location.end_line or None
+    if path and start_line:
+        if end_line and end_line != start_line:
+            return f'{path}:{start_line}-{end_line}'
+        return f'{path}:{start_line}'
+    return path or ''
+
+
+def _build_hook(
+    name: str,
+    kind_label: str,
+    location_label: str,
+    signature: str,
+    doc_line: str,
+) -> str:
+    if doc_line:
+        return f'{name}: {doc_line}'
+    if signature and location_label:
+        return f'{signature} in {location_label}.'
+    if location_label:
+        return f'{kind_label} {name} in {location_label}.'
+    if signature:
+        return signature
+    return f'{kind_label} {name} anchors this part of the flow.'
+
+
+def _build_summary(
+    node: SymbolNode,
+    location_label: str,
+    signature: str,
+    doc_line: str,
+    context: Dict[str, List[str]],
+) -> List[str]:
+    summary: List[str] = []
+    kind_label = _kind_label(node.kind)
+    if location_label:
+        summary.append(f'{kind_label} {node.name} in {location_label}.')
+    else:
+        summary.append(f'{kind_label} {node.name}.')
+    if signature:
+        summary.append(f'Signature: {signature}')
+    if doc_line:
+        summary.append(f'Docstring: {doc_line}')
+
+    outgoing = _edge_items(context.get('outgoing', []))
+    incoming = _edge_items(context.get('incoming', []))
+    if node.kind == 'file':
+        contains = _edge_summary(outgoing, 'contains', 'Contains')
+        if contains:
+            summary.append(contains)
+        imported = _edge_summary(incoming, 'imports', 'Imported by')
+        if imported:
+            summary.append(imported)
+    elif node.kind == 'class':
+        contains = _edge_summary(outgoing, 'contains', 'Contains')
+        if contains:
+            summary.append(contains)
+        calls = _edge_summary(outgoing, 'calls', 'Calls')
+        if calls:
+            summary.append(calls)
+    else:
+        calls = _edge_summary(outgoing, 'calls', 'Calls')
+        if calls:
+            summary.append(calls)
+        used_by = _edge_summary(incoming, 'calls', 'Used by')
+        if used_by:
+            summary.append(used_by)
+    return summary[:4]
+
+
+def _edge_items(entries: List[str]) -> List[tuple[str, str]]:
+    items: List[tuple[str, str]] = []
+    for entry in entries:
+        if '->' in entry:
+            left, right = entry.split('->', 1)
+        elif '<-' in entry:
+            left, right = entry.split('<-', 1)
+        else:
+            continue
+        kind = left.strip()
+        name = right.strip()
+        if '(' in name:
+            name = name.split('(', 1)[0].strip()
+        if kind and name:
+            items.append((kind, name))
+    return items
+
+
+def _edge_summary(items: List[tuple[str, str]], kind: str, label: str, limit: int = 3) -> str:
+    names = [name for edge_kind, name in items if edge_kind == kind]
+    if not names:
+        return ''
+    deduped: List[str] = []
+    seen = set()
+    for name in names:
+        if name in seen:
+            continue
+        seen.add(name)
+        deduped.append(name)
+        if len(deduped) >= limit:
+            break
+    suffix = '...' if len(names) > len(deduped) else ''
+    return f'{label}: {", ".join(deduped)}{suffix}'
+
+
+def _build_next_thread(context: Dict[str, List[str]]) -> str:
+    outgoing = _edge_items(context.get('outgoing', []))
+    incoming = _edge_items(context.get('incoming', []))
+    if outgoing:
+        return f'Follow {outgoing[0][1]} to continue the thread.'
+    if incoming:
+        return f'Backtrack to {incoming[0][1]} to see the caller.'
+    return 'Follow the nearest referenced symbol to continue the thread.'
 
 
 def _env_int(name: str, default: int) -> int:

@@ -12,6 +12,11 @@ ROUTE_DECORATORS = {'route', 'get', 'post', 'put', 'patch', 'delete'}
 METHOD_DECORATORS = {'get', 'post', 'put', 'patch', 'delete'}
 LOW_SIGNAL_BASENAMES = {'utils.py', 'helpers.py'}
 LOW_SIGNAL_SEGMENTS = {'/tests/', '/test/', '/utils/', '/helpers/'}
+EDGE_CONFIDENCE_WEIGHT = {
+    'high': 1.0,
+    'medium': 0.7,
+    'low': 0.4,
+}
 
 
 @dataclass
@@ -34,16 +39,76 @@ def build_story_arcs(
     routes = _find_flask_routes(parsed_files)
     if not routes:
         return []
-    adjacency = _build_call_adjacency(index)
+    adjacency, incoming = _build_call_graph(index)
+    scores = _score_nodes(index, adjacency, incoming)
     arcs: List[Dict[str, object]] = []
     for route in routes:
         if route.handler_id not in index.nodes:
             continue
-        scenes = _build_scene_path(index, adjacency, route.handler_id, max_depth, max_scenes)
-        arcs.append(_arc_from_route(route, scenes))
+        entry_node = index.nodes.get(route.handler_id)
+        entry_path = entry_node.location.path if entry_node and entry_node.location else ''
+        ranked_targets = _rank_targets(index, adjacency, scores, route.handler_id, entry_path)
+        internal_calls, external_calls = _collect_call_targets(index, route.handler_id)
+
+        thread_arcs: List[Dict[str, object]] = []
+        primary = ranked_targets[0] if ranked_targets else None
+        main_scenes = _build_thread_path(
+            index,
+            adjacency,
+            scores,
+            route.handler_id,
+            entry_path,
+            max_depth,
+            max_scenes,
+            forced_first=primary,
+        )
+        main_id = _route_arc_id(route, 'main')
+        thread_arcs.append(_arc_from_route(
+            route,
+            main_scenes,
+            internal_calls,
+            external_calls,
+            arc_id=main_id,
+            thread='main',
+            thread_index=0,
+            parent_id=None,
+        ))
+
+        branch_index = 1
+        for candidate in ranked_targets[1:3]:
+            branch_scenes = _build_thread_path(
+                index,
+                adjacency,
+                scores,
+                route.handler_id,
+                entry_path,
+                max_depth,
+                max_scenes,
+                forced_first=candidate,
+            )
+            if len(branch_scenes) <= 1:
+                continue
+            branch_id = _route_arc_id(route, f'branch-{branch_index}')
+            thread_arcs.append(_arc_from_route(
+                route,
+                branch_scenes,
+                internal_calls,
+                external_calls,
+                arc_id=branch_id,
+                thread='branch',
+                thread_index=branch_index,
+                parent_id=main_id,
+            ))
+            branch_index += 1
+
+        related_ids = [arc['id'] for arc in thread_arcs]
+        for arc in thread_arcs:
+            arc['related_ids'] = [item for item in related_ids if item != arc['id']]
+        arcs.extend(thread_arcs)
     arcs.sort(key=lambda arc: (
         str(arc.get('route', {}).get('path', '')),
         str(arc.get('route', {}).get('handler_name', '')),
+        int(arc.get('thread_index', 0)),
     ))
     return arcs
 
@@ -137,8 +202,9 @@ def _string_value(node: ast.AST) -> Optional[str]:
     return None
 
 
-def _build_call_adjacency(index: RepoIndex) -> Dict[str, List[str]]:
-    adjacency: Dict[str, set[str]] = {}
+def _build_call_graph(index: RepoIndex) -> tuple[Dict[str, List[tuple[str, str]]], Dict[str, List[tuple[str, str]]]]:
+    adjacency: Dict[str, List[tuple[str, str]]] = {}
+    incoming: Dict[str, List[tuple[str, str]]] = {}
     for edge in index.edges:
         if edge.kind != 'calls':
             continue
@@ -147,11 +213,58 @@ def _build_call_adjacency(index: RepoIndex) -> Dict[str, List[str]]:
         target = index.nodes[edge.target]
         if target.kind == 'external':
             continue
-        adjacency.setdefault(edge.source, set()).add(edge.target)
-    ordered: Dict[str, List[str]] = {}
-    for source, targets in adjacency.items():
-        ordered[source] = sorted(targets, key=lambda node_id: _node_sort_key(index.nodes.get(node_id)))
-    return ordered
+        adjacency.setdefault(edge.source, []).append((edge.target, edge.confidence))
+        incoming.setdefault(edge.target, []).append((edge.source, edge.confidence))
+    for source in adjacency:
+        adjacency[source] = sorted(
+            adjacency[source],
+            key=lambda item: _node_sort_key(index.nodes.get(item[0])),
+        )
+    return adjacency, incoming
+
+
+def _score_nodes(
+    index: RepoIndex,
+    adjacency: Dict[str, List[tuple[str, str]]],
+    incoming: Dict[str, List[tuple[str, str]]],
+) -> Dict[str, float]:
+    scores: Dict[str, float] = {}
+    for node_id, node in index.nodes.items():
+        if node.kind == 'external':
+            continue
+        fan_out = len(adjacency.get(node_id, []))
+        fan_in = len(incoming.get(node_id, []))
+        doc_bonus = 1.5 if node.summary else 0.0
+        score = fan_out * 2.0 + fan_in * 1.0 + doc_bonus
+        if node.kind == 'class':
+            score += 0.5
+        if _should_skip(node):
+            score -= 2.0
+        scores[node_id] = score
+    return scores
+
+
+def _rank_targets(
+    index: RepoIndex,
+    adjacency: Dict[str, List[tuple[str, str]]],
+    scores: Dict[str, float],
+    source_id: str,
+    entry_path: str,
+) -> List[tuple[str, str, float]]:
+    ranked: List[tuple[str, str, float]] = []
+    for target_id, confidence in adjacency.get(source_id, []):
+        target = index.nodes.get(target_id)
+        if not target or target.kind == 'external':
+            continue
+        score = scores.get(target_id, 0.0)
+        if entry_path and target.location and target.location.path and target.location.path != entry_path:
+            score += 0.8
+        score += EDGE_CONFIDENCE_WEIGHT.get(confidence, 0.4)
+        if _should_skip(target):
+            score -= 1.5
+        ranked.append((target_id, confidence, score))
+    ranked.sort(key=lambda item: item[2], reverse=True)
+    return ranked
 
 
 def _node_sort_key(node: Optional[SymbolNode]) -> tuple[str, str]:
@@ -163,38 +276,54 @@ def _node_sort_key(node: Optional[SymbolNode]) -> tuple[str, str]:
     return (node.name, path)
 
 
-def _build_scene_path(
+def _build_thread_path(
     index: RepoIndex,
-    adjacency: Dict[str, List[str]],
+    adjacency: Dict[str, List[tuple[str, str]]],
+    scores: Dict[str, float],
     entry_id: str,
+    entry_path: str,
     max_depth: int,
     max_scenes: int,
+    forced_first: Optional[tuple[str, str, float]] = None,
 ) -> List[Dict[str, object]]:
     visited: set[str] = set()
     scenes: List[Dict[str, object]] = []
 
-    def visit(node_id: str, depth: int, role: str) -> None:
+    def add_scene(node_id: str, role: str, confidence: str) -> bool:
         if node_id in visited:
-            return
+            return False
         node = index.nodes.get(node_id)
         if not node or node.kind == 'external':
-            return
+            return False
         if role != 'entry' and _should_skip(node):
-            return
+            return False
         visited.add(node_id)
-        scenes.append(_scene_from_node(node, role))
+        scenes.append(_scene_from_node(node, role, confidence))
+        return True
+
+    def walk(node_id: str, depth: int) -> None:
         if depth >= max_depth or len(scenes) >= max_scenes:
             return
-        for target_id in adjacency.get(node_id, []):
+        ranked = _rank_targets(index, adjacency, scores, node_id, entry_path)
+        for target_id, confidence, _score in ranked:
             if len(scenes) >= max_scenes:
                 break
-            visit(target_id, depth + 1, 'step')
+            if not add_scene(target_id, 'step', confidence):
+                continue
+            walk(target_id, depth + 1)
+            break
 
-    visit(entry_id, 0, 'entry')
+    add_scene(entry_id, 'entry', 'high')
+    if forced_first:
+        target_id, confidence, _score = forced_first
+        if add_scene(target_id, 'step', confidence):
+            walk(target_id, 1)
+        return scenes
+    walk(entry_id, 0)
     return scenes
 
 
-def _scene_from_node(node: SymbolNode, role: str) -> Dict[str, object]:
+def _scene_from_node(node: SymbolNode, role: str, confidence: str) -> Dict[str, object]:
     location = node.location
     path = location.path if location else ''
     line = location.start_line if location else 0
@@ -205,6 +334,7 @@ def _scene_from_node(node: SymbolNode, role: str) -> Dict[str, object]:
         'file_path': path,
         'line': line,
         'role': role,
+        'confidence': confidence,
     }
 
 
@@ -222,18 +352,31 @@ def _should_skip(node: SymbolNode) -> bool:
     return any(segment in padded for segment in LOW_SIGNAL_SEGMENTS)
 
 
-def _arc_from_route(route: RouteInfo, scenes: List[Dict[str, object]]) -> Dict[str, object]:
+def _arc_from_route(
+    route: RouteInfo,
+    scenes: List[Dict[str, object]],
+    internal_calls: List[str],
+    external_calls: List[str],
+    arc_id: str,
+    thread: str,
+    thread_index: int,
+    parent_id: Optional[str],
+) -> Dict[str, object]:
     methods_label = _methods_label(route.methods)
     if route.path:
         title = f'{methods_label} {route.path}'.strip()
     else:
         title = f'{methods_label} {route.handler_name}'.strip()
-    arc_id = _route_arc_id(route)
+    if thread != 'main':
+        title = f'{title} (branch {thread_index})'
     return {
         'id': arc_id,
         'title': title,
         'summary': _arc_summary(route, scenes),
         'entry_id': route.handler_id,
+        'thread': thread,
+        'thread_index': thread_index,
+        'parent_id': parent_id,
         'route': {
             'path': route.path,
             'methods': route.methods,
@@ -245,11 +388,41 @@ def _arc_from_route(route: RouteInfo, scenes: List[Dict[str, object]]) -> Dict[s
         },
         'scenes': scenes,
         'scene_count': len(scenes),
+        'calls': {
+            'internal': internal_calls,
+            'external': external_calls,
+        },
     }
 
 
-def _route_arc_id(route: RouteInfo) -> str:
-    payload = f'{route.handler_id}|{route.path}|{",".join(route.methods)}'
+def _collect_call_targets(index: RepoIndex, entry_id: str, limit: int = 6) -> tuple[List[str], List[str]]:
+    internal: List[str] = []
+    external: List[str] = []
+    seen_internal = set()
+    seen_external = set()
+    for edge in index.edges:
+        if edge.kind != 'calls' or edge.source != entry_id:
+            continue
+        target = index.nodes.get(edge.target)
+        if not target:
+            continue
+        if target.kind == 'external':
+            if target.name in seen_external:
+                continue
+            seen_external.add(target.name)
+            external.append(target.name)
+        else:
+            if target.name in seen_internal:
+                continue
+            seen_internal.add(target.name)
+            internal.append(target.name)
+        if len(internal) >= limit and len(external) >= limit:
+            break
+    return internal[:limit], external[:limit]
+
+
+def _route_arc_id(route: RouteInfo, thread_label: str) -> str:
+    payload = f'{route.handler_id}|{route.path}|{",".join(route.methods)}|{thread_label}'
     digest = hashlib.sha1(payload.encode("utf-8", errors="replace")).hexdigest()[:12]
     return f'arc:{digest}'
 

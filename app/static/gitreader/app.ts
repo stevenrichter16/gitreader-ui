@@ -58,6 +58,7 @@ interface StoryScene {
     file_path: string;
     line: number;
     role: string;
+    confidence?: EdgeConfidence;
 }
 
 interface StoryArc {
@@ -65,9 +66,17 @@ interface StoryArc {
     title: string;
     summary: string;
     entry_id: string;
+    thread?: string;
+    thread_index?: number;
+    parent_id?: string | null;
+    related_ids?: string[];
     route: StoryRouteInfo;
     scenes: StoryScene[];
     scene_count: number;
+    calls?: {
+        internal?: string[];
+        external?: string[];
+    };
 }
 
 interface ApiWarning {
@@ -524,6 +533,17 @@ class GitReaderApp {
             }
         });
 
+        this.narratorOutput.addEventListener('click', (event) => {
+            const target = (event.target as HTMLElement).closest<HTMLElement>('[data-arc-id]');
+            if (!target) {
+                return;
+            }
+            const arcId = target.dataset.arcId;
+            if (arcId) {
+                void this.setTocMode('routes', arcId);
+            }
+        });
+
         this.repoForm.addEventListener('submit', (event) => {
             event.preventDefault();
             this.applyRepoSelection();
@@ -609,7 +629,7 @@ class GitReaderApp {
         const summary = [handler, arc.summary].filter(Boolean).join(' - ') || 'Route arc';
         return {
             id: arc.id,
-            title: arc.title || handler || 'Route',
+            title: this.formatArcTitle(arc) || handler || 'Route',
             summary,
         };
     }
@@ -637,7 +657,7 @@ class GitReaderApp {
     }
 
     private formatArcOptionLabel(arc: StoryArc): string {
-        const routeLabel = this.formatRouteLabel(arc);
+        const routeLabel = this.formatArcTitle(arc);
         const handler = arc.route?.handler_name ? ` - ${arc.route.handler_name}` : '';
         return `${routeLabel}${handler}`.trim();
     }
@@ -1841,18 +1861,30 @@ class GitReaderApp {
     }
 
     private formatStoryArc(arc: StoryArc, mode: NarrationMode): { eyebrow: string; title: string; body: string } {
-        const routeLabel = this.escapeHtml(this.formatRouteLabel(arc));
+        const routeLabel = this.escapeHtml(this.formatArcTitle(arc));
         const scenes = Array.isArray(arc.scenes) ? arc.scenes : [];
         if (mode === 'summary') {
+            const entryNode = this.nodeById.get(arc.entry_id);
+            const summaryText = arc.summary ? this.escapeHtml(arc.summary) : '';
+            const metaItems = this.buildArcMetaItems(arc, entryNode);
+            const metaList = metaItems.length > 0
+                ? `<ul>${metaItems.map((item) => `<li>${this.escapeHtml(item)}</li>`).join('')}</ul>`
+                : '';
             const items = scenes.map((scene, index) => {
                 const label = this.formatStorySceneLabel(scene, index, true);
                 return `<li>${this.escapeHtml(label)}</li>`;
             });
-            const body = items.length > 0
-                ? `<ol>${items.join('')}</ol>`
-                : '<p>No flow steps captured yet.</p>';
+            const flowLabel = scenes.length > 1 ? 'Flow steps' : 'Flow steps (entry only)';
+            const flowList = items.length > 0
+                ? `<p>${flowLabel}</p><ol>${items.join('')}</ol>`
+                : '<p>No internal calls detected yet.</p>';
+            const body = `
+                ${summaryText ? `<p>${summaryText}</p>` : ''}
+                ${metaList}
+                ${flowList}
+            `;
             return {
-                eyebrow: 'Scenes',
+                eyebrow: 'What it does',
                 title: `Primary flow for ${routeLabel}`,
                 body,
             };
@@ -1873,14 +1905,10 @@ class GitReaderApp {
             };
         }
         if (mode === 'connections') {
-            const paths = scenes
-                .map((scene) => scene.file_path)
-                .filter((path): path is string => Boolean(path));
-            const unique = Array.from(new Set(paths));
-            const items = unique.map((path) => `<li>${this.escapeHtml(path)}</li>`);
-            const body = items.length > 0
-                ? `<ul>${items.join('')}</ul>`
-                : '<p>No file connections yet.</p>';
+            const connectionItems = this.buildArcConnectionItems(arc, scenes);
+            const body = connectionItems.length > 0
+                ? `<ul>${connectionItems.map((item) => `<li>${this.escapeHtml(item)}</li>`).join('')}</ul>`
+                : '<p>Connections are still being mapped.</p>';
             return {
                 eyebrow: 'Connections',
                 title: `Files touched by ${routeLabel}`,
@@ -1888,6 +1916,19 @@ class GitReaderApp {
             };
         }
         if (mode === 'next') {
+            const related = arc.related_ids ?? [];
+            if (related.length > 0) {
+                const buttons = related.map((arcId) => {
+                    const target = this.storyArcsById.get(arcId);
+                    const label = target ? this.formatArcTitle(target) : arcId;
+                    return `<button class="ghost-btn arc-jump" data-arc-id="${this.escapeHtml(arcId)}">${this.escapeHtml(label)}</button>`;
+                });
+                return {
+                    eyebrow: 'Next thread',
+                    title: 'Where to go next',
+                    body: `<p>Jump to a related thread.</p><div class="arc-jump-list">${buttons.join('')}</div>`,
+                };
+            }
             const last = scenes[scenes.length - 1];
             const location = last ? this.formatStorySceneLocation(last) : '';
             const label = last
@@ -1912,7 +1953,8 @@ class GitReaderApp {
     private formatStorySceneLabel(scene: StoryScene, index: number, includeLocation: boolean): string {
         const roleLabel = scene.role === 'entry' ? 'Entry' : `Step ${index + 1}`;
         const kindLabel = this.getKindLabel(scene.kind);
-        const base = `${roleLabel}: ${scene.name} (${kindLabel})`;
+        const confidence = scene.confidence === 'low' ? ' (low confidence)' : '';
+        const base = `${roleLabel}: ${scene.name} (${kindLabel})${confidence}`;
         if (!includeLocation) {
             return base;
         }
@@ -1928,6 +1970,98 @@ class GitReaderApp {
             return `${scene.file_path}:${scene.line}`;
         }
         return scene.file_path;
+    }
+
+    private buildArcMetaItems(arc: StoryArc, entryNode?: SymbolNode): string[] {
+        const items: string[] = [];
+        const threadLabel = this.getArcThreadLabel(arc);
+        if (threadLabel) {
+            items.push(`Thread: ${threadLabel}`);
+        }
+        const methods = arc.route?.methods?.length ? arc.route.methods.join('|') : 'ANY';
+        const path = arc.route?.path ? arc.route.path : '';
+        const routeLabel = path ? `${methods} ${path}`.trim() : methods;
+        if (routeLabel) {
+            items.push(`Route: ${routeLabel}`);
+        }
+        if (arc.route?.handler_name) {
+            items.push(`Handler: ${arc.route.handler_name}`);
+        }
+        if (arc.route?.module) {
+            items.push(`Module: ${arc.route.module}`);
+        }
+        if (arc.route?.file_path) {
+            const line = arc.route.line ? `:${arc.route.line}` : '';
+            items.push(`Defined in: ${arc.route.file_path}${line}`);
+        }
+        if (entryNode?.signature) {
+            items.push(`Signature: ${entryNode.signature}`);
+        }
+        if (entryNode?.summary) {
+            items.push(`Docstring: ${entryNode.summary}`);
+        }
+        const steps = arc.scene_count || 0;
+        items.push(`Steps detected: ${steps}`);
+        const internalCalls = arc.calls?.internal ?? [];
+        if (internalCalls.length > 0) {
+            items.push(`Internal calls: ${internalCalls.slice(0, 4).join(', ')}`);
+        }
+        const externalCalls = arc.calls?.external ?? [];
+        if (externalCalls.length > 0) {
+            items.push(`External calls: ${externalCalls.slice(0, 4).join(', ')}`);
+        }
+        return items;
+    }
+
+    private buildArcConnectionItems(arc: StoryArc, scenes: StoryScene[]): string[] {
+        const items: string[] = [];
+        const internalCalls = arc.calls?.internal ?? [];
+        if (internalCalls.length > 0) {
+            items.push(`Internal calls: ${internalCalls.slice(0, 5).join(', ')}`);
+        }
+        const externalCalls = arc.calls?.external ?? [];
+        if (externalCalls.length > 0) {
+            items.push(`External calls: ${externalCalls.slice(0, 5).join(', ')}`);
+        }
+        const related = arc.related_ids ?? [];
+        if (related.length > 0) {
+            const labels = related.map((arcId) => {
+                const target = this.storyArcsById.get(arcId);
+                return target ? this.formatArcTitle(target) : arcId;
+            });
+            items.push(`Related threads: ${labels.join(', ')}`);
+        }
+        const paths = scenes
+            .map((scene) => scene.file_path)
+            .filter((path): path is string => Boolean(path));
+        const unique = Array.from(new Set(paths));
+        if (unique.length > 0) {
+            items.push(`Files: ${unique.slice(0, 6).join(', ')}`);
+        }
+        return items;
+    }
+
+    private getArcThreadLabel(arc: StoryArc): string {
+        if (!arc.thread || arc.thread === 'main') {
+            return '';
+        }
+        if (arc.thread === 'branch') {
+            const index = arc.thread_index ?? 0;
+            return `Branch ${index}`;
+        }
+        return arc.thread;
+    }
+
+    private formatArcTitle(arc: StoryArc): string {
+        const base = arc.title || this.formatRouteLabel(arc);
+        const threadLabel = this.getArcThreadLabel(arc);
+        if (!threadLabel) {
+            return base;
+        }
+        if (base.toLowerCase().includes('branch')) {
+            return base;
+        }
+        return `${base} (${threadLabel})`;
     }
 
     private setMode(mode: NarrationMode): void {

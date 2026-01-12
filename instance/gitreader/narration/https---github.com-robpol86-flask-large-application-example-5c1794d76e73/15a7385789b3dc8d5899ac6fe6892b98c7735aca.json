@@ -1,0 +1,34 @@
+{
+  "created_at": 1768190864.871896,
+  "response": {
+    "cached": false,
+    "connections": [
+      "contains -> CustomFormatter (class)",
+      "contains -> setup_logging (function)",
+      "contains -> log_messages (function)",
+      "contains -> parse_options (function)"
+    ],
+    "hook": "File manage.py in manage.py:1-200.",
+    "key_lines": [
+      {
+        "line": 1,
+        "text": "Snippet Start"
+      },
+      {
+        "line": 200,
+        "text": "Snippet End"
+      }
+    ],
+    "mode": "hook",
+    "model": "gpt-4o-mini",
+    "next_thread": "Follow CustomFormatter to continue the thread.",
+    "prompt_version": "v1",
+    "source": "fallback",
+    "summary": [
+      "File manage.py in manage.py:1-200.",
+      "Contains: CustomFormatter, setup_logging, log_messages..."
+    ],
+    "symbol_id": "file:manage.py",
+    "symbol_name": "manage.py"
+  }
+}

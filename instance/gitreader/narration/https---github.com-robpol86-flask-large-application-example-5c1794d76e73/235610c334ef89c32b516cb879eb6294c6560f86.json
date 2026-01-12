@@ -1,0 +1,40 @@
+{
+  "created_at": 1768191107.9015381,
+  "response": {
+    "cached": false,
+    "connections": [
+      "calls -> flask.Flask (external)",
+      "calls -> dict (external)",
+      "calls -> update (external)",
+      "calls -> app.add_url_rule (external)"
+    ],
+    "hook": "create_app: Flask application factory. Initializes and returns the Flask application.",
+    "key_lines": [
+      {
+        "line": 66,
+        "text": "Signature"
+      },
+      {
+        "line": 67,
+        "text": "Body Start"
+      },
+      {
+        "line": 112,
+        "text": "Body End"
+      }
+    ],
+    "mode": "summary",
+    "model": "gpt-4o-mini",
+    "next_thread": "Follow flask.Flask to continue the thread.",
+    "prompt_version": "v1",
+    "source": "fallback",
+    "summary": [
+      "Function create_app in pypi_portal/application.py:66-112.",
+      "Signature: def create_app(config_obj, no_sql=False)",
+      "Docstring: Flask application factory. Initializes and returns the Flask application.",
+      "Calls: flask.Flask, dict, update..."
+    ],
+    "symbol_id": "symbol:pypi_portal.application.create_app",
+    "symbol_name": "create_app"
+  }
+}

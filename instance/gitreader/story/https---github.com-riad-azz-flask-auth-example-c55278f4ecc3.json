@@ -1,0 +1,179 @@
+{
+  "arcs": [
+    {
+      "calls": {
+        "external": [
+          "routes_bp.route",
+          "flask.render_template"
+        ],
+        "internal": []
+      },
+      "entry_id": "symbol:app.routes.home",
+      "id": "arc:3213cd654b01",
+      "parent_id": null,
+      "related_ids": [],
+      "route": {
+        "file_path": "app/routes.py",
+        "handler_id": "symbol:app.routes.home",
+        "handler_name": "home",
+        "line": 20,
+        "methods": [],
+        "module": "app.routes",
+        "path": "/"
+      },
+      "scene_count": 1,
+      "scenes": [
+        {
+          "confidence": "high",
+          "file_path": "app/routes.py",
+          "id": "symbol:app.routes.home",
+          "kind": "function",
+          "line": 20,
+          "name": "home",
+          "role": "entry"
+        }
+      ],
+      "summary": "ANY / starts here.",
+      "thread": "main",
+      "thread_index": 0,
+      "title": "ANY /"
+    },
+    {
+      "calls": {
+        "external": [
+          "routes_bp.route",
+          "app.forms.LoginForm",
+          "form.validate_on_submit",
+          "flask.render_template",
+          "flask.redirect",
+          "one_or_none"
+        ],
+        "internal": []
+      },
+      "entry_id": "symbol:app.routes.login",
+      "id": "arc:21cfc46914cb",
+      "parent_id": null,
+      "related_ids": [],
+      "route": {
+        "file_path": "app/routes.py",
+        "handler_id": "symbol:app.routes.login",
+        "handler_name": "login",
+        "line": 25,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "module": "app.routes",
+        "path": "/login"
+      },
+      "scene_count": 1,
+      "scenes": [
+        {
+          "confidence": "high",
+          "file_path": "app/routes.py",
+          "id": "symbol:app.routes.login",
+          "kind": "function",
+          "line": 25,
+          "name": "login",
+          "role": "entry"
+        }
+      ],
+      "summary": "GET|POST /login starts here.",
+      "thread": "main",
+      "thread_index": 0,
+      "title": "GET|POST /login"
+    },
+    {
+      "calls": {
+        "external": [
+          "routes_bp.route",
+          "flask_login.logout_user",
+          "flask.redirect",
+          "flask.url_for"
+        ],
+        "internal": []
+      },
+      "entry_id": "symbol:app.routes.logout",
+      "id": "arc:6c31b980586f",
+      "parent_id": null,
+      "related_ids": [],
+      "route": {
+        "file_path": "app/routes.py",
+        "handler_id": "symbol:app.routes.logout",
+        "handler_name": "logout",
+        "line": 77,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "module": "app.routes",
+        "path": "/logout"
+      },
+      "scene_count": 1,
+      "scenes": [
+        {
+          "confidence": "high",
+          "file_path": "app/routes.py",
+          "id": "symbol:app.routes.logout",
+          "kind": "function",
+          "line": 77,
+          "name": "logout",
+          "role": "entry"
+        }
+      ],
+      "summary": "GET|POST /logout starts here.",
+      "thread": "main",
+      "thread_index": 0,
+      "title": "GET|POST /logout"
+    },
+    {
+      "calls": {
+        "external": [
+          "routes_bp.route",
+          "app.forms.RegistrationForm",
+          "form.validate_on_submit",
+          "flask.render_template",
+          "flask.redirect",
+          "app.extensions.bcrypt"
+        ],
+        "internal": []
+      },
+      "entry_id": "symbol:app.routes.register",
+      "id": "arc:e99937bbc335",
+      "parent_id": null,
+      "related_ids": [],
+      "route": {
+        "file_path": "app/routes.py",
+        "handler_id": "symbol:app.routes.register",
+        "handler_name": "register",
+        "line": 48,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "module": "app.routes",
+        "path": "/register"
+      },
+      "scene_count": 1,
+      "scenes": [
+        {
+          "confidence": "high",
+          "file_path": "app/routes.py",
+          "id": "symbol:app.routes.register",
+          "kind": "function",
+          "line": 48,
+          "name": "register",
+          "role": "entry"
+        }
+      ],
+      "summary": "GET|POST /register starts here.",
+      "thread": "main",
+      "thread_index": 0,
+      "title": "GET|POST /register"
+    }
+  ],
+  "content_signature": "77567f4674902211cd7b1aa9da078bdfbb0350ba",
+  "generated_at": 1768190697.084699,
+  "story_version": "v2",
+  "warnings": []
+}

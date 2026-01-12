@@ -1,5 +1,5 @@
 {
-  "created_at": 1768187943.2827148,
+  "created_at": 1768188259.598521,
   "response": {
     "cached": false,
     "connections": [
@@ -16,7 +16,7 @@
         "text": "Snippet End"
       }
     ],
-    "mode": "hook",
+    "mode": "summary",
     "model": "gpt-4o-mini",
     "next_thread": "Follow app/__init__.py to continue the thread.",
     "prompt_version": "v1",

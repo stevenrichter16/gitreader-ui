@@ -1,0 +1,34 @@
+{
+  "created_at": 1768191166.2054348,
+  "response": {
+    "cached": false,
+    "connections": [
+      "contains -> HardCoded (class)",
+      "contains -> CeleryConfig (class)",
+      "contains -> Config (class)",
+      "contains -> Testing (class)"
+    ],
+    "hook": "File pypi_portal/config.py in pypi_portal/config.py:1-67.",
+    "key_lines": [
+      {
+        "line": 1,
+        "text": "Snippet Start"
+      },
+      {
+        "line": 67,
+        "text": "Snippet End"
+      }
+    ],
+    "mode": "next",
+    "model": "gpt-4o-mini",
+    "next_thread": "Follow HardCoded to continue the thread.",
+    "prompt_version": "v1",
+    "source": "fallback",
+    "summary": [
+      "File pypi_portal/config.py in pypi_portal/config.py:1-67.",
+      "Contains: HardCoded, CeleryConfig, Config..."
+    ],
+    "symbol_id": "file:pypi_portal/config.py",
+    "symbol_name": "pypi_portal/config.py"
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "created_at": 1768190801.001579,
+  "response": {
+    "cached": false,
+    "connections": [
+      "calls -> CustomFormatter (class)",
+      "calls -> logging (external)",
+      "calls -> console_handler.setLevel (external)",
+      "calls -> console_handler.setFormatter (external)"
+    ],
+    "hook": "setup_logging: Setup Google-Style logging for the entire application.",
+    "key_lines": [
+      {
+        "line": 81,
+        "text": "Signature"
+      },
+      {
+        "line": 82,
+        "text": "Body Start"
+      },
+      {
+        "line": 118,
+        "text": "Body End"
+      }
+    ],
+    "mode": "hook",
+    "model": "gpt-4o-mini",
+    "next_thread": "Follow CustomFormatter to continue the thread.",
+    "prompt_version": "v1",
+    "source": "fallback",
+    "summary": [
+      "Function setup_logging in manage.py:81-118.",
+      "Signature: def setup_logging(name=None)",
+      "Docstring: Setup Google-Style logging for the entire application.",
+      "Calls: CustomFormatter, logging, console_handler.setLevel..."
+    ],
+    "symbol_id": "symbol:manage.setup_logging",
+    "symbol_name": "setup_logging"
+  }
+}

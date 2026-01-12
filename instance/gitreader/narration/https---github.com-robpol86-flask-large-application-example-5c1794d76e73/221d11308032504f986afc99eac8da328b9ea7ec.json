@@ -1,0 +1,35 @@
+{
+  "created_at": 1768191031.2644749,
+  "response": {
+    "cached": false,
+    "connections": [
+      "contains -> get_config (function)",
+      "contains -> create_app (function)",
+      "imports -> importlib (external)",
+      "imports -> locale (external)"
+    ],
+    "hook": "File pypi_portal/application.py in pypi_portal/application.py:1-112.",
+    "key_lines": [
+      {
+        "line": 1,
+        "text": "Snippet Start"
+      },
+      {
+        "line": 112,
+        "text": "Snippet End"
+      }
+    ],
+    "mode": "hook",
+    "model": "gpt-4o-mini",
+    "next_thread": "Follow get_config to continue the thread.",
+    "prompt_version": "v1",
+    "source": "fallback",
+    "summary": [
+      "File pypi_portal/application.py in pypi_portal/application.py:1-112.",
+      "Contains: get_config, create_app",
+      "Imported by: manage.py, tests/conftest.py, tests/test_application.py"
+    ],
+    "symbol_id": "file:pypi_portal/application.py",
+    "symbol_name": "pypi_portal/application.py"
+  }
+}

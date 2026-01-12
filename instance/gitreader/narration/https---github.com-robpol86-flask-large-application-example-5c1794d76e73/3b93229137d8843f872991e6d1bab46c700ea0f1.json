@@ -1,0 +1,37 @@
+{
+  "created_at": 1768190941.6276128,
+  "response": {
+    "cached": false,
+    "connections": [
+      "contains -> format (method)",
+      "inherits -> Formatter (external)"
+    ],
+    "hook": "class CustomFormatter(logging.Formatter) in manage.py:73-78.",
+    "key_lines": [
+      {
+        "line": 73,
+        "text": "Signature"
+      },
+      {
+        "line": 74,
+        "text": "Body Start"
+      },
+      {
+        "line": 78,
+        "text": "Body End"
+      }
+    ],
+    "mode": "hook",
+    "model": "gpt-4o-mini",
+    "next_thread": "Follow format to continue the thread.",
+    "prompt_version": "v1",
+    "source": "fallback",
+    "summary": [
+      "Class CustomFormatter in manage.py:73-78.",
+      "Signature: class CustomFormatter(logging.Formatter)",
+      "Contains: format"
+    ],
+    "symbol_id": "symbol:manage.CustomFormatter",
+    "symbol_name": "CustomFormatter"
+  }
+}

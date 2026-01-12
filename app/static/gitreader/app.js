@@ -346,6 +346,17 @@
             }
         });
 
+        this.narratorOutput.addEventListener('click', function (event) {
+            var target = event.target.closest('[data-arc-id]');
+            if (!target) {
+                return;
+            }
+            var arcId = target.dataset.arcId;
+            if (arcId) {
+                _this.setTocMode('routes', arcId);
+            }
+        });
+
         this.repoForm.addEventListener('submit', function (event) {
             event.preventDefault();
             _this.applyRepoSelection();
@@ -434,7 +445,7 @@
         var summary = [handler, arc.summary].filter(Boolean).join(' - ') || 'Route arc';
         return {
             id: arc.id,
-            title: arc.title || handler || 'Route',
+            title: this.formatArcTitle(arc) || handler || 'Route',
             summary: summary,
         };
     };
@@ -463,7 +474,7 @@
     };
 
     GitReaderApp.prototype.formatArcOptionLabel = function (arc) {
-        var routeLabel = this.formatRouteLabel(arc);
+        var routeLabel = this.formatArcTitle(arc);
         var handler = arc.route && arc.route.handler_name ? ' - ' + arc.route.handler_name : '';
         return (routeLabel + handler).trim();
     };
@@ -1919,18 +1930,26 @@
     };
 
     GitReaderApp.prototype.formatStoryArc = function (arc, mode) {
-        var routeLabel = escapeHtml(this.formatRouteLabel(arc));
+        var routeLabel = escapeHtml(this.formatArcTitle(arc));
         var scenes = Array.isArray(arc.scenes) ? arc.scenes : [];
         if (mode === 'summary') {
+            var entryNode = this.nodeById.get(arc.entry_id);
+            var summaryText = arc.summary ? escapeHtml(arc.summary) : '';
+            var metaItems = this.buildArcMetaItems(arc, entryNode);
+            var metaList = metaItems.length > 0
+                ? '<ul>' + metaItems.map(function (item) { return '<li>' + escapeHtml(item) + '</li>'; }).join('') + '</ul>'
+                : '';
             var items = scenes.map(function (scene, index) {
                 var label = this.formatStorySceneLabel(scene, index, true);
                 return '<li>' + escapeHtml(label) + '</li>';
             }, this);
-            var body = items.length > 0
-                ? '<ol>' + items.join('') + '</ol>'
-                : '<p>No flow steps captured yet.</p>';
+            var flowLabel = scenes.length > 1 ? 'Flow steps' : 'Flow steps (entry only)';
+            var flowList = items.length > 0
+                ? '<p>' + flowLabel + '</p><ol>' + items.join('') + '</ol>'
+                : '<p>No internal calls detected yet.</p>';
+            var body = (summaryText ? '<p>' + summaryText + '</p>' : '') + metaList + flowList;
             return {
-                eyebrow: 'Scenes',
+                eyebrow: 'What it does',
                 title: 'Primary flow for ' + routeLabel,
                 body: body
             };
@@ -1951,21 +1970,30 @@
             };
         }
         if (mode === 'connections') {
-            var paths = scenes
-                .map(function (scene) { return scene.file_path; })
-                .filter(function (path) { return Boolean(path); });
-            var unique = Array.from(new Set(paths));
-            var pathItems = unique.map(function (path) { return '<li>' + escapeHtml(path) + '</li>'; });
-            var pathBody = pathItems.length > 0
-                ? '<ul>' + pathItems.join('') + '</ul>'
-                : '<p>No file connections yet.</p>';
+            var connectionItems = this.buildArcConnectionItems(arc, scenes);
+            var connectionBody = connectionItems.length > 0
+                ? '<ul>' + connectionItems.map(function (item) { return '<li>' + escapeHtml(item) + '</li>'; }).join('') + '</ul>'
+                : '<p>Connections are still being mapped.</p>';
             return {
                 eyebrow: 'Connections',
                 title: 'Files touched by ' + routeLabel,
-                body: pathBody
+                body: connectionBody
             };
         }
         if (mode === 'next') {
+            var related = arc.related_ids || [];
+            if (related.length > 0) {
+                var buttons = related.map(function (arcId) {
+                    var target = this.storyArcsById.get(arcId);
+                    var label = target ? this.formatArcTitle(target) : arcId;
+                    return '<button class="ghost-btn arc-jump" data-arc-id="' + escapeHtml(arcId) + '">' + escapeHtml(label) + '</button>';
+                }, this);
+                return {
+                    eyebrow: 'Next thread',
+                    title: 'Where to go next',
+                    body: '<p>Jump to a related thread.</p><div class="arc-jump-list">' + buttons.join('') + '</div>'
+                };
+            }
             var last = scenes[scenes.length - 1];
             var location = last ? this.formatStorySceneLocation(last) : '';
             var label = last
@@ -1990,7 +2018,8 @@
     GitReaderApp.prototype.formatStorySceneLabel = function (scene, index, includeLocation) {
         var roleLabel = scene.role === 'entry' ? 'Entry' : 'Step ' + (index + 1);
         var kindLabel = this.getKindLabel(scene.kind);
-        var base = roleLabel + ': ' + scene.name + ' (' + kindLabel + ')';
+        var confidence = scene.confidence === 'low' ? ' (low confidence)' : '';
+        var base = roleLabel + ': ' + scene.name + ' (' + kindLabel + ')' + confidence;
         if (!includeLocation) {
             return base;
         }
@@ -2006,6 +2035,98 @@
             return scene.file_path + ':' + scene.line;
         }
         return scene.file_path;
+    };
+
+    GitReaderApp.prototype.buildArcMetaItems = function (arc, entryNode) {
+        var items = [];
+        var threadLabel = this.getArcThreadLabel(arc);
+        if (threadLabel) {
+            items.push('Thread: ' + threadLabel);
+        }
+        var methods = arc.route && arc.route.methods && arc.route.methods.length ? arc.route.methods.join('|') : 'ANY';
+        var path = arc.route && arc.route.path ? arc.route.path : '';
+        var routeLabel = path ? (methods + ' ' + path).trim() : methods;
+        if (routeLabel) {
+            items.push('Route: ' + routeLabel);
+        }
+        if (arc.route && arc.route.handler_name) {
+            items.push('Handler: ' + arc.route.handler_name);
+        }
+        if (arc.route && arc.route.module) {
+            items.push('Module: ' + arc.route.module);
+        }
+        if (arc.route && arc.route.file_path) {
+            var line = arc.route.line ? ':' + arc.route.line : '';
+            items.push('Defined in: ' + arc.route.file_path + line);
+        }
+        if (entryNode && entryNode.signature) {
+            items.push('Signature: ' + entryNode.signature);
+        }
+        if (entryNode && entryNode.summary) {
+            items.push('Docstring: ' + entryNode.summary);
+        }
+        var steps = arc.scene_count || 0;
+        items.push('Steps detected: ' + steps);
+        var internalCalls = (arc.calls && arc.calls.internal) ? arc.calls.internal : [];
+        if (internalCalls.length > 0) {
+            items.push('Internal calls: ' + internalCalls.slice(0, 4).join(', '));
+        }
+        var externalCalls = (arc.calls && arc.calls.external) ? arc.calls.external : [];
+        if (externalCalls.length > 0) {
+            items.push('External calls: ' + externalCalls.slice(0, 4).join(', '));
+        }
+        return items;
+    };
+
+    GitReaderApp.prototype.buildArcConnectionItems = function (arc, scenes) {
+        var items = [];
+        var internalCalls = (arc.calls && arc.calls.internal) ? arc.calls.internal : [];
+        if (internalCalls.length > 0) {
+            items.push('Internal calls: ' + internalCalls.slice(0, 5).join(', '));
+        }
+        var externalCalls = (arc.calls && arc.calls.external) ? arc.calls.external : [];
+        if (externalCalls.length > 0) {
+            items.push('External calls: ' + externalCalls.slice(0, 5).join(', '));
+        }
+        var related = arc.related_ids || [];
+        if (related.length > 0) {
+            var labels = related.map(function (arcId) {
+                var target = this.storyArcsById.get(arcId);
+                return target ? this.formatArcTitle(target) : arcId;
+            }, this);
+            items.push('Related threads: ' + labels.join(', '));
+        }
+        var paths = scenes
+            .map(function (scene) { return scene.file_path; })
+            .filter(function (path) { return Boolean(path); });
+        var unique = Array.from(new Set(paths));
+        if (unique.length > 0) {
+            items.push('Files: ' + unique.slice(0, 6).join(', '));
+        }
+        return items;
+    };
+
+    GitReaderApp.prototype.getArcThreadLabel = function (arc) {
+        if (!arc.thread || arc.thread === 'main') {
+            return '';
+        }
+        if (arc.thread === 'branch') {
+            var index = arc.thread_index || 0;
+            return 'Branch ' + index;
+        }
+        return arc.thread;
+    };
+
+    GitReaderApp.prototype.formatArcTitle = function (arc) {
+        var base = arc.title || this.formatRouteLabel(arc);
+        var threadLabel = this.getArcThreadLabel(arc);
+        if (!threadLabel) {
+            return base;
+        }
+        if (base.toLowerCase().indexOf('branch') !== -1) {
+            return base;
+        }
+        return base + ' (' + threadLabel + ')';
     };
 
     GitReaderApp.prototype.setMode = function (mode) {

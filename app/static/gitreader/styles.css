@@ -616,6 +616,13 @@ body {
     gap: 6px;
 }
 
+.arc-jump-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+}
+
 .route-picker {
     display: flex;
     align-items: center;

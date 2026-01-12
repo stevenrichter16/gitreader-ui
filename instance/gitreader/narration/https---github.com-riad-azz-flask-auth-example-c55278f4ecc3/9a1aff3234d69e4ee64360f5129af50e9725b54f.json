@@ -1,5 +1,5 @@
 {
-  "created_at": 1768187004.6885362,
+  "created_at": 1768187957.394858,
   "response": {
     "cached": false,
     "connections": [
@@ -8,7 +8,7 @@
       "contains -> home (function)",
       "contains -> login (function)"
     ],
-    "hook": "app/routes.py hints at the next beat in the code story.",
+    "hook": "File app/routes.py in app/routes.py:1-79.",
     "key_lines": [
       {
         "line": 1,
@@ -21,13 +21,12 @@
     ],
     "mode": "summary",
     "model": "gpt-4o-mini",
-    "next_thread": "Follow the nearest referenced symbol to continue the thread.",
+    "next_thread": "Follow routes_bp to continue the thread.",
     "prompt_version": "v1",
     "source": "fallback",
     "summary": [
-      "app/routes.py establishes a new step in the flow.",
-      "It wires together a small slice of behavior.",
-      "The shape suggests where the next chapter connects."
+      "File app/routes.py in app/routes.py:1-79.",
+      "Contains: routes_bp, load_user, home..."
     ],
     "symbol_id": "file:app/routes.py",
     "symbol_name": "app/routes.py"

@@ -1,0 +1,38 @@
+{
+  "created_at": 1768191001.298639,
+  "response": {
+    "cached": false,
+    "connections": [
+      "calls -> format (external)",
+      "calls -> flask.Blueprint (external)"
+    ],
+    "hook": "_factory: Generates blueprint objects for view modules.",
+    "key_lines": [
+      {
+        "line": 10,
+        "text": "Signature"
+      },
+      {
+        "line": 11,
+        "text": "Body Start"
+      },
+      {
+        "line": 25,
+        "text": "Body End"
+      }
+    ],
+    "mode": "hook",
+    "model": "gpt-4o-mini",
+    "next_thread": "Follow format to continue the thread.",
+    "prompt_version": "v1",
+    "source": "fallback",
+    "summary": [
+      "Function _factory in pypi_portal/blueprints.py:10-25.",
+      "Signature: def _factory(partial_module_string, url_prefix)",
+      "Docstring: Generates blueprint objects for view modules.",
+      "Calls: format, flask.Blueprint"
+    ],
+    "symbol_id": "symbol:pypi_portal.blueprints._factory",
+    "symbol_name": "_factory"
+  }
+}

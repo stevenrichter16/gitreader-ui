@@ -1,0 +1,34 @@
+{
+  "created_at": 1768191182.9347358,
+  "response": {
+    "cached": false,
+    "connections": [
+      "contains -> _escape (function)",
+      "contains -> default (function)",
+      "contains -> success (function)",
+      "contains -> info (function)"
+    ],
+    "hook": "File pypi_portal/core/flash.py in pypi_portal/core/flash.py:1-57.",
+    "key_lines": [
+      {
+        "line": 1,
+        "text": "Snippet Start"
+      },
+      {
+        "line": 57,
+        "text": "Snippet End"
+      }
+    ],
+    "mode": "next",
+    "model": "gpt-4o-mini",
+    "next_thread": "Follow _escape to continue the thread.",
+    "prompt_version": "v1",
+    "source": "fallback",
+    "summary": [
+      "File pypi_portal/core/flash.py in pypi_portal/core/flash.py:1-57.",
+      "Contains: _escape, default, success..."
+    ],
+    "symbol_id": "file:pypi_portal/core/flash.py",
+    "symbol_name": "pypi_portal/core/flash.py"
+  }
+}

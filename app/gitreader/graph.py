@@ -20,6 +20,7 @@ def build_graph(parsed_files: List[ParsedFile]) -> GraphResult:
 
     module_map: Dict[str, str] = {}
     symbols_by_module: Dict[str, Dict[str, str]] = {}
+    symbols_by_qualname: Dict[str, str] = {}
     methods_by_class: Dict[Tuple[str, str], Dict[str, str]] = {}
     blueprint_vars: Dict[str, Dict[str, str]] = {}
 
@@ -39,12 +40,14 @@ def build_graph(parsed_files: List[ParsedFile]) -> GraphResult:
 
     for parsed in parsed_files:
         blueprint_vars[parsed.module] = _extract_blueprints(parsed, nodes, edges)
-        _extract_symbols(parsed, nodes, edges, symbols_by_module, methods_by_class)
+        _extract_symbols(parsed, nodes, edges, symbols_by_module, symbols_by_qualname, methods_by_class)
 
     imports_by_module: Dict[str, Dict[str, str]] = {}
+    import_symbols_by_module: Dict[str, Dict[str, str]] = {}
     for parsed in parsed_files:
-        alias_map = _extract_imports(parsed, module_map, nodes, edges)
+        alias_map, alias_symbols = _extract_imports(parsed, module_map, nodes, edges, symbols_by_qualname)
         imports_by_module[parsed.module] = alias_map
+        import_symbols_by_module[parsed.module] = alias_symbols
 
     for parsed in parsed_files:
         _extract_calls(
@@ -52,8 +55,10 @@ def build_graph(parsed_files: List[ParsedFile]) -> GraphResult:
             nodes,
             edges,
             symbols_by_module,
+            symbols_by_qualname,
             methods_by_class,
             imports_by_module,
+            import_symbols_by_module,
             module_map,
             blueprint_vars,
         )
@@ -67,6 +72,7 @@ def _extract_symbols(
     nodes: Dict[str, SymbolNode],
     edges: List[GraphEdge],
     symbols_by_module: Dict[str, Dict[str, str]],
+    symbols_by_qualname: Dict[str, str],
     methods_by_class: Dict[Tuple[str, str], Dict[str, str]],
 ) -> None:
     for node in parsed.tree.body:
@@ -84,6 +90,7 @@ def _extract_symbols(
             )
             nodes[class_id] = class_node
             symbols_by_module[parsed.module][node.name] = class_id
+            symbols_by_qualname[f'{parsed.module}.{node.name}'] = class_id
             edges.append(GraphEdge(
                 source=file_id(parsed.path),
                 target=class_id,
@@ -106,6 +113,7 @@ def _extract_symbols(
                     )
                     nodes[method_id] = method_node
                     methods_by_class[(parsed.module, node.name)][item.name] = method_id
+                    symbols_by_qualname[f'{parsed.module}.{node.name}.{item.name}'] = method_id
                     edges.append(GraphEdge(
                         source=class_id,
                         target=method_id,
@@ -126,6 +134,7 @@ def _extract_symbols(
             )
             nodes[func_id] = func_node
             symbols_by_module[parsed.module][node.name] = func_id
+            symbols_by_qualname[f'{parsed.module}.{node.name}'] = func_id
             edges.append(GraphEdge(
                 source=file_id(parsed.path),
                 target=func_id,
@@ -139,26 +148,37 @@ def _extract_imports(
     module_map: Dict[str, str],
     nodes: Dict[str, SymbolNode],
     edges: List[GraphEdge],
-) -> Dict[str, str]:
+    symbols_by_qualname: Dict[str, str],
+) -> tuple[Dict[str, str], Dict[str, str]]:
     alias_map: Dict[str, str] = {}
+    alias_symbols: Dict[str, str] = {}
     for node in parsed.tree.body:
         if isinstance(node, ast.Import):
             for alias in node.names:
                 module_name = alias.name
                 alias_name = alias.asname or module_name.split('.')[-1]
                 alias_map[alias_name] = module_name
+                if module_name in symbols_by_qualname:
+                    alias_symbols[alias_name] = symbols_by_qualname[module_name]
                 _add_import_edge(parsed.path, module_name, module_map, nodes, edges)
         elif isinstance(node, ast.ImportFrom):
             module_name = _resolve_import_module(parsed.module, node.module, node.level)
             if module_name:
                 _add_import_edge(parsed.path, module_name, module_map, nodes, edges)
             for alias in node.names:
+                if alias.name == '*':
+                    continue
                 alias_name = alias.asname or alias.name
                 if module_name:
-                    alias_map[alias_name] = f'{module_name}.{alias.name}'
+                    qualname = f'{module_name}.{alias.name}'
+                    alias_map[alias_name] = qualname
+                    if qualname in symbols_by_qualname:
+                        alias_symbols[alias_name] = symbols_by_qualname[qualname]
                 else:
                     alias_map[alias_name] = alias.name
-    return alias_map
+                    if alias.name in symbols_by_qualname:
+                        alias_symbols[alias_name] = symbols_by_qualname[alias.name]
+    return alias_map, alias_symbols
 
 
 def _add_import_edge(
@@ -188,13 +208,16 @@ def _extract_calls(
     nodes: Dict[str, SymbolNode],
     edges: List[GraphEdge],
     symbols_by_module: Dict[str, Dict[str, str]],
+    symbols_by_qualname: Dict[str, str],
     methods_by_class: Dict[Tuple[str, str], Dict[str, str]],
     imports_by_module: Dict[str, Dict[str, str]],
+    import_symbols_by_module: Dict[str, Dict[str, str]],
     module_map: Dict[str, str],
     blueprint_vars: Dict[str, Dict[str, str]],
 ) -> None:
     module_symbols = symbols_by_module.get(parsed.module, {})
     alias_map = imports_by_module.get(parsed.module, {})
+    alias_symbols = import_symbols_by_module.get(parsed.module, {})
     blueprint_map = blueprint_vars.get(parsed.module, {})
 
     for node in parsed.tree.body:
@@ -211,13 +234,15 @@ def _extract_calls(
                             method_id,
                             node.name,
                             nodes,
-                            edges,
-                            module_symbols,
-                            methods_by_class,
-                            alias_map,
-                            module_map,
-                            blueprint_map,
-                        )
+                    edges,
+                    module_symbols,
+                    symbols_by_qualname,
+                    methods_by_class,
+                    alias_map,
+                    alias_symbols,
+                    module_map,
+                    blueprint_map,
+                )
         elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             func_id = module_symbols.get(node.name)
             if func_id:
@@ -228,8 +253,10 @@ def _extract_calls(
                     nodes,
                     edges,
                     module_symbols,
+                    symbols_by_qualname,
                     methods_by_class,
                     alias_map,
+                    alias_symbols,
                     module_map,
                     blueprint_map,
                 )
@@ -242,8 +269,10 @@ def _walk_calls(
     nodes: Dict[str, SymbolNode],
     edges: List[GraphEdge],
     module_symbols: Dict[str, str],
+    symbols_by_qualname: Dict[str, str],
     methods_by_class: Dict[Tuple[str, str], Dict[str, str]],
     alias_map: Dict[str, str],
+    alias_symbols: Dict[str, str],
     module_map: Dict[str, str],
     blueprint_map: Dict[str, str],
 ) -> None:
@@ -254,8 +283,11 @@ def _walk_calls(
             target_name = node.func.id
             target_id = module_symbols.get(target_name)
             confidence = 'high'
+            if not target_id and target_name in alias_symbols:
+                target_id = alias_symbols[target_name]
+                confidence = 'medium'
             if not target_id and target_name in alias_map:
-                target_id = _resolve_module_target(alias_map[target_name], module_map, nodes)
+                target_id = _resolve_module_target(alias_map[target_name], module_map, symbols_by_qualname, nodes)
                 confidence = 'medium'
             if not target_id:
                 target_id = _ensure_external(nodes, target_name)
@@ -280,9 +312,39 @@ def _walk_calls(
                             confidence='medium',
                         ))
                         continue
+                if base in module_symbols:
+                    class_id = module_symbols.get(base)
+                    class_node = nodes.get(class_id) if class_id else None
+                    if class_node and class_node.kind == 'class':
+                        method_id = methods_by_class.get((class_node.module or '', class_node.name), {}).get(attr)
+                        if method_id:
+                            edges.append(GraphEdge(
+                                source=source_id,
+                                target=method_id,
+                                kind='calls',
+                                confidence='medium',
+                            ))
+                            continue
+                if base in alias_symbols:
+                    symbol_id_value = alias_symbols[base]
+                    symbol_node = nodes.get(symbol_id_value)
+                    if symbol_node and symbol_node.kind == 'class':
+                        method_id = methods_by_class.get((symbol_node.module or '', symbol_node.name), {}).get(attr)
+                        if method_id:
+                            edges.append(GraphEdge(
+                                source=source_id,
+                                target=method_id,
+                                kind='calls',
+                                confidence='medium',
+                            ))
+                            continue
                 if base in alias_map:
                     module_name = alias_map[base]
-                    target_id = _resolve_module_target(module_name, module_map, nodes)
+                    qualified = f'{module_name}.{attr}'
+                    if qualified in symbols_by_qualname:
+                        target_id = symbols_by_qualname[qualified]
+                    else:
+                        target_id = _resolve_module_target(module_name, module_map, symbols_by_qualname, nodes)
                     edges.append(GraphEdge(
                         source=source_id,
                         target=target_id,
@@ -372,7 +434,14 @@ def _extract_blueprints(
     return blueprint_vars
 
 
-def _resolve_module_target(module_name: str, module_map: Dict[str, str], nodes: Dict[str, SymbolNode]) -> str:
+def _resolve_module_target(
+    module_name: str,
+    module_map: Dict[str, str],
+    symbols_by_qualname: Dict[str, str],
+    nodes: Dict[str, SymbolNode],
+) -> str:
+    if module_name in symbols_by_qualname:
+        return symbols_by_qualname[module_name]
     target_id = module_map.get(module_name)
     if target_id:
         return target_id

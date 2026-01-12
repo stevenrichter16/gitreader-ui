@@ -1,0 +1,34 @@
+{
+  "created_at": 1768191232.395999,
+  "response": {
+    "cached": false,
+    "connections": [
+      "contains -> index (function)",
+      "contains -> sync (function)",
+      "imports -> time (external)",
+      "imports -> flask (external)"
+    ],
+    "hook": "File pypi_portal/views/pypi/packages.py in pypi_portal/views/pypi/packages.py:1-63.",
+    "key_lines": [
+      {
+        "line": 1,
+        "text": "Snippet Start"
+      },
+      {
+        "line": 63,
+        "text": "Snippet End"
+      }
+    ],
+    "mode": "next",
+    "model": "gpt-4o-mini",
+    "next_thread": "Follow index to continue the thread.",
+    "prompt_version": "v1",
+    "source": "fallback",
+    "summary": [
+      "File pypi_portal/views/pypi/packages.py in pypi_portal/views/pypi/packages.py:1-63.",
+      "Contains: index, sync"
+    ],
+    "symbol_id": "file:pypi_portal/views/pypi/packages.py",
+    "symbol_name": "pypi_portal/views/pypi/packages.py"
+  }
+}

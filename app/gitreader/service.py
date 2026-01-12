@@ -15,6 +15,7 @@ DEFAULT_MAX_FILE_SIZE = 512 * 1024
 DEFAULT_MAX_FILES = 5000
 DEFAULT_SNIPPET_LINES = 200
 DEFAULT_FALLBACK_CONTEXT = 40
+STORY_CACHE_VERSION = 'v2'
 LOGGER = logging.getLogger(__name__)
 
 
@@ -143,11 +144,45 @@ def get_story_arcs(
     max_files: Optional[int] = DEFAULT_MAX_FILES,
 ) -> tuple[RepoIndex, list[dict[str, object]], list[ParseWarning]]:
     index = get_repo_index(spec, cache_root=cache_root, max_file_size=max_file_size, max_files=max_files)
+    story_cache_root = os.path.join(cache_root, 'story')
+    cached = storage.load_story(story_cache_root, index.repo_id)
+    if (
+        cached
+        and cached.get('content_signature') == index.content_signature
+        and cached.get('story_version') == STORY_CACHE_VERSION
+    ):
+        cached_arcs = cached.get('arcs') if isinstance(cached.get('arcs'), list) else []
+        cached_warnings = _parse_warning_payload(cached.get('warnings', []))
+        return index, cached_arcs, cached_warnings
+
     scan_result = scan.scan_repo(index.root_path, max_file_size=max_file_size, max_files=max_files)
     parsed = parse_files(index.root_path, scan_result.python_files)
     arcs = build_story_arcs(index, parsed.files)
     warnings = scan_result.warnings + parsed.warnings
+    storage.save_story(story_cache_root, index.repo_id, {
+        'content_signature': index.content_signature,
+        'story_version': STORY_CACHE_VERSION,
+        'generated_at': time.time(),
+        'arcs': arcs,
+        'warnings': [warning.to_dict() for warning in warnings],
+    })
     return index, arcs, warnings
+
+
+def _parse_warning_payload(payload: object) -> list[ParseWarning]:
+    warnings: list[ParseWarning] = []
+    if not isinstance(payload, list):
+        return warnings
+    for item in payload:
+        if not isinstance(item, dict):
+            continue
+        warnings.append(ParseWarning(
+            code=str(item.get('code', 'warning')),
+            message=str(item.get('message', '')),
+            path=str(item.get('path', '')),
+            line=item.get('line'),
+        ))
+    return warnings
 
 
 def build_symbol_snippet(

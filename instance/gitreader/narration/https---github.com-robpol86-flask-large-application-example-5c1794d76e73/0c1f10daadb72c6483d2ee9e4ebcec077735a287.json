@@ -1,0 +1,33 @@
+{
+  "created_at": 1768191214.901546,
+  "response": {
+    "cached": false,
+    "connections": [
+      "contains -> index (function)",
+      "imports -> flask (external)",
+      "imports -> pypi_portal/blueprints.py (file)"
+    ],
+    "hook": "File pypi_portal/views/home/index.py in pypi_portal/views/home/index.py:1-8.",
+    "key_lines": [
+      {
+        "line": 1,
+        "text": "Snippet Start"
+      },
+      {
+        "line": 8,
+        "text": "Snippet End"
+      }
+    ],
+    "mode": "next",
+    "model": "gpt-4o-mini",
+    "next_thread": "Follow index to continue the thread.",
+    "prompt_version": "v1",
+    "source": "fallback",
+    "summary": [
+      "File pypi_portal/views/home/index.py in pypi_portal/views/home/index.py:1-8.",
+      "Contains: index"
+    ],
+    "symbol_id": "file:pypi_portal/views/home/index.py",
+    "symbol_name": "pypi_portal/views/home/index.py"
+  }
+}

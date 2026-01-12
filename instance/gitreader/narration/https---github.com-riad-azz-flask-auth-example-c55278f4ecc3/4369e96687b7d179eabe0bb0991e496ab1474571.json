@@ -1,0 +1,33 @@
+{
+  "created_at": 1768188267.567678,
+  "response": {
+    "cached": false,
+    "connections": [
+      "calls -> one_or_none (external)",
+      "calls -> filter_by (external)"
+    ],
+    "hook": "def load_user(user_id) in app/routes.py:14-15.",
+    "key_lines": [
+      {
+        "line": 14,
+        "text": "Snippet Start"
+      },
+      {
+        "line": 15,
+        "text": "Snippet End"
+      }
+    ],
+    "mode": "summary",
+    "model": "gpt-4o-mini",
+    "next_thread": "Follow one_or_none to continue the thread.",
+    "prompt_version": "v1",
+    "source": "fallback",
+    "summary": [
+      "Function load_user in app/routes.py:14-15.",
+      "Signature: def load_user(user_id)",
+      "Calls: one_or_none, filter_by"
+    ],
+    "symbol_id": "symbol:app.routes.load_user",
+    "symbol_name": "load_user"
+  }
+}
