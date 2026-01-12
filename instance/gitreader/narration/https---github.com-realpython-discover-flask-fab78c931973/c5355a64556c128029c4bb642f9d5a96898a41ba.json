@@ -1,0 +1,36 @@
+{
+  "created_at": 1768193878.336962,
+  "response": {
+    "cached": false,
+    "connections": [
+      "calls -> config.get_main_option (external)",
+      "calls -> alembic.context (external)",
+      "calls -> alembic.context (external)",
+      "calls -> alembic.context (external)"
+    ],
+    "hook": "run_migrations_offline: Run migrations in 'offline' mode.",
+    "key_lines": [
+      {
+        "line": 27,
+        "text": "Snippet Start"
+      },
+      {
+        "line": 43,
+        "text": "Snippet End"
+      }
+    ],
+    "mode": "summary",
+    "model": "gpt-5.2",
+    "next_thread": "Follow config.get_main_option to continue the thread.",
+    "prompt_version": "v1",
+    "source": "fallback",
+    "summary": [
+      "Function run_migrations_offline in migrations/env.py:27-43.",
+      "Signature: def run_migrations_offline()",
+      "Docstring: Run migrations in 'offline' mode.",
+      "Calls: config.get_main_option, alembic.context..."
+    ],
+    "symbol_id": "symbol:migrations.env.run_migrations_offline",
+    "symbol_name": "run_migrations_offline"
+  }
+}

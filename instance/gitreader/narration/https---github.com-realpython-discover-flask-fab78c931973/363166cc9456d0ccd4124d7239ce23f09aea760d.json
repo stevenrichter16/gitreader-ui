@@ -1,0 +1,35 @@
+{
+  "created_at": 1768193710.78962,
+  "response": {
+    "cached": false,
+    "connections": [
+      "inherits -> object (external)"
+    ],
+    "hook": "class BaseConfig(object) in config.py:5-9.",
+    "key_lines": [
+      {
+        "line": 5,
+        "text": "Signature"
+      },
+      {
+        "line": 6,
+        "text": "Body Start"
+      },
+      {
+        "line": 9,
+        "text": "Body End"
+      }
+    ],
+    "mode": "hook",
+    "model": "gpt-5.2",
+    "next_thread": "Follow object to continue the thread.",
+    "prompt_version": "v1",
+    "source": "fallback",
+    "summary": [
+      "Class BaseConfig in config.py:5-9.",
+      "Signature: class BaseConfig(object)"
+    ],
+    "symbol_id": "symbol:config.BaseConfig",
+    "symbol_name": "BaseConfig"
+  }
+}

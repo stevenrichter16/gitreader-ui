@@ -1,0 +1,386 @@
+{
+  "arcs": [
+    {
+      "calls": {
+        "external": [
+          "home_blueprint.route",
+          "form.validate_on_submit",
+          "add",
+          "commit",
+          "flask.flash",
+          "flask.redirect"
+        ],
+        "internal": [
+          "MessageForm",
+          "BlogPost"
+        ]
+      },
+      "entry_id": "symbol:project.home.views.home",
+      "id": "arc:e6b5b82468fa",
+      "parent_id": null,
+      "related_ids": [
+        "arc:ff8ac44975e4"
+      ],
+      "route": {
+        "file_path": "project/home/views.py",
+        "handler_id": "symbol:project.home.views.home",
+        "handler_name": "home",
+        "line": 30,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "module": "project.home.views",
+        "path": "/"
+      },
+      "scene_count": 2,
+      "scenes": [
+        {
+          "confidence": "high",
+          "file_path": "project/home/views.py",
+          "id": "symbol:project.home.views.home",
+          "kind": "function",
+          "line": 30,
+          "name": "home",
+          "role": "entry"
+        },
+        {
+          "confidence": "medium",
+          "file_path": "project/models.py",
+          "id": "symbol:project.models.BlogPost",
+          "kind": "class",
+          "line": 8,
+          "name": "BlogPost",
+          "role": "step"
+        }
+      ],
+      "summary": "GET|POST / calls BlogPost.",
+      "thread": "main",
+      "thread_index": 0,
+      "title": "GET|POST /"
+    },
+    {
+      "calls": {
+        "external": [
+          "home_blueprint.route",
+          "form.validate_on_submit",
+          "add",
+          "commit",
+          "flask.flash",
+          "flask.redirect"
+        ],
+        "internal": [
+          "MessageForm",
+          "BlogPost"
+        ]
+      },
+      "entry_id": "symbol:project.home.views.home",
+      "id": "arc:ff8ac44975e4",
+      "parent_id": "arc:e6b5b82468fa",
+      "related_ids": [
+        "arc:e6b5b82468fa"
+      ],
+      "route": {
+        "file_path": "project/home/views.py",
+        "handler_id": "symbol:project.home.views.home",
+        "handler_name": "home",
+        "line": 30,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "module": "project.home.views",
+        "path": "/"
+      },
+      "scene_count": 2,
+      "scenes": [
+        {
+          "confidence": "high",
+          "file_path": "project/home/views.py",
+          "id": "symbol:project.home.views.home",
+          "kind": "function",
+          "line": 30,
+          "name": "home",
+          "role": "entry"
+        },
+        {
+          "confidence": "medium",
+          "file_path": "project/home/forms.py",
+          "id": "symbol:project.home.forms.MessageForm",
+          "kind": "class",
+          "line": 6,
+          "name": "MessageForm",
+          "role": "step"
+        }
+      ],
+      "summary": "GET|POST / calls MessageForm.",
+      "thread": "branch",
+      "thread_index": 1,
+      "title": "GET|POST / (branch 1)"
+    },
+    {
+      "calls": {
+        "external": [
+          "users_blueprint.route",
+          "flask.render_template",
+          "form.validate_on_submit",
+          "first",
+          "project.models.bcrypt",
+          "flask.ext.login.login_user"
+        ],
+        "internal": [
+          "LoginForm"
+        ]
+      },
+      "entry_id": "symbol:project.users.views.login",
+      "id": "arc:ab2e556a518f",
+      "parent_id": null,
+      "related_ids": [],
+      "route": {
+        "file_path": "project/users/views.py",
+        "handler_id": "symbol:project.users.views.login",
+        "handler_name": "login",
+        "line": 29,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "module": "project.users.views",
+        "path": "/login"
+      },
+      "scene_count": 2,
+      "scenes": [
+        {
+          "confidence": "high",
+          "file_path": "project/users/views.py",
+          "id": "symbol:project.users.views.login",
+          "kind": "function",
+          "line": 29,
+          "name": "login",
+          "role": "entry"
+        },
+        {
+          "confidence": "medium",
+          "file_path": "project/users/forms.py",
+          "id": "symbol:project.users.forms.LoginForm",
+          "kind": "class",
+          "line": 6,
+          "name": "LoginForm",
+          "role": "step"
+        }
+      ],
+      "summary": "GET|POST /login calls LoginForm.",
+      "thread": "main",
+      "thread_index": 0,
+      "title": "GET|POST /login"
+    },
+    {
+      "calls": {
+        "external": [
+          "users_blueprint.route",
+          "flask.ext.login.logout_user",
+          "flask.flash",
+          "flask.redirect",
+          "flask.url_for"
+        ],
+        "internal": []
+      },
+      "entry_id": "symbol:project.users.views.logout",
+      "id": "arc:5765040aa22c",
+      "parent_id": null,
+      "related_ids": [],
+      "route": {
+        "file_path": "project/users/views.py",
+        "handler_id": "symbol:project.users.views.logout",
+        "handler_name": "logout",
+        "line": 49,
+        "methods": [],
+        "module": "project.users.views",
+        "path": "/logout"
+      },
+      "scene_count": 1,
+      "scenes": [
+        {
+          "confidence": "high",
+          "file_path": "project/users/views.py",
+          "id": "symbol:project.users.views.logout",
+          "kind": "function",
+          "line": 49,
+          "name": "logout",
+          "role": "entry"
+        }
+      ],
+      "summary": "ANY /logout starts here.",
+      "thread": "main",
+      "thread_index": 0,
+      "title": "ANY /logout"
+    },
+    {
+      "calls": {
+        "external": [
+          "users_blueprint.route",
+          "form.validate_on_submit",
+          "flask.render_template",
+          "add",
+          "commit",
+          "flask.ext.login.login_user"
+        ],
+        "internal": [
+          "RegisterForm",
+          "User"
+        ]
+      },
+      "entry_id": "symbol:project.users.views.register",
+      "id": "arc:b68bbfdc2686",
+      "parent_id": null,
+      "related_ids": [
+        "arc:695357a5d3cd"
+      ],
+      "route": {
+        "file_path": "project/users/views.py",
+        "handler_id": "symbol:project.users.views.register",
+        "handler_name": "register",
+        "line": 57,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "module": "project.users.views",
+        "path": "/register/"
+      },
+      "scene_count": 2,
+      "scenes": [
+        {
+          "confidence": "high",
+          "file_path": "project/users/views.py",
+          "id": "symbol:project.users.views.register",
+          "kind": "function",
+          "line": 57,
+          "name": "register",
+          "role": "entry"
+        },
+        {
+          "confidence": "medium",
+          "file_path": "project/models.py",
+          "id": "symbol:project.models.User",
+          "kind": "class",
+          "line": 26,
+          "name": "User",
+          "role": "step"
+        }
+      ],
+      "summary": "GET|POST /register/ calls User.",
+      "thread": "main",
+      "thread_index": 0,
+      "title": "GET|POST /register/"
+    },
+    {
+      "calls": {
+        "external": [
+          "users_blueprint.route",
+          "form.validate_on_submit",
+          "flask.render_template",
+          "add",
+          "commit",
+          "flask.ext.login.login_user"
+        ],
+        "internal": [
+          "RegisterForm",
+          "User"
+        ]
+      },
+      "entry_id": "symbol:project.users.views.register",
+      "id": "arc:695357a5d3cd",
+      "parent_id": "arc:b68bbfdc2686",
+      "related_ids": [
+        "arc:b68bbfdc2686"
+      ],
+      "route": {
+        "file_path": "project/users/views.py",
+        "handler_id": "symbol:project.users.views.register",
+        "handler_name": "register",
+        "line": 57,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "module": "project.users.views",
+        "path": "/register/"
+      },
+      "scene_count": 2,
+      "scenes": [
+        {
+          "confidence": "high",
+          "file_path": "project/users/views.py",
+          "id": "symbol:project.users.views.register",
+          "kind": "function",
+          "line": 57,
+          "name": "register",
+          "role": "entry"
+        },
+        {
+          "confidence": "medium",
+          "file_path": "project/users/forms.py",
+          "id": "symbol:project.users.forms.RegisterForm",
+          "kind": "class",
+          "line": 11,
+          "name": "RegisterForm",
+          "role": "step"
+        }
+      ],
+      "summary": "GET|POST /register/ calls RegisterForm.",
+      "thread": "branch",
+      "thread_index": 1,
+      "title": "GET|POST /register/ (branch 1)"
+    },
+    {
+      "calls": {
+        "external": [
+          "home_blueprint.route",
+          "flask.render_template"
+        ],
+        "internal": []
+      },
+      "entry_id": "symbol:project.home.views.welcome",
+      "id": "arc:6452eda046bf",
+      "parent_id": null,
+      "related_ids": [],
+      "route": {
+        "file_path": "project/home/views.py",
+        "handler_id": "symbol:project.home.views.welcome",
+        "handler_name": "welcome",
+        "line": 50,
+        "methods": [],
+        "module": "project.home.views",
+        "path": "/welcome"
+      },
+      "scene_count": 1,
+      "scenes": [
+        {
+          "confidence": "high",
+          "file_path": "project/home/views.py",
+          "id": "symbol:project.home.views.welcome",
+          "kind": "function",
+          "line": 50,
+          "name": "welcome",
+          "role": "entry"
+        }
+      ],
+      "summary": "ANY /welcome starts here.",
+      "thread": "main",
+      "thread_index": 0,
+      "title": "ANY /welcome"
+    }
+  ],
+  "content_signature": "9824ac98c4b935de7749f58262c2b78d5f52cb9e",
+  "generated_at": 1768193712.86372,
+  "story_version": "v2",
+  "warnings": [
+    {
+      "code": "syntax_error",
+      "line": 38,
+      "message": "Missing parentheses in call to 'print'. Did you mean print(...)?",
+      "path": "manage.py"
+    }
+  ]
+}

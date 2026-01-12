@@ -1,0 +1,35 @@
+{
+  "created_at": 1768193896.0488992,
+  "response": {
+    "cached": false,
+    "connections": [
+      "contains -> BlogPost (class)",
+      "contains -> User (class)",
+      "imports -> project/__init__.py (file)",
+      "imports -> project/__init__.py (file)"
+    ],
+    "hook": "File project/models.py in project/models.py:1-54.",
+    "key_lines": [
+      {
+        "line": 1,
+        "text": "Snippet Start"
+      },
+      {
+        "line": 54,
+        "text": "Snippet End"
+      }
+    ],
+    "mode": "summary",
+    "model": "gpt-5.2",
+    "next_thread": "Follow BlogPost to continue the thread.",
+    "prompt_version": "v1",
+    "source": "fallback",
+    "summary": [
+      "File project/models.py in project/models.py:1-54.",
+      "Contains: BlogPost, User",
+      "Imported by: db_create_users.py, tests/test_users.py, tests/base.py..."
+    ],
+    "symbol_id": "file:project/models.py",
+    "symbol_name": "project/models.py"
+  }
+}

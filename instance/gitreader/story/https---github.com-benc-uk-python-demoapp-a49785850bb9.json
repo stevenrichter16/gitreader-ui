@@ -1,0 +1,217 @@
+{
+  "arcs": [
+    {
+      "calls": {
+        "external": [
+          "flask.current_app",
+          "flask.render_template"
+        ],
+        "internal": []
+      },
+      "entry_id": "symbol:src.app.views.index",
+      "id": "arc:5977477a6406",
+      "parent_id": null,
+      "related_ids": [],
+      "route": {
+        "file_path": "src/app/views.py",
+        "handler_id": "symbol:src.app.views.index",
+        "handler_name": "index",
+        "line": 10,
+        "methods": [],
+        "module": "src.app.views",
+        "path": "/"
+      },
+      "scene_count": 1,
+      "scenes": [
+        {
+          "confidence": "high",
+          "file_path": "src/app/views.py",
+          "id": "symbol:src.app.views.index",
+          "kind": "function",
+          "line": 10,
+          "name": "index",
+          "role": "entry"
+        }
+      ],
+      "summary": "ANY / starts here.",
+      "thread": "main",
+      "thread_index": 0,
+      "title": "ANY /"
+    },
+    {
+      "calls": {
+        "external": [
+          "flask.current_app",
+          "psutil",
+          "flask.jsonify"
+        ],
+        "internal": []
+      },
+      "entry_id": "symbol:src.app.apis.api_monitor",
+      "id": "arc:b8cff13352ff",
+      "parent_id": null,
+      "related_ids": [],
+      "route": {
+        "file_path": "src/app/apis.py",
+        "handler_id": "symbol:src.app.apis.api_monitor",
+        "handler_name": "api_monitor",
+        "line": 39,
+        "methods": [],
+        "module": "src.app.apis",
+        "path": "/api/monitor"
+      },
+      "scene_count": 1,
+      "scenes": [
+        {
+          "confidence": "high",
+          "file_path": "src/app/apis.py",
+          "id": "symbol:src.app.apis.api_monitor",
+          "kind": "function",
+          "line": 39,
+          "name": "api_monitor",
+          "role": "entry"
+        }
+      ],
+      "summary": "ANY /api/monitor starts here.",
+      "thread": "main",
+      "thread_index": 0,
+      "title": "ANY /api/monitor"
+    },
+    {
+      "calls": {
+        "external": [
+          "flask.current_app",
+          "flask.jsonify",
+          "psutil",
+          "proc.as_dict",
+          "append"
+        ],
+        "internal": []
+      },
+      "entry_id": "symbol:src.app.apis.api_process",
+      "id": "arc:e583e17d4507",
+      "parent_id": null,
+      "related_ids": [],
+      "route": {
+        "file_path": "src/app/apis.py",
+        "handler_id": "symbol:src.app.apis.api_process",
+        "handler_name": "api_process",
+        "line": 15,
+        "methods": [],
+        "module": "src.app.apis",
+        "path": "/api/process"
+      },
+      "scene_count": 1,
+      "scenes": [
+        {
+          "confidence": "high",
+          "file_path": "src/app/apis.py",
+          "id": "symbol:src.app.apis.api_process",
+          "kind": "function",
+          "line": 15,
+          "name": "api_process",
+          "role": "entry"
+        }
+      ],
+      "summary": "ANY /api/process starts here.",
+      "thread": "main",
+      "thread_index": 0,
+      "title": "ANY /api/process"
+    },
+    {
+      "calls": {
+        "external": [
+          "flask.current_app",
+          "cpuinfo",
+          "psutil",
+          "strftime",
+          "flask.render_template",
+          "fromtimestamp"
+        ],
+        "internal": []
+      },
+      "entry_id": "symbol:src.app.views.info",
+      "id": "arc:05c692e5cbf8",
+      "parent_id": null,
+      "related_ids": [],
+      "route": {
+        "file_path": "src/app/views.py",
+        "handler_id": "symbol:src.app.views.info",
+        "handler_name": "info",
+        "line": 15,
+        "methods": [],
+        "module": "src.app.views",
+        "path": "/info"
+      },
+      "scene_count": 1,
+      "scenes": [
+        {
+          "confidence": "high",
+          "file_path": "src/app/views.py",
+          "id": "symbol:src.app.views.info",
+          "kind": "function",
+          "line": 15,
+          "name": "info",
+          "role": "entry"
+        }
+      ],
+      "summary": "ANY /info starts here.",
+      "thread": "main",
+      "thread_index": 0,
+      "title": "ANY /info"
+    },
+    {
+      "calls": {
+        "external": [
+          "flask.current_app",
+          "flask.render_template"
+        ],
+        "internal": []
+      },
+      "entry_id": "symbol:src.app.views.monitor",
+      "id": "arc:d448f6167a43",
+      "parent_id": null,
+      "related_ids": [],
+      "route": {
+        "file_path": "src/app/views.py",
+        "handler_id": "symbol:src.app.views.monitor",
+        "handler_name": "monitor",
+        "line": 29,
+        "methods": [],
+        "module": "src.app.views",
+        "path": "/monitor"
+      },
+      "scene_count": 1,
+      "scenes": [
+        {
+          "confidence": "high",
+          "file_path": "src/app/views.py",
+          "id": "symbol:src.app.views.monitor",
+          "kind": "function",
+          "line": 29,
+          "name": "monitor",
+          "role": "entry"
+        }
+      ],
+      "summary": "ANY /monitor starts here.",
+      "thread": "main",
+      "thread_index": 0,
+      "title": "ANY /monitor"
+    }
+  ],
+  "content_signature": "8c07c0e210403439d7e9e2314d9c486320adf848",
+  "generated_at": 1768194186.0265548,
+  "story_version": "v2",
+  "warnings": [
+    {
+      "code": "binary_file",
+      "message": "Skipped binary file",
+      "path": "src/app/static/img/flask.png"
+    },
+    {
+      "code": "binary_file",
+      "message": "Skipped binary file",
+      "path": "src/app/static/img/favicon.ico"
+    }
+  ]
+}

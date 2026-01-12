@@ -2,6 +2,8 @@ type NarrationMode = 'hook' | 'summary' | 'key_lines' | 'connections' | 'next';
 
 type TocMode = 'story' | 'tree' | 'routes';
 
+type TourMode = 'story' | 'teacher' | 'expert';
+
 type SymbolKind = 'file' | 'class' | 'function' | 'method' | 'external' | 'blueprint';
 
 type EdgeKind = 'imports' | 'calls' | 'inherits' | 'contains' | 'blueprint';
@@ -152,6 +154,56 @@ interface NarrationResponse {
     prompt_version?: string;
 }
 
+interface TourState {
+    repo_id: string;
+    ref: string | null;
+    subdir: string | null;
+    arc_id: string;
+    mode: TourMode;
+    step_index: number;
+    last_node_id?: string;
+    visited_node_ids?: string[];
+    branch_stack?: string[];
+    context_window?: Array<{ node_id: string; summary: string }>;
+}
+
+interface TourRelatedNode {
+    node_id: string;
+    label: string;
+}
+
+interface TourRelatedArc {
+    arc_id: string;
+    title: string;
+}
+
+interface TourStep {
+    step_index: number;
+    total_steps?: number;
+    node_id: string;
+    arc_id: string;
+    arc_title?: string;
+    title: string;
+    hook: string;
+    explanation: string[];
+    why_it_matters: string;
+    next_click: string;
+    pitfall?: string;
+    confidence?: EdgeConfidence;
+    related_nodes?: TourRelatedNode[];
+    related_arcs?: TourRelatedArc[];
+    cached?: boolean;
+    source?: string;
+    model?: string;
+    prompt_version?: string;
+}
+
+interface TourResponse {
+    state: TourState;
+    step: TourStep;
+    warnings?: ApiWarning[];
+}
+
 type SnippetMode = 'body' | 'full';
 
 type GraphLayoutMode = 'cluster' | 'layer' | 'free';
@@ -193,6 +245,13 @@ class GitReaderApp {
     private routePicker: HTMLElement;
     private routeSelect: HTMLSelectElement;
     private routeJump: HTMLButtonElement;
+    private tourControls: HTMLElement;
+    private tourModeSelect: HTMLSelectElement;
+    private tourStartButton: HTMLButtonElement;
+    private tourPrevButton: HTMLButtonElement;
+    private tourNextButton: HTMLButtonElement;
+    private tourEndButton: HTMLButtonElement;
+    private tourStatus: HTMLElement;
     private repoForm: HTMLFormElement;
     private repoInput: HTMLInputElement;
     private localInput: HTMLInputElement;
@@ -207,6 +266,10 @@ class GitReaderApp {
     private storyArcs: StoryArc[] = [];
     private storyArcsById: Map<string, StoryArc> = new Map();
     private activeStoryArc: StoryArc | null = null;
+    private tourActive = false;
+    private tourState: TourState | null = null;
+    private tourStep: TourStep | null = null;
+    private tourMode: TourMode = 'story';
     private graphNodes: SymbolNode[] = [];
     private graphEdges: GraphEdge[] = [];
     private nodeById: Map<string, SymbolNode> = new Map();
@@ -264,9 +327,20 @@ class GitReaderApp {
         this.routePicker = this.getElement('route-picker');
         this.routeSelect = this.getElement('route-select') as HTMLSelectElement;
         this.routeJump = this.getElement('route-jump') as HTMLButtonElement;
+        this.tourControls = this.getElement('tour-controls');
+        this.tourModeSelect = this.getElement('tour-mode') as HTMLSelectElement;
+        this.tourStartButton = this.getElement('tour-start') as HTMLButtonElement;
+        this.tourPrevButton = this.getElement('tour-prev') as HTMLButtonElement;
+        this.tourNextButton = this.getElement('tour-next') as HTMLButtonElement;
+        this.tourEndButton = this.getElement('tour-end') as HTMLButtonElement;
+        this.tourStatus = this.getElement('tour-status');
+        this.tourModeSelect.value = this.tourMode;
         this.graphRevealButton.disabled = true;
         this.routeSelect.disabled = true;
         this.routeJump.disabled = true;
+        this.tourPrevButton.disabled = true;
+        this.tourNextButton.disabled = true;
+        this.tourEndButton.disabled = true;
         this.repoForm = this.getElement('repo-picker') as HTMLFormElement;
         this.repoInput = this.getElement('repo-input') as HTMLInputElement;
         this.localInput = this.getElement('local-input') as HTMLInputElement;
@@ -281,6 +355,7 @@ class GitReaderApp {
         this.loadGraphPreferences();
         this.bindEvents();
         this.updateNarratorToggle();
+        this.updateTourControls();
         this.updateSnippetModeUi();
         this.updateGraphControls();
         this.loadData().catch((error) => {
@@ -480,6 +555,30 @@ class GitReaderApp {
             });
         });
 
+        this.tourModeSelect.addEventListener('change', () => {
+            const mode = this.tourModeSelect.value as TourMode;
+            this.tourMode = mode;
+            if (this.tourActive) {
+                void this.startTour();
+            }
+        });
+
+        this.tourStartButton.addEventListener('click', () => {
+            void this.startTour();
+        });
+
+        this.tourPrevButton.addEventListener('click', () => {
+            void this.advanceTour('prev');
+        });
+
+        this.tourNextButton.addEventListener('click', () => {
+            void this.advanceTour('next');
+        });
+
+        this.tourEndButton.addEventListener('click', () => {
+            this.endTour();
+        });
+
         this.routeSelect.addEventListener('change', () => {
             const arcId = this.routeSelect.value;
             if (!arcId) {
@@ -541,6 +640,28 @@ class GitReaderApp {
             const arcId = target.dataset.arcId;
             if (arcId) {
                 void this.setTocMode('routes', arcId);
+            }
+        });
+
+        this.narratorOutput.addEventListener('click', (event) => {
+            const target = (event.target as HTMLElement).closest<HTMLElement>('[data-tour-node]');
+            if (!target) {
+                return;
+            }
+            const nodeId = target.dataset.tourNode;
+            if (nodeId) {
+                void this.advanceTour('jump', nodeId);
+            }
+        });
+
+        this.narratorOutput.addEventListener('click', (event) => {
+            const target = (event.target as HTMLElement).closest<HTMLElement>('[data-tour-arc]');
+            if (!target) {
+                return;
+            }
+            const arcId = target.dataset.tourArc;
+            if (arcId) {
+                void this.advanceTour('branch', undefined, arcId);
             }
         });
 
@@ -697,6 +818,9 @@ class GitReaderApp {
             await this.loadStoryArc(chapterId);
             return;
         }
+        if (this.tourActive) {
+            return;
+        }
         const requestToken = ++this.chapterRequestToken;
         this.currentChapterId = chapterId;
         this.setActiveToc(chapterId);
@@ -727,6 +851,9 @@ class GitReaderApp {
         this.activeStoryArc = null;
         if (!arcId) {
             this.renderStoryArcEmpty();
+            return;
+        }
+        if (this.tourActive) {
             return;
         }
         let arc = this.storyArcsById.get(arcId);
@@ -1355,6 +1482,10 @@ class GitReaderApp {
             const nodeId = event.target.id();
             const node = this.nodeById.get(nodeId);
             if (!node) {
+                return;
+            }
+            if (this.tourActive) {
+                void this.advanceTour('jump', nodeId);
                 return;
             }
             if (this.handleFileFocusClick(node, event.originalEvent)) {
@@ -2069,6 +2200,10 @@ class GitReaderApp {
         this.modeButtons.forEach((button) => {
             button.classList.toggle('is-active', button.dataset.mode === mode);
         });
+        if (this.tourActive && this.tourStep) {
+            this.renderTourStep(this.tourStep);
+            return;
+        }
         if (this.activeStoryArc) {
             this.renderStoryArc(this.activeStoryArc);
             return;
@@ -2129,6 +2264,164 @@ class GitReaderApp {
         this.narratorToggle.textContent = this.narratorVisible ? 'Narrator' : 'Narrator Off';
     }
 
+    private updateTourControls(): void {
+        this.tourControls.classList.toggle('is-active', this.tourActive);
+        this.tourStartButton.disabled = this.tourActive;
+        this.tourPrevButton.disabled = !this.tourActive;
+        this.tourNextButton.disabled = !this.tourActive;
+        this.tourEndButton.disabled = !this.tourActive;
+        if (this.tourState && this.tourStep) {
+            const total = this.tourStep.total_steps ?? 0;
+            const label = total > 0
+                ? `Step ${this.tourState.step_index + 1} of ${total}`
+                : `Step ${this.tourState.step_index + 1}`;
+            this.tourStatus.textContent = label;
+        } else {
+            this.tourStatus.textContent = '';
+        }
+    }
+
+    private async startTour(): Promise<void> {
+        const arcId = this.getActiveTourArcId();
+        try {
+            const response = await this.fetchJson<TourResponse>(this.buildApiUrl('/gitreader/api/tour/start'), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    mode: this.tourMode,
+                    arc_id: arcId || undefined,
+                }),
+            });
+            this.tourActive = true;
+            this.tourState = response.state;
+            this.tourStep = response.step;
+            this.renderTourStep(response.step);
+            this.updateTourControls();
+            await this.syncTourFocus(response.step);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unable to start tour.';
+            this.renderTourError(message);
+        }
+    }
+
+    private async advanceTour(action: 'next' | 'prev' | 'jump' | 'branch', nodeId?: string, arcId?: string): Promise<void> {
+        if (!this.tourState) {
+            return;
+        }
+        try {
+            const response = await this.fetchJson<TourResponse>(this.buildApiUrl('/gitreader/api/tour/step'), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    state: this.tourState,
+                    action,
+                    target_node_id: nodeId,
+                    target_arc_id: arcId,
+                }),
+            });
+            this.tourState = response.state;
+            this.tourStep = response.step;
+            this.renderTourStep(response.step);
+            this.updateTourControls();
+            await this.syncTourFocus(response.step);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unable to advance tour.';
+            this.renderTourError(message);
+        }
+    }
+
+    private endTour(): void {
+        this.tourActive = false;
+        this.tourState = null;
+        this.tourStep = null;
+        this.updateTourControls();
+        if (this.activeStoryArc) {
+            this.renderStoryArc(this.activeStoryArc);
+            return;
+        }
+        if (this.currentSymbol) {
+            void this.updateNarrator(this.currentSymbol);
+            return;
+        }
+        this.renderStoryArcEmpty();
+    }
+
+    private getActiveTourArcId(): string | null {
+        if (this.activeStoryArc?.id) {
+            return this.activeStoryArc.id;
+        }
+        if (this.tocMode === 'routes' && this.currentChapterId) {
+            return this.currentChapterId;
+        }
+        if (this.routeSelect.value) {
+            return this.routeSelect.value;
+        }
+        return null;
+    }
+
+    private async syncTourFocus(step: TourStep): Promise<void> {
+        if (!step?.node_id) {
+            return;
+        }
+        const node = this.nodeById.get(step.node_id);
+        if (!node) {
+            return;
+        }
+        await this.loadGraphForScope('full');
+        if (this.graphInstance) {
+            this.graphInstance.$('node:selected').unselect();
+            const element = this.graphInstance.$id(node.id);
+            if (element && typeof element.select === 'function') {
+                element.select();
+            }
+        }
+        try {
+            await this.loadSymbolSnippet(node, false);
+        } catch {
+            this.renderCode(node);
+        }
+    }
+
+    private renderTourStep(step: TourStep): void {
+        const explanation = (step.explanation ?? []).map((item) => `<li>${this.escapeHtml(item)}</li>`).join('');
+        const relatedNodes = step.related_nodes ?? [];
+        const relatedNodeButtons = relatedNodes.map((item) => (
+            `<button class="ghost-btn arc-jump" data-tour-node="${this.escapeHtml(item.node_id)}">${this.escapeHtml(item.label)}</button>`
+        ));
+        const relatedArcs = step.related_arcs ?? [];
+        const relatedArcButtons = relatedArcs.map((item) => (
+            `<button class="ghost-btn arc-jump" data-tour-arc="${this.escapeHtml(item.arc_id)}">${this.escapeHtml(item.title)}</button>`
+        ));
+        const pitfall = step.pitfall ? `<p class="tour-pitfall">${this.escapeHtml(step.pitfall)}</p>` : '';
+        this.narratorOutput.innerHTML = `
+            <p class="eyebrow">Tour: ${this.escapeHtml(this.tourMode)}</p>
+            <h3>${this.escapeHtml(step.title)}</h3>
+            <p>${this.escapeHtml(step.hook)}</p>
+            ${explanation ? `<ul>${explanation}</ul>` : ''}
+            <p><strong>Why it matters:</strong> ${this.escapeHtml(step.why_it_matters)}</p>
+            <p><strong>Next:</strong> ${this.escapeHtml(step.next_click)}</p>
+            ${pitfall}
+            ${relatedNodeButtons.length > 0 || relatedArcButtons.length > 0 ? `
+                <div class="arc-jump-list">
+                    ${relatedNodeButtons.join('')}
+                    ${relatedArcButtons.join('')}
+                </div>
+            ` : ''}
+        `;
+    }
+
+    private renderTourError(message: string): void {
+        this.narratorOutput.innerHTML = `
+            <p class="eyebrow">Tour</p>
+            <h3>Tour unavailable</h3>
+            <p>${this.escapeHtml(message)}</p>
+        `;
+    }
+
     private setCanvasOverlay(message: string, visible: boolean): void {
         this.canvasOverlay.textContent = message;
         this.canvasOverlay.classList.toggle('is-visible', visible);
@@ -2166,10 +2459,12 @@ class GitReaderApp {
         this.snippetCache.clear();
         this.updateSnippetModeUi();
         if (this.currentSymbol) {
-            const narrate = !this.activeStoryArc;
+            const narrate = !this.activeStoryArc && !this.tourActive;
             await this.loadSymbolSnippet(this.currentSymbol, narrate);
             if (this.activeStoryArc) {
                 this.renderStoryArc(this.activeStoryArc);
+            } else if (this.tourActive && this.tourStep) {
+                this.renderTourStep(this.tourStep);
             }
         }
     }

@@ -1,0 +1,44 @@
+{
+  "created_at": 1768191651.6532328,
+  "response": {
+    "cached": false,
+    "connections": [
+      "calls -> pypi_portal.blueprints.pypi_packages (external)",
+      "calls -> pypi_portal.extensions.redis (external)",
+      "calls -> update_package_list (function)",
+      "calls -> range (external)"
+    ],
+    "hook": "sync: Sync local database with data from PyPI's API through a Celery task.",
+    "key_lines": [
+      {
+        "line": 23,
+        "text": "Decorators"
+      },
+      {
+        "line": 24,
+        "text": "Signature"
+      },
+      {
+        "line": 25,
+        "text": "Body Start"
+      },
+      {
+        "line": 63,
+        "text": "Body End"
+      }
+    ],
+    "mode": "next",
+    "model": "gpt-4o-mini",
+    "next_thread": "Follow pypi_portal.blueprints.pypi_packages to continue the thread.",
+    "prompt_version": "v1",
+    "source": "fallback",
+    "summary": [
+      "Function sync in pypi_portal/views/pypi/packages.py:23-63.",
+      "Signature: def sync()",
+      "Docstring: Sync local database with data from PyPI's API through a Celery task.",
+      "Calls: pypi_portal.blueprints.pypi_packages, pypi_portal.extensions.redis, update_package_list..."
+    ],
+    "symbol_id": "symbol:pypi_portal.views.pypi.packages.sync",
+    "symbol_name": "sync"
+  }
+}

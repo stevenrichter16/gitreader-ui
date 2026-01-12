@@ -1,0 +1,34 @@
+{
+  "created_at": 1768191602.523634,
+  "response": {
+    "cached": false,
+    "connections": [
+      "calls -> flask.flash (external)",
+      "calls -> _escape (function)"
+    ],
+    "hook": "def warning(message) in pypi_portal/core/flash.py:44-45.",
+    "key_lines": [
+      {
+        "line": 44,
+        "text": "Signature"
+      },
+      {
+        "line": 45,
+        "text": "Body Start"
+      }
+    ],
+    "mode": "next",
+    "model": "gpt-4o-mini",
+    "next_thread": "Follow flask.flash to continue the thread.",
+    "prompt_version": "v1",
+    "source": "fallback",
+    "summary": [
+      "Function warning in pypi_portal/core/flash.py:44-45.",
+      "Signature: def warning(message)",
+      "Calls: flask.flash, _escape",
+      "Used by: sync"
+    ],
+    "symbol_id": "symbol:pypi_portal.core.flash.warning",
+    "symbol_name": "warning"
+  }
+}

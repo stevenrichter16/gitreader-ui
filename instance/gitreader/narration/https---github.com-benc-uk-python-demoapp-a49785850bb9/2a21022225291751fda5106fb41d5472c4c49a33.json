@@ -1,0 +1,34 @@
+{
+  "created_at": 1768194240.226824,
+  "response": {
+    "cached": false,
+    "connections": [
+      "contains -> index (function)",
+      "contains -> info (function)",
+      "contains -> monitor (function)",
+      "imports -> flask (external)"
+    ],
+    "hook": "File src/app/views.py in src/app/views.py:1-30.",
+    "key_lines": [
+      {
+        "line": 1,
+        "text": "Snippet Start"
+      },
+      {
+        "line": 30,
+        "text": "Snippet End"
+      }
+    ],
+    "mode": "summary",
+    "model": "gpt-5.2",
+    "next_thread": "Follow index to continue the thread.",
+    "prompt_version": "v1",
+    "source": "fallback",
+    "summary": [
+      "File src/app/views.py in src/app/views.py:1-30.",
+      "Contains: index, info, monitor"
+    ],
+    "symbol_id": "file:src/app/views.py",
+    "symbol_name": "src/app/views.py"
+  }
+}

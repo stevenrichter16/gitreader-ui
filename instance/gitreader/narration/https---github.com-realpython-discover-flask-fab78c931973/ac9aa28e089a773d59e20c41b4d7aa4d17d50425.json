@@ -1,0 +1,34 @@
+{
+  "created_at": 1768193889.106415,
+  "response": {
+    "cached": false,
+    "connections": [
+      "calls -> first (external)",
+      "calls -> filter (external)",
+      "calls -> int (external)"
+    ],
+    "hook": "def load_user(user_id) in project/__init__.py:36-37.",
+    "key_lines": [
+      {
+        "line": 36,
+        "text": "Snippet Start"
+      },
+      {
+        "line": 37,
+        "text": "Snippet End"
+      }
+    ],
+    "mode": "summary",
+    "model": "gpt-5.2",
+    "next_thread": "Follow first to continue the thread.",
+    "prompt_version": "v1",
+    "source": "fallback",
+    "summary": [
+      "Function load_user in project/__init__.py:36-37.",
+      "Signature: def load_user(user_id)",
+      "Calls: first, filter, int"
+    ],
+    "symbol_id": "symbol:project.load_user",
+    "symbol_name": "load_user"
+  }
+}

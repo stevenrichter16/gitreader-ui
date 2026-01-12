@@ -44,9 +44,20 @@
         this.routePicker = getElement('route-picker');
         this.routeSelect = getElement('route-select');
         this.routeJump = getElement('route-jump');
+        this.tourControls = getElement('tour-controls');
+        this.tourModeSelect = getElement('tour-mode');
+        this.tourStartButton = getElement('tour-start');
+        this.tourPrevButton = getElement('tour-prev');
+        this.tourNextButton = getElement('tour-next');
+        this.tourEndButton = getElement('tour-end');
+        this.tourStatus = getElement('tour-status');
+        this.tourModeSelect.value = 'story';
         this.graphRevealButton.disabled = true;
         this.routeSelect.disabled = true;
         this.routeJump.disabled = true;
+        this.tourPrevButton.disabled = true;
+        this.tourNextButton.disabled = true;
+        this.tourEndButton.disabled = true;
         this.repoForm = getElement('repo-picker');
         this.repoInput = getElement('repo-input');
         this.localInput = getElement('local-input');
@@ -62,6 +73,10 @@
         this.storyArcs = [];
         this.storyArcsById = new Map();
         this.activeStoryArc = null;
+        this.tourActive = false;
+        this.tourState = null;
+        this.tourStep = null;
+        this.tourMode = 'story';
         this.graphNodes = [];
         this.graphEdges = [];
         this.nodeById = new Map();
@@ -100,6 +115,7 @@
         this.loadGraphPreferences();
         this.bindEvents();
         this.updateNarratorToggle();
+        this.updateTourControls();
         this.updateSnippetModeUi();
         this.updateGraphControls();
         this.loadData().catch(function (error) {
@@ -293,6 +309,30 @@
             });
         });
 
+        this.tourModeSelect.addEventListener('change', function () {
+            var mode = _this.tourModeSelect.value;
+            _this.tourMode = mode;
+            if (_this.tourActive) {
+                _this.startTour();
+            }
+        });
+
+        this.tourStartButton.addEventListener('click', function () {
+            _this.startTour();
+        });
+
+        this.tourPrevButton.addEventListener('click', function () {
+            _this.advanceTour('prev');
+        });
+
+        this.tourNextButton.addEventListener('click', function () {
+            _this.advanceTour('next');
+        });
+
+        this.tourEndButton.addEventListener('click', function () {
+            _this.endTour();
+        });
+
         this.routeSelect.addEventListener('change', function () {
             var arcId = _this.routeSelect.value;
             if (!arcId) {
@@ -354,6 +394,28 @@
             var arcId = target.dataset.arcId;
             if (arcId) {
                 _this.setTocMode('routes', arcId);
+            }
+        });
+
+        this.narratorOutput.addEventListener('click', function (event) {
+            var target = event.target.closest('[data-tour-node]');
+            if (!target) {
+                return;
+            }
+            var nodeId = target.dataset.tourNode;
+            if (nodeId) {
+                _this.advanceTour('jump', nodeId);
+            }
+        });
+
+        this.narratorOutput.addEventListener('click', function (event) {
+            var target = event.target.closest('[data-tour-arc]');
+            if (!target) {
+                return;
+            }
+            var arcId = target.dataset.tourArc;
+            if (arcId) {
+                _this.advanceTour('branch', undefined, arcId);
             }
         });
 
@@ -514,6 +576,9 @@
         if (this.tocMode === 'routes') {
             return this.loadStoryArc(chapterId);
         }
+        if (this.tourActive) {
+            return Promise.resolve();
+        }
         var requestToken = ++this.chapterRequestToken;
         this.currentChapterId = chapterId;
         this.setActiveToc(chapterId);
@@ -546,6 +611,9 @@
         this.activeStoryArc = null;
         if (!arcId) {
             this.renderStoryArcEmpty();
+            return Promise.resolve();
+        }
+        if (this.tourActive) {
             return Promise.resolve();
         }
         var arc = this.storyArcsById.get(arcId);
@@ -1183,6 +1251,10 @@
             if (!node) {
                 return;
             }
+            if (_this.tourActive) {
+                _this.advanceTour('jump', nodeId);
+                return;
+            }
             if (_this.handleFileFocusClick(node, event.originalEvent)) {
                 return;
             }
@@ -1564,10 +1636,12 @@
         this.snippetCache.clear();
         this.updateSnippetModeUi();
         if (this.currentSymbol) {
-            var narrate = !this.activeStoryArc;
+            var narrate = !this.activeStoryArc && !_this.tourActive;
             return this.loadSymbolSnippet(this.currentSymbol, narrate).then(function () {
                 if (_this.activeStoryArc) {
                     _this.renderStoryArc(_this.activeStoryArc);
+                } else if (_this.tourActive && _this.tourStep) {
+                    _this.renderTourStep(_this.tourStep);
                 }
             });
         }
@@ -2134,6 +2208,10 @@
         this.modeButtons.forEach(function (button) {
             button.classList.toggle('is-active', button.dataset.mode === mode);
         });
+        if (this.tourActive && this.tourStep) {
+            this.renderTourStep(this.tourStep);
+            return;
+        }
         if (this.activeStoryArc) {
             this.renderStoryArc(this.activeStoryArc);
             return;
@@ -2183,6 +2261,159 @@
         this.narratorToggle.classList.toggle('is-active', this.narratorVisible);
         this.narratorToggle.setAttribute('aria-pressed', String(this.narratorVisible));
         this.narratorToggle.textContent = this.narratorVisible ? 'Narrator' : 'Narrator Off';
+    };
+
+    GitReaderApp.prototype.updateTourControls = function () {
+        this.tourControls.classList.toggle('is-active', this.tourActive);
+        this.tourStartButton.disabled = this.tourActive;
+        this.tourPrevButton.disabled = !this.tourActive;
+        this.tourNextButton.disabled = !this.tourActive;
+        this.tourEndButton.disabled = !this.tourActive;
+        if (this.tourState && this.tourStep) {
+            var total = this.tourStep.total_steps || 0;
+            var label = total > 0
+                ? 'Step ' + (this.tourState.step_index + 1) + ' of ' + total
+                : 'Step ' + (this.tourState.step_index + 1);
+            this.tourStatus.textContent = label;
+        } else {
+            this.tourStatus.textContent = '';
+        }
+    };
+
+    GitReaderApp.prototype.startTour = function () {
+        var _this = this;
+        var arcId = this.getActiveTourArcId();
+        return this.fetchJson(this.buildApiUrl('/gitreader/api/tour/start'), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                mode: this.tourMode,
+                arc_id: arcId || undefined,
+            }),
+        }).then(function (response) {
+            _this.tourActive = true;
+            _this.tourState = response.state;
+            _this.tourStep = response.step;
+            _this.renderTourStep(response.step);
+            _this.updateTourControls();
+            return _this.syncTourFocus(response.step);
+        }).catch(function (error) {
+            var message = error instanceof Error ? error.message : 'Unable to start tour.';
+            _this.renderTourError(message);
+        });
+    };
+
+    GitReaderApp.prototype.advanceTour = function (action, nodeId, arcId) {
+        var _this = this;
+        if (!this.tourState) {
+            return Promise.resolve();
+        }
+        return this.fetchJson(this.buildApiUrl('/gitreader/api/tour/step'), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                state: this.tourState,
+                action: action,
+                target_node_id: nodeId,
+                target_arc_id: arcId,
+            }),
+        }).then(function (response) {
+            _this.tourState = response.state;
+            _this.tourStep = response.step;
+            _this.renderTourStep(response.step);
+            _this.updateTourControls();
+            return _this.syncTourFocus(response.step);
+        }).catch(function (error) {
+            var message = error instanceof Error ? error.message : 'Unable to advance tour.';
+            _this.renderTourError(message);
+        });
+    };
+
+    GitReaderApp.prototype.endTour = function () {
+        this.tourActive = false;
+        this.tourState = null;
+        this.tourStep = null;
+        this.updateTourControls();
+        if (this.activeStoryArc) {
+            this.renderStoryArc(this.activeStoryArc);
+            return;
+        }
+        if (this.currentSymbol) {
+            this.updateNarrator(this.currentSymbol);
+            return;
+        }
+        this.renderStoryArcEmpty();
+    };
+
+    GitReaderApp.prototype.getActiveTourArcId = function () {
+        if (this.activeStoryArc && this.activeStoryArc.id) {
+            return this.activeStoryArc.id;
+        }
+        if (this.tocMode === 'routes' && this.currentChapterId) {
+            return this.currentChapterId;
+        }
+        if (this.routeSelect.value) {
+            return this.routeSelect.value;
+        }
+        return null;
+    };
+
+    GitReaderApp.prototype.syncTourFocus = function (step) {
+        var _this = this;
+        if (!step || !step.node_id) {
+            return Promise.resolve();
+        }
+        var node = this.nodeById.get(step.node_id);
+        if (!node) {
+            return Promise.resolve();
+        }
+        return this.loadGraphForScope('full').then(function () {
+            if (_this.graphInstance) {
+                _this.graphInstance.$('node:selected').unselect();
+                var element = _this.graphInstance.$id(node.id);
+                if (element && typeof element.select === 'function') {
+                    element.select();
+                }
+            }
+            return _this.loadSymbolSnippet(node, false).catch(function () {
+                _this.renderCode(node);
+            });
+        });
+    };
+
+    GitReaderApp.prototype.renderTourStep = function (step) {
+        var explanation = (step.explanation || []).map(function (item) { return '<li>' + escapeHtml(item) + '</li>'; }).join('');
+        var relatedNodes = step.related_nodes || [];
+        var relatedNodeButtons = relatedNodes.map(function (item) {
+            return '<button class="ghost-btn arc-jump" data-tour-node="' + escapeHtml(item.node_id) + '">' + escapeHtml(item.label) + '</button>';
+        });
+        var relatedArcs = step.related_arcs || [];
+        var relatedArcButtons = relatedArcs.map(function (item) {
+            return '<button class="ghost-btn arc-jump" data-tour-arc="' + escapeHtml(item.arc_id) + '">' + escapeHtml(item.title) + '</button>';
+        });
+        var pitfall = step.pitfall ? '<p class="tour-pitfall">' + escapeHtml(step.pitfall) + '</p>' : '';
+        this.narratorOutput.innerHTML =
+            '<p class="eyebrow">Tour: ' + escapeHtml(this.tourMode) + '</p>' +
+            '<h3>' + escapeHtml(step.title) + '</h3>' +
+            '<p>' + escapeHtml(step.hook) + '</p>' +
+            (explanation ? '<ul>' + explanation + '</ul>' : '') +
+            '<p><strong>Why it matters:</strong> ' + escapeHtml(step.why_it_matters) + '</p>' +
+            '<p><strong>Next:</strong> ' + escapeHtml(step.next_click) + '</p>' +
+            pitfall +
+            (relatedNodeButtons.length > 0 || relatedArcButtons.length > 0
+                ? '<div class="arc-jump-list">' + relatedNodeButtons.join('') + relatedArcButtons.join('') + '</div>'
+                : '');
+    };
+
+    GitReaderApp.prototype.renderTourError = function (message) {
+        this.narratorOutput.innerHTML =
+            '<p class="eyebrow">Tour</p>' +
+            '<h3>Tour unavailable</h3>' +
+            '<p>' + escapeHtml(message) + '</p>';
     };
 
     GitReaderApp.prototype.setCanvasOverlay = function (message, visible) {

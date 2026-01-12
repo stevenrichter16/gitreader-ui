@@ -9,10 +9,11 @@ from typing import Dict, List, Optional
 from . import storage
 from .models import RepoSpec, RepoIndex, SymbolNode
 from .service import build_symbol_snippet, get_repo_index
+from .signals import extract_signals, format_signals, primary_route, signal_summary
 
 
 LOGGER = logging.getLogger(__name__)
-PROMPT_VERSION = 'v1'
+PROMPT_VERSION = 'v2'
 
 
 def narrate_symbol(
@@ -123,15 +124,17 @@ def _generate_narration(
     mode: str,
 ) -> tuple[Dict[str, object], str, str]:
     api_key = os.getenv('GITREADER_LLM_API_KEY') or os.getenv('OPENAI_API_KEY')
-    model = os.getenv('GITREADER_LLM_MODEL', 'gpt-4o-mini')
+    model = os.getenv('GITREADER_LLM_MODEL', 'gpt-5.2')
     base_url = os.getenv('OPENAI_BASE_URL', 'https://api.openai.com/v1').rstrip('/')
 
-    fallback = _fallback_narration(node, snippet, context)
+    snippet_text = str(snippet.get('snippet') or '')
+    signals = extract_signals(snippet_text)
+    fallback = _fallback_narration(node, snippet, context, signals)
     if not api_key:
         LOGGER.warning('gitreader narrator disabled: missing GITREADER_LLM_API_KEY or OPENAI_API_KEY')
         return fallback, 'fallback', model
 
-    messages = _build_messages(node, snippet, context, mode)
+    messages = _build_messages(node, snippet, context, mode, signals)
     start_time = time.perf_counter()
     try:
         content = _call_openai(
@@ -156,26 +159,33 @@ def _build_messages(
     snippet: Dict[str, object],
     context: Dict[str, List[str]],
     mode: str,
+    signals: Dict[str, List[str]],
 ) -> List[Dict[str, str]]:
     snippet_text = _format_snippet(snippet)
     signature = node.signature or ''
     docstring = node.docstring or ''
     location = node.location.to_dict() if node.location else {}
+    module_name = node.module or ''
     incoming = '\n'.join(f'- {item}' for item in context.get('incoming', [])) or '- none'
     outgoing = '\n'.join(f'- {item}' for item in context.get('outgoing', [])) or '- none'
+    signals_lines = format_signals(signals)
+    signals_block = '\n'.join(f'- {item}' for item in signals_lines) or '- none'
 
     system = (
         'You are the GitReader narrator. Respond only with valid JSON. '
-        'Keep the tone vivid but precise. Use line numbers from the snippet for key_lines.'
+        'Be specific to this codebase: mention file paths, routes, templates, data access, '
+        'and concrete symbols. Avoid generic filler. Use line numbers from the snippet for key_lines.'
     )
     user = (
         f'Mode: {mode}\n'
         f'Symbol: {node.name}\n'
         f'Kind: {node.kind}\n'
         f'Location: {location}\n'
+        f'Module: {module_name}\n'
         f'Signature: {signature}\n'
         f'Docstring: {docstring}\n'
         f'\nSnippet:\n{snippet_text}\n'
+        f'\nSignals:\n{signals_block}\n'
         f'\nGraph context (incoming):\n{incoming}\n'
         f'Graph context (outgoing):\n{outgoing}\n'
         'Return JSON with keys: '
@@ -209,6 +219,7 @@ def _call_openai(
     payload = {
         'model': model,
         'messages': messages,
+        'reasoning': 'high',
         'temperature': _env_float('GITREADER_LLM_TEMPERATURE', 0.4),
         'max_tokens': _env_int('GITREADER_LLM_MAX_TOKENS', 700),
     }
@@ -308,14 +319,16 @@ def _fallback_narration(
     node: SymbolNode,
     snippet: Dict[str, object],
     context: Dict[str, List[str]],
+    signals: Dict[str, List[str]],
 ) -> Dict[str, object]:
     name = node.name
     kind_label = _kind_label(node.kind)
     location_label = _format_location(node, snippet)
     signature = node.signature or ''
     doc_line = node.summary or ''
-    hook = _build_hook(name, kind_label, location_label, signature, doc_line)
-    summary = _build_summary(node, location_label, signature, doc_line, context)
+    route_label = primary_route(signals)
+    hook = _build_hook(name, kind_label, location_label, signature, doc_line, route_label, signals)
+    summary = _build_summary(node, location_label, signature, doc_line, context, route_label, signals)
     key_lines = []
     for highlight in snippet.get('highlights', []) or []:
         if not isinstance(highlight, dict):
@@ -372,7 +385,14 @@ def _build_hook(
     location_label: str,
     signature: str,
     doc_line: str,
+    route_label: str,
+    signals: Dict[str, List[str]],
 ) -> str:
+    if route_label:
+        return f'{name} handles {route_label}.'
+    templates = signals.get('templates') or []
+    if templates:
+        return f'{name} renders {templates[0]}.'
     if doc_line:
         return f'{name}: {doc_line}'
     if signature and location_label:
@@ -390,17 +410,24 @@ def _build_summary(
     signature: str,
     doc_line: str,
     context: Dict[str, List[str]],
+    route_label: str,
+    signals: Dict[str, List[str]],
 ) -> List[str]:
     summary: List[str] = []
     kind_label = _kind_label(node.kind)
-    if location_label:
+    if location_label and route_label:
+        summary.append(f'{kind_label} {node.name} in {location_label}. Route: {route_label}.')
+    elif location_label:
         summary.append(f'{kind_label} {node.name} in {location_label}.')
+    elif route_label:
+        summary.append(f'Route: {route_label}.')
     else:
         summary.append(f'{kind_label} {node.name}.')
     if signature:
         summary.append(f'Signature: {signature}')
     if doc_line:
         summary.append(f'Docstring: {doc_line}')
+    summary.extend(signal_summary(signals))
 
     outgoing = _edge_items(context.get('outgoing', []))
     incoming = _edge_items(context.get('incoming', []))

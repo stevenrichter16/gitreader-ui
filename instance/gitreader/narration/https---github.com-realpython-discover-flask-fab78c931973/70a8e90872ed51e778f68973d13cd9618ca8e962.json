@@ -1,0 +1,43 @@
+{
+  "created_at": 1768193827.436824,
+  "response": {
+    "cached": false,
+    "connections": [
+      "calls -> home_blueprint.route (external)",
+      "calls -> MessageForm (class)",
+      "calls -> form.validate_on_submit (external)",
+      "calls -> BlogPost (class)"
+    ],
+    "hook": "def home() in project/home/views.py:28-46.",
+    "key_lines": [
+      {
+        "line": 28,
+        "text": "Decorators"
+      },
+      {
+        "line": 30,
+        "text": "Signature"
+      },
+      {
+        "line": 31,
+        "text": "Body Start"
+      },
+      {
+        "line": 46,
+        "text": "Body End"
+      }
+    ],
+    "mode": "summary",
+    "model": "gpt-5.2",
+    "next_thread": "Follow home_blueprint.route to continue the thread.",
+    "prompt_version": "v1",
+    "source": "fallback",
+    "summary": [
+      "Function home in project/home/views.py:28-46.",
+      "Signature: def home()",
+      "Calls: home_blueprint.route, MessageForm, form.validate_on_submit..."
+    ],
+    "symbol_id": "symbol:project.home.views.home",
+    "symbol_name": "home"
+  }
+}

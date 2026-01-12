@@ -1,0 +1,35 @@
+{
+  "created_at": 1768193837.115773,
+  "response": {
+    "cached": false,
+    "connections": [
+      "contains -> home_blueprint (blueprint)",
+      "contains -> home (function)",
+      "contains -> welcome (function)",
+      "imports -> flask (external)"
+    ],
+    "hook": "File project/home/views.py in project/home/views.py:1-51.",
+    "key_lines": [
+      {
+        "line": 1,
+        "text": "Snippet Start"
+      },
+      {
+        "line": 51,
+        "text": "Snippet End"
+      }
+    ],
+    "mode": "summary",
+    "model": "gpt-5.2",
+    "next_thread": "Follow home_blueprint to continue the thread.",
+    "prompt_version": "v1",
+    "source": "fallback",
+    "summary": [
+      "File project/home/views.py in project/home/views.py:1-51.",
+      "Contains: home_blueprint, home, welcome",
+      "Imported by: project/__init__.py"
+    ],
+    "symbol_id": "file:project/home/views.py",
+    "symbol_name": "project/home/views.py"
+  }
+}

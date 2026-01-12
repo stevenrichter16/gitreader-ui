@@ -1,0 +1,809 @@
+{
+  "commit_sha": "cefaed4c63430a0358915824f0a5fc3b284468de",
+  "content_signature": "8c07c0e210403439d7e9e2314d9c486320adf848",
+  "edges": [
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:src/app/conftest.py",
+      "target": "symbol:src.app.conftest.client"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:src/app/__init__.py",
+      "target": "symbol:src.app.create_app"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:src/app/apis.py",
+      "target": "symbol:src.app.apis.api_process"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:src/app/apis.py",
+      "target": "symbol:src.app.apis.api_monitor"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:src/app/views.py",
+      "target": "symbol:src.app.views.index"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:src/app/views.py",
+      "target": "symbol:src.app.views.info"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:src/app/views.py",
+      "target": "symbol:src.app.views.monitor"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:src/app/tests/test_views.py",
+      "target": "symbol:src.app.tests.test_views.test_home"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:src/app/tests/test_views.py",
+      "target": "symbol:src.app.tests.test_views.test_page_content"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:src/app/tests/test_views.py",
+      "target": "symbol:src.app.tests.test_views.test_info"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:src/app/tests/test_api.py",
+      "target": "symbol:src.app.tests.test_api.test_api_process"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:src/app/tests/test_api.py",
+      "target": "symbol:src.app.tests.test_api.test_api_monitor"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:src/run.py",
+      "target": "external:os"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:src/run.py",
+      "target": "external:app"
+    },
+    {
+      "confidence": "high",
+      "kind": "imports",
+      "source": "file:src/app/conftest.py",
+      "target": "file:src/app/__init__.py"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:src/app/conftest.py",
+      "target": "external:pytest"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:src/app/__init__.py",
+      "target": "external:flask"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:src/app/apis.py",
+      "target": "external:flask"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:src/app/apis.py",
+      "target": "external:psutil"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:src/app/views.py",
+      "target": "external:flask"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:src/app/views.py",
+      "target": "external:cpuinfo"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:src/app/views.py",
+      "target": "external:psutil"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:src/app/views.py",
+      "target": "external:platform"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:src/app/views.py",
+      "target": "external:datetime"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:src/app/tests/test_api.py",
+      "target": "external:json"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:src.app.conftest.client",
+      "target": "external:app.test_client"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:src.app.create_app",
+      "target": "external:flask.Flask"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:src.app.create_app",
+      "target": "external:app.app_context"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:src.app.apis.api_process",
+      "target": "external:flask.current_app"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:src.app.apis.api_process",
+      "target": "external:flask.jsonify"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:src.app.apis.api_process",
+      "target": "external:psutil"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:src.app.apis.api_process",
+      "target": "external:proc.as_dict"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:src.app.apis.api_process",
+      "target": "external:append"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:src.app.apis.api_monitor",
+      "target": "external:flask.current_app"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:src.app.apis.api_monitor",
+      "target": "external:psutil"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:src.app.apis.api_monitor",
+      "target": "external:flask.jsonify"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:src.app.apis.api_monitor",
+      "target": "external:psutil"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:src.app.apis.api_monitor",
+      "target": "external:psutil"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:src.app.apis.api_monitor",
+      "target": "external:psutil"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:src.app.apis.api_monitor",
+      "target": "external:psutil"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:src.app.views.index",
+      "target": "external:flask.current_app"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:src.app.views.index",
+      "target": "external:flask.render_template"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:src.app.views.info",
+      "target": "external:flask.current_app"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:src.app.views.info",
+      "target": "external:cpuinfo"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:src.app.views.info",
+      "target": "external:psutil"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:src.app.views.info",
+      "target": "external:psutil"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:src.app.views.info",
+      "target": "external:strftime"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:src.app.views.info",
+      "target": "external:flask.render_template"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:src.app.views.info",
+      "target": "external:fromtimestamp"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:src.app.views.info",
+      "target": "external:psutil"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:src.app.views.monitor",
+      "target": "external:flask.current_app"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:src.app.views.monitor",
+      "target": "external:flask.render_template"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:src.app.tests.test_views.test_home",
+      "target": "external:client.get"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:src.app.tests.test_views.test_page_content",
+      "target": "external:client.get"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:src.app.tests.test_views.test_info",
+      "target": "external:client.get"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:src.app.tests.test_api.test_api_process",
+      "target": "external:client.get"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:src.app.tests.test_api.test_api_process",
+      "target": "external:json"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:src.app.tests.test_api.test_api_process",
+      "target": "external:len"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:src.app.tests.test_api.test_api_process",
+      "target": "external:len"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:src.app.tests.test_api.test_api_monitor",
+      "target": "external:client.get"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:src.app.tests.test_api.test_api_monitor",
+      "target": "external:json"
+    }
+  ],
+  "generated_at": 1768194183.3502789,
+  "nodes": [
+    {
+      "id": "file:src/run.py",
+      "kind": "file",
+      "location": {
+        "end_col": 0,
+        "end_line": 0,
+        "path": "src/run.py",
+        "start_col": 0,
+        "start_line": 0
+      },
+      "module": "src.run",
+      "name": "src/run.py",
+      "summary": ""
+    },
+    {
+      "id": "file:src/app/conftest.py",
+      "kind": "file",
+      "location": {
+        "end_col": 0,
+        "end_line": 0,
+        "path": "src/app/conftest.py",
+        "start_col": 0,
+        "start_line": 0
+      },
+      "module": "src.app.conftest",
+      "name": "src/app/conftest.py",
+      "summary": ""
+    },
+    {
+      "id": "file:src/app/__init__.py",
+      "kind": "file",
+      "location": {
+        "end_col": 0,
+        "end_line": 0,
+        "path": "src/app/__init__.py",
+        "start_col": 0,
+        "start_line": 0
+      },
+      "module": "src.app",
+      "name": "src/app/__init__.py",
+      "summary": ""
+    },
+    {
+      "id": "file:src/app/apis.py",
+      "kind": "file",
+      "location": {
+        "end_col": 0,
+        "end_line": 0,
+        "path": "src/app/apis.py",
+        "start_col": 0,
+        "start_line": 0
+      },
+      "module": "src.app.apis",
+      "name": "src/app/apis.py",
+      "summary": ""
+    },
+    {
+      "id": "file:src/app/views.py",
+      "kind": "file",
+      "location": {
+        "end_col": 0,
+        "end_line": 0,
+        "path": "src/app/views.py",
+        "start_col": 0,
+        "start_line": 0
+      },
+      "module": "src.app.views",
+      "name": "src/app/views.py",
+      "summary": ""
+    },
+    {
+      "id": "file:src/app/tests/test_views.py",
+      "kind": "file",
+      "location": {
+        "end_col": 0,
+        "end_line": 0,
+        "path": "src/app/tests/test_views.py",
+        "start_col": 0,
+        "start_line": 0
+      },
+      "module": "src.app.tests.test_views",
+      "name": "src/app/tests/test_views.py",
+      "summary": ""
+    },
+    {
+      "id": "file:src/app/tests/test_api.py",
+      "kind": "file",
+      "location": {
+        "end_col": 0,
+        "end_line": 0,
+        "path": "src/app/tests/test_api.py",
+        "start_col": 0,
+        "start_line": 0
+      },
+      "module": "src.app.tests.test_api",
+      "name": "src/app/tests/test_api.py",
+      "summary": ""
+    },
+    {
+      "id": "symbol:src.app.conftest.client",
+      "kind": "function",
+      "location": {
+        "end_col": 20,
+        "end_line": 10,
+        "path": "src/app/conftest.py",
+        "start_col": 0,
+        "start_line": 8
+      },
+      "module": "src.app.conftest",
+      "name": "client",
+      "signature": "def client()",
+      "summary": ""
+    },
+    {
+      "id": "symbol:src.app.create_app",
+      "kind": "function",
+      "location": {
+        "end_col": 14,
+        "end_line": 9,
+        "path": "src/app/__init__.py",
+        "start_col": 0,
+        "start_line": 4
+      },
+      "module": "src.app",
+      "name": "create_app",
+      "signature": "def create_app()",
+      "summary": ""
+    },
+    {
+      "id": "symbol:src.app.apis.api_process",
+      "kind": "function",
+      "location": {
+        "end_col": 27,
+        "end_line": 32,
+        "path": "src/app/apis.py",
+        "start_col": 0,
+        "start_line": 15
+      },
+      "module": "src.app.apis",
+      "name": "api_process",
+      "signature": "def api_process()",
+      "summary": ""
+    },
+    {
+      "id": "symbol:src.app.apis.api_monitor",
+      "kind": "function",
+      "location": {
+        "end_col": 27,
+        "end_line": 75,
+        "path": "src/app/apis.py",
+        "start_col": 0,
+        "start_line": 39
+      },
+      "module": "src.app.apis",
+      "name": "api_monitor",
+      "signature": "def api_monitor()",
+      "summary": ""
+    },
+    {
+      "id": "symbol:src.app.views.index",
+      "kind": "function",
+      "location": {
+        "end_col": 40,
+        "end_line": 11,
+        "path": "src/app/views.py",
+        "start_col": 0,
+        "start_line": 10
+      },
+      "module": "src.app.views",
+      "name": "index",
+      "signature": "def index()",
+      "summary": ""
+    },
+    {
+      "id": "symbol:src.app.views.info",
+      "kind": "function",
+      "location": {
+        "end_col": 52,
+        "end_line": 25,
+        "path": "src/app/views.py",
+        "start_col": 0,
+        "start_line": 15
+      },
+      "module": "src.app.views",
+      "name": "info",
+      "signature": "def info()",
+      "summary": ""
+    },
+    {
+      "id": "symbol:src.app.views.monitor",
+      "kind": "function",
+      "location": {
+        "end_col": 42,
+        "end_line": 30,
+        "path": "src/app/views.py",
+        "start_col": 0,
+        "start_line": 29
+      },
+      "module": "src.app.views",
+      "name": "monitor",
+      "signature": "def monitor()",
+      "summary": ""
+    },
+    {
+      "id": "symbol:src.app.tests.test_views.test_home",
+      "kind": "function",
+      "location": {
+        "end_col": 33,
+        "end_line": 5,
+        "path": "src/app/tests/test_views.py",
+        "start_col": 0,
+        "start_line": 1
+      },
+      "module": "src.app.tests.test_views",
+      "name": "test_home",
+      "signature": "def test_home(client)",
+      "summary": ""
+    },
+    {
+      "id": "symbol:src.app.tests.test_views.test_page_content",
+      "kind": "function",
+      "location": {
+        "end_col": 34,
+        "end_line": 12,
+        "path": "src/app/tests/test_views.py",
+        "start_col": 0,
+        "start_line": 8
+      },
+      "module": "src.app.tests.test_views",
+      "name": "test_page_content",
+      "signature": "def test_page_content(client)",
+      "summary": ""
+    },
+    {
+      "id": "symbol:src.app.tests.test_views.test_info",
+      "kind": "function",
+      "location": {
+        "end_col": 35,
+        "end_line": 19,
+        "path": "src/app/tests/test_views.py",
+        "start_col": 0,
+        "start_line": 15
+      },
+      "module": "src.app.tests.test_views",
+      "name": "test_info",
+      "signature": "def test_info(client)",
+      "summary": ""
+    },
+    {
+      "id": "symbol:src.app.tests.test_api.test_api_process",
+      "kind": "function",
+      "location": {
+        "end_col": 56,
+        "end_line": 13,
+        "path": "src/app/tests/test_api.py",
+        "start_col": 0,
+        "start_line": 5
+      },
+      "module": "src.app.tests.test_api",
+      "name": "test_api_process",
+      "signature": "def test_api_process(client)",
+      "summary": ""
+    },
+    {
+      "id": "symbol:src.app.tests.test_api.test_api_monitor",
+      "kind": "function",
+      "location": {
+        "end_col": 40,
+        "end_line": 29,
+        "path": "src/app/tests/test_api.py",
+        "start_col": 0,
+        "start_line": 17
+      },
+      "module": "src.app.tests.test_api",
+      "name": "test_api_monitor",
+      "signature": "def test_api_monitor(client)",
+      "summary": ""
+    },
+    {
+      "id": "external:os",
+      "kind": "external",
+      "name": "os",
+      "summary": ""
+    },
+    {
+      "id": "external:app",
+      "kind": "external",
+      "name": "app",
+      "summary": ""
+    },
+    {
+      "id": "external:pytest",
+      "kind": "external",
+      "name": "pytest",
+      "summary": ""
+    },
+    {
+      "id": "external:flask",
+      "kind": "external",
+      "name": "flask",
+      "summary": ""
+    },
+    {
+      "id": "external:psutil",
+      "kind": "external",
+      "name": "psutil",
+      "summary": ""
+    },
+    {
+      "id": "external:cpuinfo",
+      "kind": "external",
+      "name": "cpuinfo",
+      "summary": ""
+    },
+    {
+      "id": "external:platform",
+      "kind": "external",
+      "name": "platform",
+      "summary": ""
+    },
+    {
+      "id": "external:datetime",
+      "kind": "external",
+      "name": "datetime",
+      "summary": ""
+    },
+    {
+      "id": "external:json",
+      "kind": "external",
+      "name": "json",
+      "summary": ""
+    },
+    {
+      "id": "external:app.test_client",
+      "kind": "external",
+      "name": "app.test_client",
+      "summary": ""
+    },
+    {
+      "id": "external:flask.Flask",
+      "kind": "external",
+      "name": "flask.Flask",
+      "summary": ""
+    },
+    {
+      "id": "external:app.app_context",
+      "kind": "external",
+      "name": "app.app_context",
+      "summary": ""
+    },
+    {
+      "id": "external:flask.current_app",
+      "kind": "external",
+      "name": "flask.current_app",
+      "summary": ""
+    },
+    {
+      "id": "external:flask.jsonify",
+      "kind": "external",
+      "name": "flask.jsonify",
+      "summary": ""
+    },
+    {
+      "id": "external:proc.as_dict",
+      "kind": "external",
+      "name": "proc.as_dict",
+      "summary": ""
+    },
+    {
+      "id": "external:append",
+      "kind": "external",
+      "name": "append",
+      "summary": ""
+    },
+    {
+      "id": "external:flask.render_template",
+      "kind": "external",
+      "name": "flask.render_template",
+      "summary": ""
+    },
+    {
+      "id": "external:strftime",
+      "kind": "external",
+      "name": "strftime",
+      "summary": ""
+    },
+    {
+      "id": "external:fromtimestamp",
+      "kind": "external",
+      "name": "fromtimestamp",
+      "summary": ""
+    },
+    {
+      "id": "external:client.get",
+      "kind": "external",
+      "name": "client.get",
+      "summary": ""
+    },
+    {
+      "id": "external:len",
+      "kind": "external",
+      "name": "len",
+      "summary": ""
+    }
+  ],
+  "repo_id": "https---github.com-benc-uk-python-demoapp-a49785850bb9",
+  "root_path": "/Users/steven/Documents/gitreader/instance/gitreader/repos/https---github.com-benc-uk-python-demoapp-a49785850bb9",
+  "stats": {
+    "edges": 61,
+    "nodes": 40,
+    "python_files": 7,
+    "skipped_files": 2,
+    "total_bytes": 248165,
+    "total_files": 44,
+    "warnings": 2
+  },
+  "toc": [
+    {
+      "id": "group:src",
+      "summary": "7 files",
+      "title": "Package: src"
+    }
+  ],
+  "warnings": [
+    {
+      "code": "binary_file",
+      "message": "Skipped binary file",
+      "path": "src/app/static/img/flask.png"
+    },
+    {
+      "code": "binary_file",
+      "message": "Skipped binary file",
+      "path": "src/app/static/img/favicon.ico"
+    }
+  ]
+}

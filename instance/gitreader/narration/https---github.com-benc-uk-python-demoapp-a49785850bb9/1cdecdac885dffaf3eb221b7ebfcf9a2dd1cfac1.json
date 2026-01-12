@@ -1,0 +1,38 @@
+{
+  "created_at": 1768195657.8895009,
+  "response": {
+    "cached": false,
+    "connections": [
+      "calls -> flask.current_app (external)",
+      "calls -> flask.render_template (external)"
+    ],
+    "hook": "index handles ANY /.",
+    "key_lines": [
+      {
+        "line": 9,
+        "text": "Decorators"
+      },
+      {
+        "line": 10,
+        "text": "Signature"
+      },
+      {
+        "line": 11,
+        "text": "Body Start"
+      }
+    ],
+    "mode": "hook",
+    "model": "gpt-5.2",
+    "next_thread": "Follow flask.current_app to continue the thread.",
+    "prompt_version": "v2",
+    "source": "fallback",
+    "summary": [
+      "Function index in src/app/views.py:9-11. Route: ANY /.",
+      "Signature: def index()",
+      "Renders: index.html.",
+      "Calls: flask.current_app, flask.render_template"
+    ],
+    "symbol_id": "symbol:src.app.views.index",
+    "symbol_name": "index"
+  }
+}

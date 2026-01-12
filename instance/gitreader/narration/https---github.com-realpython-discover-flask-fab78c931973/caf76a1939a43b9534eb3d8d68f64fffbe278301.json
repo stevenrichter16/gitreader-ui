@@ -1,0 +1,38 @@
+{
+  "created_at": 1768193825.851885,
+  "response": {
+    "cached": false,
+    "connections": [
+      "contains -> __init__ (method)",
+      "contains -> __repr__ (method)",
+      "inherits -> Model (external)"
+    ],
+    "hook": "class BlogPost(db.Model) in project/models.py:8-23.",
+    "key_lines": [
+      {
+        "line": 8,
+        "text": "Signature"
+      },
+      {
+        "line": 9,
+        "text": "Body Start"
+      },
+      {
+        "line": 23,
+        "text": "Body End"
+      }
+    ],
+    "mode": "summary",
+    "model": "gpt-5.2",
+    "next_thread": "Follow __init__ to continue the thread.",
+    "prompt_version": "v1",
+    "source": "fallback",
+    "summary": [
+      "Class BlogPost in project/models.py:8-23.",
+      "Signature: class BlogPost(db.Model)",
+      "Contains: __init__, __repr__"
+    ],
+    "symbol_id": "symbol:project.models.BlogPost",
+    "symbol_name": "BlogPost"
+  }
+}

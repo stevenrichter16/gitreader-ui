@@ -1,0 +1,3218 @@
+{
+  "commit_sha": "00762e9ee9e5713cb61ca8734236d05d6e424da9",
+  "content_signature": "9824ac98c4b935de7749f58262c2b78d5f52cb9e",
+  "edges": [
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:config.py",
+      "target": "symbol:config.BaseConfig"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:config.py",
+      "target": "symbol:config.TestConfig"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:config.py",
+      "target": "symbol:config.DevelopmentConfig"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:config.py",
+      "target": "symbol:config.ProductionConfig"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:migrations/env.py",
+      "target": "symbol:migrations.env.run_migrations_offline"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:migrations/env.py",
+      "target": "symbol:migrations.env.run_migrations_online"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:migrations/versions/4a5b39003781_.py",
+      "target": "symbol:migrations.versions.4a5b39003781_.upgrade"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:migrations/versions/4a5b39003781_.py",
+      "target": "symbol:migrations.versions.4a5b39003781_.downgrade"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:migrations/versions/c1b2d6a2aa6_.py",
+      "target": "symbol:migrations.versions.c1b2d6a2aa6_.upgrade"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:migrations/versions/c1b2d6a2aa6_.py",
+      "target": "symbol:migrations.versions.c1b2d6a2aa6_.downgrade"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:migrations/versions/3e0014fa59ca_.py",
+      "target": "symbol:migrations.versions.3e0014fa59ca_.upgrade"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:migrations/versions/3e0014fa59ca_.py",
+      "target": "symbol:migrations.versions.3e0014fa59ca_.downgrade"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:tests/test_basic.py",
+      "target": "symbol:tests.test_basic.FlaskTestCase"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "symbol:tests.test_basic.FlaskTestCase",
+      "target": "symbol:tests.test_basic.FlaskTestCase.test_index"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "symbol:tests.test_basic.FlaskTestCase",
+      "target": "symbol:tests.test_basic.FlaskTestCase.test_main_route_requires_login"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "symbol:tests.test_basic.FlaskTestCase",
+      "target": "symbol:tests.test_basic.FlaskTestCase.test_welcome_route_works_as_expected"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "symbol:tests.test_basic.FlaskTestCase",
+      "target": "symbol:tests.test_basic.FlaskTestCase.test_posts_show_up_on_main_page"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:tests/test_users.py",
+      "target": "symbol:tests.test_users.TestUser"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "symbol:tests.test_users.TestUser",
+      "target": "symbol:tests.test_users.TestUser.test_user_registeration"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "symbol:tests.test_users.TestUser",
+      "target": "symbol:tests.test_users.TestUser.test_incorrect_user_registeration"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "symbol:tests.test_users.TestUser",
+      "target": "symbol:tests.test_users.TestUser.test_get_by_id"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "symbol:tests.test_users.TestUser",
+      "target": "symbol:tests.test_users.TestUser.test_check_password"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:tests/test_users.py",
+      "target": "symbol:tests.test_users.UserViewsTests"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "symbol:tests.test_users.UserViewsTests",
+      "target": "symbol:tests.test_users.UserViewsTests.test_login_page_loads"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "symbol:tests.test_users.UserViewsTests",
+      "target": "symbol:tests.test_users.UserViewsTests.test_correct_login"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "symbol:tests.test_users.UserViewsTests",
+      "target": "symbol:tests.test_users.UserViewsTests.test_incorrect_login"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "symbol:tests.test_users.UserViewsTests",
+      "target": "symbol:tests.test_users.UserViewsTests.test_logout"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "symbol:tests.test_users.UserViewsTests",
+      "target": "symbol:tests.test_users.UserViewsTests.test_logout_route_requires_login"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:tests/base.py",
+      "target": "symbol:tests.base.BaseTestCase"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "symbol:tests.base.BaseTestCase",
+      "target": "symbol:tests.base.BaseTestCase.create_app"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "symbol:tests.base.BaseTestCase",
+      "target": "symbol:tests.base.BaseTestCase.setUp"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "symbol:tests.base.BaseTestCase",
+      "target": "symbol:tests.base.BaseTestCase.tearDown"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:tests/test_blog.py",
+      "target": "symbol:tests.test_blog.BlogPostTests"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "symbol:tests.test_blog.BlogPostTests",
+      "target": "symbol:tests.test_blog.BlogPostTests.test_user_can_post"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:project/models.py",
+      "target": "symbol:project.models.BlogPost"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "symbol:project.models.BlogPost",
+      "target": "symbol:project.models.BlogPost.__init__"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "symbol:project.models.BlogPost",
+      "target": "symbol:project.models.BlogPost.__repr__"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:project/models.py",
+      "target": "symbol:project.models.User"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "symbol:project.models.User",
+      "target": "symbol:project.models.User.__init__"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "symbol:project.models.User",
+      "target": "symbol:project.models.User.is_authenticated"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "symbol:project.models.User",
+      "target": "symbol:project.models.User.is_active"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "symbol:project.models.User",
+      "target": "symbol:project.models.User.is_anonymous"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "symbol:project.models.User",
+      "target": "symbol:project.models.User.get_id"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "symbol:project.models.User",
+      "target": "symbol:project.models.User.__repr__"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:project/__init__.py",
+      "target": "symbol:project.load_user"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:project/home/forms.py",
+      "target": "symbol:project.home.forms.MessageForm"
+    },
+    {
+      "confidence": "medium",
+      "kind": "contains",
+      "source": "file:project/home/views.py",
+      "target": "blueprint:home_blueprint"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:project/home/views.py",
+      "target": "symbol:project.home.views.home"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:project/home/views.py",
+      "target": "symbol:project.home.views.welcome"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:project/users/forms.py",
+      "target": "symbol:project.users.forms.LoginForm"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:project/users/forms.py",
+      "target": "symbol:project.users.forms.RegisterForm"
+    },
+    {
+      "confidence": "medium",
+      "kind": "contains",
+      "source": "file:project/users/views.py",
+      "target": "blueprint:users_blueprint"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:project/users/views.py",
+      "target": "symbol:project.users.views.login"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:project/users/views.py",
+      "target": "symbol:project.users.views.logout"
+    },
+    {
+      "confidence": "high",
+      "kind": "contains",
+      "source": "file:project/users/views.py",
+      "target": "symbol:project.users.views.register"
+    },
+    {
+      "confidence": "high",
+      "kind": "imports",
+      "source": "file:run.py",
+      "target": "file:project/__init__.py"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:config.py",
+      "target": "external:os"
+    },
+    {
+      "confidence": "high",
+      "kind": "imports",
+      "source": "file:db_create_users.py",
+      "target": "file:project/__init__.py"
+    },
+    {
+      "confidence": "high",
+      "kind": "imports",
+      "source": "file:db_create_users.py",
+      "target": "file:project/models.py"
+    },
+    {
+      "confidence": "high",
+      "kind": "imports",
+      "source": "file:db_create.py",
+      "target": "file:project/__init__.py"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:sql.py",
+      "target": "external:sqlite3"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:migrations/env.py",
+      "target": "external:__future__"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:migrations/env.py",
+      "target": "external:alembic"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:migrations/env.py",
+      "target": "external:sqlalchemy"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:migrations/env.py",
+      "target": "external:logging.config"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:migrations/env.py",
+      "target": "external:flask"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:migrations/versions/4a5b39003781_.py",
+      "target": "external:alembic"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:migrations/versions/4a5b39003781_.py",
+      "target": "external:sqlalchemy"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:migrations/versions/c1b2d6a2aa6_.py",
+      "target": "external:alembic"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:migrations/versions/c1b2d6a2aa6_.py",
+      "target": "external:sqlalchemy"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:migrations/versions/3e0014fa59ca_.py",
+      "target": "external:alembic"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:migrations/versions/3e0014fa59ca_.py",
+      "target": "external:sqlalchemy"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:tests/test_basic.py",
+      "target": "external:unittest"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:tests/test_basic.py",
+      "target": "external:base"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:tests/test_users.py",
+      "target": "external:unittest"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:tests/test_users.py",
+      "target": "external:flask.ext.login"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:tests/test_users.py",
+      "target": "external:flask"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:tests/test_users.py",
+      "target": "external:base"
+    },
+    {
+      "confidence": "high",
+      "kind": "imports",
+      "source": "file:tests/test_users.py",
+      "target": "file:project/__init__.py"
+    },
+    {
+      "confidence": "high",
+      "kind": "imports",
+      "source": "file:tests/test_users.py",
+      "target": "file:project/models.py"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:tests/base.py",
+      "target": "external:flask.ext.testing"
+    },
+    {
+      "confidence": "high",
+      "kind": "imports",
+      "source": "file:tests/base.py",
+      "target": "file:project/__init__.py"
+    },
+    {
+      "confidence": "high",
+      "kind": "imports",
+      "source": "file:tests/base.py",
+      "target": "file:project/models.py"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:tests/test_blog.py",
+      "target": "external:unittest"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:tests/test_blog.py",
+      "target": "external:base"
+    },
+    {
+      "confidence": "high",
+      "kind": "imports",
+      "source": "file:project/models.py",
+      "target": "file:project/__init__.py"
+    },
+    {
+      "confidence": "high",
+      "kind": "imports",
+      "source": "file:project/models.py",
+      "target": "file:project/__init__.py"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:project/models.py",
+      "target": "external:sqlalchemy"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:project/models.py",
+      "target": "external:sqlalchemy.orm"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:project/__init__.py",
+      "target": "external:flask"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:project/__init__.py",
+      "target": "external:flask.ext.sqlalchemy"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:project/__init__.py",
+      "target": "external:flask.ext.bcrypt"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:project/__init__.py",
+      "target": "external:flask.ext.login"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:project/__init__.py",
+      "target": "external:os"
+    },
+    {
+      "confidence": "high",
+      "kind": "imports",
+      "source": "file:project/__init__.py",
+      "target": "file:project/users/views.py"
+    },
+    {
+      "confidence": "high",
+      "kind": "imports",
+      "source": "file:project/__init__.py",
+      "target": "file:project/home/views.py"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:project/__init__.py",
+      "target": "external:models"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:project/home/forms.py",
+      "target": "external:flask_wtf"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:project/home/forms.py",
+      "target": "external:wtforms"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:project/home/forms.py",
+      "target": "external:wtforms.validators"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:project/home/views.py",
+      "target": "external:flask"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:project/home/views.py",
+      "target": "external:flask.ext.login"
+    },
+    {
+      "confidence": "high",
+      "kind": "imports",
+      "source": "file:project/home/views.py",
+      "target": "file:project/home/forms.py"
+    },
+    {
+      "confidence": "high",
+      "kind": "imports",
+      "source": "file:project/home/views.py",
+      "target": "file:project/__init__.py"
+    },
+    {
+      "confidence": "high",
+      "kind": "imports",
+      "source": "file:project/home/views.py",
+      "target": "file:project/models.py"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:project/users/forms.py",
+      "target": "external:flask_wtf"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:project/users/forms.py",
+      "target": "external:wtforms"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:project/users/forms.py",
+      "target": "external:wtforms.validators"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:project/users/views.py",
+      "target": "external:flask"
+    },
+    {
+      "confidence": "low",
+      "kind": "imports",
+      "source": "file:project/users/views.py",
+      "target": "external:flask.ext.login"
+    },
+    {
+      "confidence": "high",
+      "kind": "imports",
+      "source": "file:project/users/views.py",
+      "target": "file:project/users/forms.py"
+    },
+    {
+      "confidence": "high",
+      "kind": "imports",
+      "source": "file:project/users/views.py",
+      "target": "file:project/__init__.py"
+    },
+    {
+      "confidence": "high",
+      "kind": "imports",
+      "source": "file:project/users/views.py",
+      "target": "file:project/models.py"
+    },
+    {
+      "confidence": "low",
+      "kind": "inherits",
+      "source": "symbol:config.BaseConfig",
+      "target": "external:object"
+    },
+    {
+      "confidence": "low",
+      "kind": "inherits",
+      "source": "symbol:config.TestConfig",
+      "target": "external:BaseConfig"
+    },
+    {
+      "confidence": "low",
+      "kind": "inherits",
+      "source": "symbol:config.DevelopmentConfig",
+      "target": "external:BaseConfig"
+    },
+    {
+      "confidence": "low",
+      "kind": "inherits",
+      "source": "symbol:config.ProductionConfig",
+      "target": "external:BaseConfig"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:migrations.env.run_migrations_offline",
+      "target": "external:config.get_main_option"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:migrations.env.run_migrations_offline",
+      "target": "external:alembic.context"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:migrations.env.run_migrations_offline",
+      "target": "external:alembic.context"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:migrations.env.run_migrations_offline",
+      "target": "external:alembic.context"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:migrations.env.run_migrations_online",
+      "target": "external:sqlalchemy.engine_from_config"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:migrations.env.run_migrations_online",
+      "target": "external:engine.connect"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:migrations.env.run_migrations_online",
+      "target": "external:alembic.context"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:migrations.env.run_migrations_online",
+      "target": "external:config.get_section"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:migrations.env.run_migrations_online",
+      "target": "external:connection.close"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:migrations.env.run_migrations_online",
+      "target": "external:alembic.context"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:migrations.env.run_migrations_online",
+      "target": "external:alembic.context"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:migrations.versions.4a5b39003781_.upgrade",
+      "target": "external:alembic.op"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:migrations.versions.4a5b39003781_.upgrade",
+      "target": "external:alembic.op"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:migrations.versions.4a5b39003781_.upgrade",
+      "target": "external:sqlalchemy"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:migrations.versions.4a5b39003781_.upgrade",
+      "target": "external:sqlalchemy"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:migrations.versions.4a5b39003781_.upgrade",
+      "target": "external:sqlalchemy"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:migrations.versions.4a5b39003781_.upgrade",
+      "target": "external:sqlalchemy"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:migrations.versions.4a5b39003781_.upgrade",
+      "target": "external:sqlalchemy"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:migrations.versions.4a5b39003781_.upgrade",
+      "target": "external:sqlalchemy"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:migrations.versions.4a5b39003781_.upgrade",
+      "target": "external:sqlalchemy"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:migrations.versions.4a5b39003781_.upgrade",
+      "target": "external:sqlalchemy"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:migrations.versions.4a5b39003781_.upgrade",
+      "target": "external:sqlalchemy"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:migrations.versions.4a5b39003781_.upgrade",
+      "target": "external:sqlalchemy"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:migrations.versions.4a5b39003781_.upgrade",
+      "target": "external:sqlalchemy"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:migrations.versions.4a5b39003781_.downgrade",
+      "target": "external:alembic.op"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:migrations.versions.4a5b39003781_.downgrade",
+      "target": "external:alembic.op"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:migrations.versions.c1b2d6a2aa6_.upgrade",
+      "target": "external:alembic.op"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:migrations.versions.c1b2d6a2aa6_.upgrade",
+      "target": "external:sqlalchemy"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:migrations.versions.c1b2d6a2aa6_.upgrade",
+      "target": "external:sqlalchemy"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:migrations.versions.c1b2d6a2aa6_.downgrade",
+      "target": "external:alembic.op"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:migrations.versions.3e0014fa59ca_.upgrade",
+      "target": "external:alembic.op"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:migrations.versions.3e0014fa59ca_.downgrade",
+      "target": "external:alembic.op"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:migrations.versions.3e0014fa59ca_.downgrade",
+      "target": "external:sqlalchemy"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:migrations.versions.3e0014fa59ca_.downgrade",
+      "target": "external:sqlalchemy"
+    },
+    {
+      "confidence": "low",
+      "kind": "inherits",
+      "source": "symbol:tests.test_basic.FlaskTestCase",
+      "target": "external:BaseTestCase"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_basic.FlaskTestCase.test_index",
+      "target": "external:get"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_basic.FlaskTestCase.test_index",
+      "target": "external:self.assertEqual"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_basic.FlaskTestCase.test_main_route_requires_login",
+      "target": "external:get"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_basic.FlaskTestCase.test_main_route_requires_login",
+      "target": "external:self.assertIn"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_basic.FlaskTestCase.test_welcome_route_works_as_expected",
+      "target": "external:get"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_basic.FlaskTestCase.test_welcome_route_works_as_expected",
+      "target": "external:self.assertIn"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_basic.FlaskTestCase.test_posts_show_up_on_main_page",
+      "target": "external:post"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_basic.FlaskTestCase.test_posts_show_up_on_main_page",
+      "target": "external:self.assertIn"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_basic.FlaskTestCase.test_posts_show_up_on_main_page",
+      "target": "external:dict"
+    },
+    {
+      "confidence": "low",
+      "kind": "inherits",
+      "source": "symbol:tests.test_users.TestUser",
+      "target": "external:BaseTestCase"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_users.TestUser.test_user_registeration",
+      "target": "external:post"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_users.TestUser.test_user_registeration",
+      "target": "external:self.assertIn"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_users.TestUser.test_user_registeration",
+      "target": "external:self.assertTrue"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_users.TestUser.test_user_registeration",
+      "target": "external:self.assertTrue"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_users.TestUser.test_user_registeration",
+      "target": "external:first"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_users.TestUser.test_user_registeration",
+      "target": "external:self.assertTrue"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:tests.test_users.TestUser.test_user_registeration",
+      "target": "external:flask.ext.login.current_user"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_users.TestUser.test_user_registeration",
+      "target": "external:dict"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_users.TestUser.test_user_registeration",
+      "target": "external:filter_by"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_users.TestUser.test_user_registeration",
+      "target": "external:str"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_users.TestUser.test_incorrect_user_registeration",
+      "target": "external:post"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_users.TestUser.test_incorrect_user_registeration",
+      "target": "external:self.assertIn"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_users.TestUser.test_incorrect_user_registeration",
+      "target": "external:self.assertIn"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_users.TestUser.test_incorrect_user_registeration",
+      "target": "external:dict"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_users.TestUser.test_get_by_id",
+      "target": "external:post"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_users.TestUser.test_get_by_id",
+      "target": "external:self.assertTrue"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_users.TestUser.test_get_by_id",
+      "target": "external:self.assertFalse"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_users.TestUser.test_get_by_id",
+      "target": "external:dict"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_users.TestUser.test_check_password",
+      "target": "external:first"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_users.TestUser.test_check_password",
+      "target": "external:self.assertTrue"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_users.TestUser.test_check_password",
+      "target": "external:self.assertFalse"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:tests.test_users.TestUser.test_check_password",
+      "target": "external:project.bcrypt"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:tests.test_users.TestUser.test_check_password",
+      "target": "external:project.bcrypt"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_users.TestUser.test_check_password",
+      "target": "external:filter_by"
+    },
+    {
+      "confidence": "low",
+      "kind": "inherits",
+      "source": "symbol:tests.test_users.UserViewsTests",
+      "target": "external:BaseTestCase"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_users.UserViewsTests.test_login_page_loads",
+      "target": "external:get"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_users.UserViewsTests.test_login_page_loads",
+      "target": "external:self.assertIn"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_users.UserViewsTests.test_correct_login",
+      "target": "external:post"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_users.UserViewsTests.test_correct_login",
+      "target": "external:self.assertIn"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_users.UserViewsTests.test_correct_login",
+      "target": "external:self.assertTrue"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_users.UserViewsTests.test_correct_login",
+      "target": "external:self.assertTrue"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:tests.test_users.UserViewsTests.test_correct_login",
+      "target": "external:flask.ext.login.current_user"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_users.UserViewsTests.test_correct_login",
+      "target": "external:dict"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_users.UserViewsTests.test_incorrect_login",
+      "target": "external:post"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_users.UserViewsTests.test_incorrect_login",
+      "target": "external:self.assertIn"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_users.UserViewsTests.test_incorrect_login",
+      "target": "external:dict"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_users.UserViewsTests.test_logout",
+      "target": "external:post"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_users.UserViewsTests.test_logout",
+      "target": "external:get"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_users.UserViewsTests.test_logout",
+      "target": "external:self.assertIn"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_users.UserViewsTests.test_logout",
+      "target": "external:self.assertFalse"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:tests.test_users.UserViewsTests.test_logout",
+      "target": "external:flask.ext.login.current_user"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_users.UserViewsTests.test_logout",
+      "target": "external:dict"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_users.UserViewsTests.test_logout_route_requires_login",
+      "target": "external:get"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_users.UserViewsTests.test_logout_route_requires_login",
+      "target": "external:self.assertIn"
+    },
+    {
+      "confidence": "low",
+      "kind": "inherits",
+      "source": "symbol:tests.base.BaseTestCase",
+      "target": "external:TestCase"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.base.BaseTestCase.create_app",
+      "target": "external:from_object"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:tests.base.BaseTestCase.setUp",
+      "target": "external:project.db"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.base.BaseTestCase.setUp",
+      "target": "external:add"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.base.BaseTestCase.setUp",
+      "target": "external:add"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.base.BaseTestCase.setUp",
+      "target": "external:commit"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:tests.base.BaseTestCase.setUp",
+      "target": "symbol:project.models.User"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:tests.base.BaseTestCase.setUp",
+      "target": "symbol:project.models.BlogPost"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.base.BaseTestCase.tearDown",
+      "target": "external:remove"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:tests.base.BaseTestCase.tearDown",
+      "target": "external:project.db"
+    },
+    {
+      "confidence": "low",
+      "kind": "inherits",
+      "source": "symbol:tests.test_blog.BlogPostTests",
+      "target": "external:BaseTestCase"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_blog.BlogPostTests.test_user_can_post",
+      "target": "external:post"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_blog.BlogPostTests.test_user_can_post",
+      "target": "external:post"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_blog.BlogPostTests.test_user_can_post",
+      "target": "external:self.assertEqual"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_blog.BlogPostTests.test_user_can_post",
+      "target": "external:self.assertIn"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_blog.BlogPostTests.test_user_can_post",
+      "target": "external:dict"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:tests.test_blog.BlogPostTests.test_user_can_post",
+      "target": "external:dict"
+    },
+    {
+      "confidence": "low",
+      "kind": "inherits",
+      "source": "symbol:project.models.BlogPost",
+      "target": "external:Model"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:project.models.BlogPost.__repr__",
+      "target": "external:format"
+    },
+    {
+      "confidence": "low",
+      "kind": "inherits",
+      "source": "symbol:project.models.User",
+      "target": "external:Model"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:project.models.User.__init__",
+      "target": "external:project.bcrypt"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:project.models.User.get_id",
+      "target": "external:unicode"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:project.models.User.__repr__",
+      "target": "external:format"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:project.load_user",
+      "target": "external:first"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:project.load_user",
+      "target": "external:filter"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:project.load_user",
+      "target": "external:int"
+    },
+    {
+      "confidence": "low",
+      "kind": "inherits",
+      "source": "symbol:project.home.forms.MessageForm",
+      "target": "external:Form"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:project.home.views.home",
+      "target": "external:home_blueprint.route"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:project.home.views.home",
+      "target": "symbol:project.home.forms.MessageForm"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:project.home.views.home",
+      "target": "external:form.validate_on_submit"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:project.home.views.home",
+      "target": "symbol:project.models.BlogPost"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:project.home.views.home",
+      "target": "external:add"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:project.home.views.home",
+      "target": "external:commit"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:project.home.views.home",
+      "target": "external:flask.flash"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:project.home.views.home",
+      "target": "external:flask.redirect"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:project.home.views.home",
+      "target": "external:all"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:project.home.views.home",
+      "target": "external:flask.render_template"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:project.home.views.home",
+      "target": "external:flask.url_for"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:project.home.views.home",
+      "target": "external:query"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:project.home.views.welcome",
+      "target": "external:home_blueprint.route"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:project.home.views.welcome",
+      "target": "external:flask.render_template"
+    },
+    {
+      "confidence": "low",
+      "kind": "inherits",
+      "source": "symbol:project.users.forms.LoginForm",
+      "target": "external:Form"
+    },
+    {
+      "confidence": "low",
+      "kind": "inherits",
+      "source": "symbol:project.users.forms.RegisterForm",
+      "target": "external:Form"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:project.users.views.login",
+      "target": "external:users_blueprint.route"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:project.users.views.login",
+      "target": "symbol:project.users.forms.LoginForm"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:project.users.views.login",
+      "target": "external:flask.render_template"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:project.users.views.login",
+      "target": "external:form.validate_on_submit"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:project.users.views.login",
+      "target": "external:first"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:project.users.views.login",
+      "target": "external:project.models.bcrypt"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:project.users.views.login",
+      "target": "external:flask.ext.login.login_user"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:project.users.views.login",
+      "target": "external:flask.flash"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:project.users.views.login",
+      "target": "external:flask.redirect"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:project.users.views.login",
+      "target": "external:filter_by"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:project.users.views.login",
+      "target": "external:flask.url_for"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:project.users.views.logout",
+      "target": "external:users_blueprint.route"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:project.users.views.logout",
+      "target": "external:flask.ext.login.logout_user"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:project.users.views.logout",
+      "target": "external:flask.flash"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:project.users.views.logout",
+      "target": "external:flask.redirect"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:project.users.views.logout",
+      "target": "external:flask.url_for"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:project.users.views.register",
+      "target": "external:users_blueprint.route"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:project.users.views.register",
+      "target": "symbol:project.users.forms.RegisterForm"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:project.users.views.register",
+      "target": "external:form.validate_on_submit"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:project.users.views.register",
+      "target": "external:flask.render_template"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:project.users.views.register",
+      "target": "symbol:project.models.User"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:project.users.views.register",
+      "target": "external:add"
+    },
+    {
+      "confidence": "low",
+      "kind": "calls",
+      "source": "symbol:project.users.views.register",
+      "target": "external:commit"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:project.users.views.register",
+      "target": "external:flask.ext.login.login_user"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:project.users.views.register",
+      "target": "external:flask.redirect"
+    },
+    {
+      "confidence": "medium",
+      "kind": "calls",
+      "source": "symbol:project.users.views.register",
+      "target": "external:flask.url_for"
+    }
+  ],
+  "generated_at": 1768193708.555362,
+  "nodes": [
+    {
+      "id": "file:run.py",
+      "kind": "file",
+      "location": {
+        "end_col": 0,
+        "end_line": 0,
+        "path": "run.py",
+        "start_col": 0,
+        "start_line": 0
+      },
+      "module": "run",
+      "name": "run.py",
+      "summary": ""
+    },
+    {
+      "id": "file:config.py",
+      "kind": "file",
+      "location": {
+        "end_col": 0,
+        "end_line": 0,
+        "path": "config.py",
+        "start_col": 0,
+        "start_line": 0
+      },
+      "module": "config",
+      "name": "config.py",
+      "summary": ""
+    },
+    {
+      "id": "file:db_create_users.py",
+      "kind": "file",
+      "location": {
+        "end_col": 0,
+        "end_line": 0,
+        "path": "db_create_users.py",
+        "start_col": 0,
+        "start_line": 0
+      },
+      "module": "db_create_users",
+      "name": "db_create_users.py",
+      "summary": ""
+    },
+    {
+      "id": "file:db_create.py",
+      "kind": "file",
+      "location": {
+        "end_col": 0,
+        "end_line": 0,
+        "path": "db_create.py",
+        "start_col": 0,
+        "start_line": 0
+      },
+      "module": "db_create",
+      "name": "db_create.py",
+      "summary": ""
+    },
+    {
+      "id": "file:sql.py",
+      "kind": "file",
+      "location": {
+        "end_col": 0,
+        "end_line": 0,
+        "path": "sql.py",
+        "start_col": 0,
+        "start_line": 0
+      },
+      "module": "sql",
+      "name": "sql.py",
+      "summary": ""
+    },
+    {
+      "id": "file:migrations/env.py",
+      "kind": "file",
+      "location": {
+        "end_col": 0,
+        "end_line": 0,
+        "path": "migrations/env.py",
+        "start_col": 0,
+        "start_line": 0
+      },
+      "module": "migrations.env",
+      "name": "migrations/env.py",
+      "summary": ""
+    },
+    {
+      "id": "file:migrations/versions/4a5b39003781_.py",
+      "kind": "file",
+      "location": {
+        "end_col": 0,
+        "end_line": 0,
+        "path": "migrations/versions/4a5b39003781_.py",
+        "start_col": 0,
+        "start_line": 0
+      },
+      "module": "migrations.versions.4a5b39003781_",
+      "name": "migrations/versions/4a5b39003781_.py",
+      "summary": ""
+    },
+    {
+      "id": "file:migrations/versions/c1b2d6a2aa6_.py",
+      "kind": "file",
+      "location": {
+        "end_col": 0,
+        "end_line": 0,
+        "path": "migrations/versions/c1b2d6a2aa6_.py",
+        "start_col": 0,
+        "start_line": 0
+      },
+      "module": "migrations.versions.c1b2d6a2aa6_",
+      "name": "migrations/versions/c1b2d6a2aa6_.py",
+      "summary": ""
+    },
+    {
+      "id": "file:migrations/versions/3e0014fa59ca_.py",
+      "kind": "file",
+      "location": {
+        "end_col": 0,
+        "end_line": 0,
+        "path": "migrations/versions/3e0014fa59ca_.py",
+        "start_col": 0,
+        "start_line": 0
+      },
+      "module": "migrations.versions.3e0014fa59ca_",
+      "name": "migrations/versions/3e0014fa59ca_.py",
+      "summary": ""
+    },
+    {
+      "id": "file:tests/test_basic.py",
+      "kind": "file",
+      "location": {
+        "end_col": 0,
+        "end_line": 0,
+        "path": "tests/test_basic.py",
+        "start_col": 0,
+        "start_line": 0
+      },
+      "module": "tests.test_basic",
+      "name": "tests/test_basic.py",
+      "summary": ""
+    },
+    {
+      "id": "file:tests/__init__.py",
+      "kind": "file",
+      "location": {
+        "end_col": 0,
+        "end_line": 0,
+        "path": "tests/__init__.py",
+        "start_col": 0,
+        "start_line": 0
+      },
+      "module": "tests",
+      "name": "tests/__init__.py",
+      "summary": ""
+    },
+    {
+      "id": "file:tests/test_users.py",
+      "kind": "file",
+      "location": {
+        "end_col": 0,
+        "end_line": 0,
+        "path": "tests/test_users.py",
+        "start_col": 0,
+        "start_line": 0
+      },
+      "module": "tests.test_users",
+      "name": "tests/test_users.py",
+      "summary": ""
+    },
+    {
+      "id": "file:tests/base.py",
+      "kind": "file",
+      "location": {
+        "end_col": 0,
+        "end_line": 0,
+        "path": "tests/base.py",
+        "start_col": 0,
+        "start_line": 0
+      },
+      "module": "tests.base",
+      "name": "tests/base.py",
+      "summary": ""
+    },
+    {
+      "id": "file:tests/test_blog.py",
+      "kind": "file",
+      "location": {
+        "end_col": 0,
+        "end_line": 0,
+        "path": "tests/test_blog.py",
+        "start_col": 0,
+        "start_line": 0
+      },
+      "module": "tests.test_blog",
+      "name": "tests/test_blog.py",
+      "summary": ""
+    },
+    {
+      "id": "file:project/models.py",
+      "kind": "file",
+      "location": {
+        "end_col": 0,
+        "end_line": 0,
+        "path": "project/models.py",
+        "start_col": 0,
+        "start_line": 0
+      },
+      "module": "project.models",
+      "name": "project/models.py",
+      "summary": ""
+    },
+    {
+      "id": "file:project/__init__.py",
+      "kind": "file",
+      "location": {
+        "end_col": 0,
+        "end_line": 0,
+        "path": "project/__init__.py",
+        "start_col": 0,
+        "start_line": 0
+      },
+      "module": "project",
+      "name": "project/__init__.py",
+      "summary": ""
+    },
+    {
+      "id": "file:project/home/__init__.py",
+      "kind": "file",
+      "location": {
+        "end_col": 0,
+        "end_line": 0,
+        "path": "project/home/__init__.py",
+        "start_col": 0,
+        "start_line": 0
+      },
+      "module": "project.home",
+      "name": "project/home/__init__.py",
+      "summary": ""
+    },
+    {
+      "id": "file:project/home/forms.py",
+      "kind": "file",
+      "location": {
+        "end_col": 0,
+        "end_line": 0,
+        "path": "project/home/forms.py",
+        "start_col": 0,
+        "start_line": 0
+      },
+      "module": "project.home.forms",
+      "name": "project/home/forms.py",
+      "summary": ""
+    },
+    {
+      "id": "file:project/home/views.py",
+      "kind": "file",
+      "location": {
+        "end_col": 0,
+        "end_line": 0,
+        "path": "project/home/views.py",
+        "start_col": 0,
+        "start_line": 0
+      },
+      "module": "project.home.views",
+      "name": "project/home/views.py",
+      "summary": ""
+    },
+    {
+      "id": "file:project/users/__init__.py",
+      "kind": "file",
+      "location": {
+        "end_col": 0,
+        "end_line": 0,
+        "path": "project/users/__init__.py",
+        "start_col": 0,
+        "start_line": 0
+      },
+      "module": "project.users",
+      "name": "project/users/__init__.py",
+      "summary": ""
+    },
+    {
+      "id": "file:project/users/forms.py",
+      "kind": "file",
+      "location": {
+        "end_col": 0,
+        "end_line": 0,
+        "path": "project/users/forms.py",
+        "start_col": 0,
+        "start_line": 0
+      },
+      "module": "project.users.forms",
+      "name": "project/users/forms.py",
+      "summary": ""
+    },
+    {
+      "id": "file:project/users/views.py",
+      "kind": "file",
+      "location": {
+        "end_col": 0,
+        "end_line": 0,
+        "path": "project/users/views.py",
+        "start_col": 0,
+        "start_line": 0
+      },
+      "module": "project.users.views",
+      "name": "project/users/views.py",
+      "summary": ""
+    },
+    {
+      "id": "symbol:config.BaseConfig",
+      "kind": "class",
+      "location": {
+        "end_col": 56,
+        "end_line": 9,
+        "path": "config.py",
+        "start_col": 0,
+        "start_line": 5
+      },
+      "module": "config",
+      "name": "BaseConfig",
+      "signature": "class BaseConfig(object)",
+      "summary": ""
+    },
+    {
+      "id": "symbol:config.TestConfig",
+      "kind": "class",
+      "location": {
+        "end_col": 50,
+        "end_line": 16,
+        "path": "config.py",
+        "start_col": 0,
+        "start_line": 12
+      },
+      "module": "config",
+      "name": "TestConfig",
+      "signature": "class TestConfig(BaseConfig)",
+      "summary": ""
+    },
+    {
+      "id": "symbol:config.DevelopmentConfig",
+      "kind": "class",
+      "location": {
+        "end_col": 16,
+        "end_line": 20,
+        "path": "config.py",
+        "start_col": 0,
+        "start_line": 19
+      },
+      "module": "config",
+      "name": "DevelopmentConfig",
+      "signature": "class DevelopmentConfig(BaseConfig)",
+      "summary": ""
+    },
+    {
+      "id": "symbol:config.ProductionConfig",
+      "kind": "class",
+      "location": {
+        "end_col": 17,
+        "end_line": 24,
+        "path": "config.py",
+        "start_col": 0,
+        "start_line": 23
+      },
+      "module": "config",
+      "name": "ProductionConfig",
+      "signature": "class ProductionConfig(BaseConfig)",
+      "summary": ""
+    },
+    {
+      "docstring": "Run migrations in 'offline' mode.\n\nThis configures the context with just a URL\nand not an Engine, though an Engine is acceptable\nhere as well.  By skipping the Engine creation\nwe don't even need a DBAPI to be available.\n\nCalls to context.execute() here emit the given string to the\nscript output.",
+      "id": "symbol:migrations.env.run_migrations_offline",
+      "kind": "function",
+      "location": {
+        "end_col": 32,
+        "end_line": 43,
+        "path": "migrations/env.py",
+        "start_col": 0,
+        "start_line": 27
+      },
+      "module": "migrations.env",
+      "name": "run_migrations_offline",
+      "signature": "def run_migrations_offline()",
+      "summary": "Run migrations in 'offline' mode."
+    },
+    {
+      "docstring": "Run migrations in 'online' mode.\n\nIn this scenario we need to create an Engine\nand associate a connection with the context.",
+      "id": "symbol:migrations.env.run_migrations_online",
+      "kind": "function",
+      "location": {
+        "end_col": 26,
+        "end_line": 67,
+        "path": "migrations/env.py",
+        "start_col": 0,
+        "start_line": 45
+      },
+      "module": "migrations.env",
+      "name": "run_migrations_online",
+      "signature": "def run_migrations_online()",
+      "summary": "Run migrations in 'online' mode."
+    },
+    {
+      "id": "symbol:migrations.versions.4a5b39003781_.upgrade",
+      "kind": "function",
+      "location": {
+        "end_col": 80,
+        "end_line": 26,
+        "path": "migrations/versions/4a5b39003781_.py",
+        "start_col": 0,
+        "start_line": 17
+      },
+      "module": "migrations.versions.4a5b39003781_",
+      "name": "upgrade",
+      "signature": "def upgrade()",
+      "summary": ""
+    },
+    {
+      "id": "symbol:migrations.versions.4a5b39003781_.downgrade",
+      "kind": "function",
+      "location": {
+        "end_col": 26,
+        "end_line": 33,
+        "path": "migrations/versions/4a5b39003781_.py",
+        "start_col": 0,
+        "start_line": 30
+      },
+      "module": "migrations.versions.4a5b39003781_",
+      "name": "downgrade",
+      "signature": "def downgrade()",
+      "summary": ""
+    },
+    {
+      "id": "symbol:migrations.versions.c1b2d6a2aa6_.upgrade",
+      "kind": "function",
+      "location": {
+        "end_col": 77,
+        "end_line": 19,
+        "path": "migrations/versions/c1b2d6a2aa6_.py",
+        "start_col": 0,
+        "start_line": 17
+      },
+      "module": "migrations.versions.c1b2d6a2aa6_",
+      "name": "upgrade",
+      "signature": "def upgrade()",
+      "summary": ""
+    },
+    {
+      "id": "symbol:migrations.versions.c1b2d6a2aa6_.downgrade",
+      "kind": "function",
+      "location": {
+        "end_col": 39,
+        "end_line": 25,
+        "path": "migrations/versions/c1b2d6a2aa6_.py",
+        "start_col": 0,
+        "start_line": 23
+      },
+      "module": "migrations.versions.c1b2d6a2aa6_",
+      "name": "downgrade",
+      "signature": "def downgrade()",
+      "summary": ""
+    },
+    {
+      "id": "symbol:migrations.versions.3e0014fa59ca_.upgrade",
+      "kind": "function",
+      "location": {
+        "end_col": 39,
+        "end_line": 19,
+        "path": "migrations/versions/3e0014fa59ca_.py",
+        "start_col": 0,
+        "start_line": 17
+      },
+      "module": "migrations.versions.3e0014fa59ca_",
+      "name": "upgrade",
+      "signature": "def upgrade()",
+      "summary": ""
+    },
+    {
+      "id": "symbol:migrations.versions.3e0014fa59ca_.downgrade",
+      "kind": "function",
+      "location": {
+        "end_col": 100,
+        "end_line": 25,
+        "path": "migrations/versions/3e0014fa59ca_.py",
+        "start_col": 0,
+        "start_line": 23
+      },
+      "module": "migrations.versions.3e0014fa59ca_",
+      "name": "downgrade",
+      "signature": "def downgrade()",
+      "summary": ""
+    },
+    {
+      "id": "symbol:tests.test_basic.FlaskTestCase",
+      "kind": "class",
+      "location": {
+        "end_col": 69,
+        "end_line": 32,
+        "path": "tests/test_basic.py",
+        "start_col": 0,
+        "start_line": 8
+      },
+      "module": "tests.test_basic",
+      "name": "FlaskTestCase",
+      "signature": "class FlaskTestCase(BaseTestCase)",
+      "summary": ""
+    },
+    {
+      "id": "symbol:tests.test_basic.FlaskTestCase.test_index",
+      "kind": "method",
+      "location": {
+        "end_col": 51,
+        "end_line": 13,
+        "path": "tests/test_basic.py",
+        "start_col": 4,
+        "start_line": 11
+      },
+      "module": "tests.test_basic",
+      "name": "test_index",
+      "signature": "def test_index(self)",
+      "summary": ""
+    },
+    {
+      "id": "symbol:tests.test_basic.FlaskTestCase.test_main_route_requires_login",
+      "kind": "method",
+      "location": {
+        "end_col": 74,
+        "end_line": 18,
+        "path": "tests/test_basic.py",
+        "start_col": 4,
+        "start_line": 16
+      },
+      "module": "tests.test_basic",
+      "name": "test_main_route_requires_login",
+      "signature": "def test_main_route_requires_login(self)",
+      "summary": ""
+    },
+    {
+      "id": "symbol:tests.test_basic.FlaskTestCase.test_welcome_route_works_as_expected",
+      "kind": "method",
+      "location": {
+        "end_col": 58,
+        "end_line": 23,
+        "path": "tests/test_basic.py",
+        "start_col": 4,
+        "start_line": 21
+      },
+      "module": "tests.test_basic",
+      "name": "test_welcome_route_works_as_expected",
+      "signature": "def test_welcome_route_works_as_expected(self)",
+      "summary": ""
+    },
+    {
+      "id": "symbol:tests.test_basic.FlaskTestCase.test_posts_show_up_on_main_page",
+      "kind": "method",
+      "location": {
+        "end_col": 69,
+        "end_line": 32,
+        "path": "tests/test_basic.py",
+        "start_col": 4,
+        "start_line": 26
+      },
+      "module": "tests.test_basic",
+      "name": "test_posts_show_up_on_main_page",
+      "signature": "def test_posts_show_up_on_main_page(self)",
+      "summary": ""
+    },
+    {
+      "id": "symbol:tests.test_users.TestUser",
+      "kind": "class",
+      "location": {
+        "end_col": 77,
+        "end_line": 52,
+        "path": "tests/test_users.py",
+        "start_col": 0,
+        "start_line": 14
+      },
+      "module": "tests.test_users",
+      "name": "TestUser",
+      "signature": "class TestUser(BaseTestCase)",
+      "summary": ""
+    },
+    {
+      "id": "symbol:tests.test_users.TestUser.test_user_registeration",
+      "kind": "method",
+      "location": {
+        "end_col": 60,
+        "end_line": 27,
+        "path": "tests/test_users.py",
+        "start_col": 4,
+        "start_line": 17
+      },
+      "module": "tests.test_users",
+      "name": "test_user_registeration",
+      "signature": "def test_user_registeration(self)",
+      "summary": ""
+    },
+    {
+      "id": "symbol:tests.test_users.TestUser.test_incorrect_user_registeration",
+      "kind": "method",
+      "location": {
+        "end_col": 53,
+        "end_line": 37,
+        "path": "tests/test_users.py",
+        "start_col": 4,
+        "start_line": 30
+      },
+      "module": "tests.test_users",
+      "name": "test_incorrect_user_registeration",
+      "signature": "def test_incorrect_user_registeration(self)",
+      "summary": ""
+    },
+    {
+      "id": "symbol:tests.test_users.TestUser.test_get_by_id",
+      "kind": "method",
+      "location": {
+        "end_col": 51,
+        "end_line": 46,
+        "path": "tests/test_users.py",
+        "start_col": 4,
+        "start_line": 40
+      },
+      "module": "tests.test_users",
+      "name": "test_get_by_id",
+      "signature": "def test_get_by_id(self)",
+      "summary": ""
+    },
+    {
+      "id": "symbol:tests.test_users.TestUser.test_check_password",
+      "kind": "method",
+      "location": {
+        "end_col": 77,
+        "end_line": 52,
+        "path": "tests/test_users.py",
+        "start_col": 4,
+        "start_line": 49
+      },
+      "module": "tests.test_users",
+      "name": "test_check_password",
+      "signature": "def test_check_password(self)",
+      "summary": ""
+    },
+    {
+      "id": "symbol:tests.test_users.UserViewsTests",
+      "kind": "class",
+      "location": {
+        "end_col": 74,
+        "end_line": 98,
+        "path": "tests/test_users.py",
+        "start_col": 0,
+        "start_line": 55
+      },
+      "module": "tests.test_users",
+      "name": "UserViewsTests",
+      "signature": "class UserViewsTests(BaseTestCase)",
+      "summary": ""
+    },
+    {
+      "id": "symbol:tests.test_users.UserViewsTests.test_login_page_loads",
+      "kind": "method",
+      "location": {
+        "end_col": 53,
+        "end_line": 60,
+        "path": "tests/test_users.py",
+        "start_col": 4,
+        "start_line": 58
+      },
+      "module": "tests.test_users",
+      "name": "test_login_page_loads",
+      "signature": "def test_login_page_loads(self)",
+      "summary": ""
+    },
+    {
+      "id": "symbol:tests.test_users.UserViewsTests.test_correct_login",
+      "kind": "method",
+      "location": {
+        "end_col": 53,
+        "end_line": 72,
+        "path": "tests/test_users.py",
+        "start_col": 4,
+        "start_line": 63
+      },
+      "module": "tests.test_users",
+      "name": "test_correct_login",
+      "signature": "def test_correct_login(self)",
+      "summary": ""
+    },
+    {
+      "id": "symbol:tests.test_users.UserViewsTests.test_incorrect_login",
+      "kind": "method",
+      "location": {
+        "end_col": 70,
+        "end_line": 81,
+        "path": "tests/test_users.py",
+        "start_col": 4,
+        "start_line": 75
+      },
+      "module": "tests.test_users",
+      "name": "test_incorrect_login",
+      "signature": "def test_incorrect_login(self)",
+      "summary": ""
+    },
+    {
+      "id": "symbol:tests.test_users.UserViewsTests.test_logout",
+      "kind": "method",
+      "location": {
+        "end_col": 54,
+        "end_line": 93,
+        "path": "tests/test_users.py",
+        "start_col": 4,
+        "start_line": 84
+      },
+      "module": "tests.test_users",
+      "name": "test_logout",
+      "signature": "def test_logout(self)",
+      "summary": ""
+    },
+    {
+      "id": "symbol:tests.test_users.UserViewsTests.test_logout_route_requires_login",
+      "kind": "method",
+      "location": {
+        "end_col": 74,
+        "end_line": 98,
+        "path": "tests/test_users.py",
+        "start_col": 4,
+        "start_line": 96
+      },
+      "module": "tests.test_users",
+      "name": "test_logout_route_requires_login",
+      "signature": "def test_logout_route_requires_login(self)",
+      "summary": ""
+    },
+    {
+      "docstring": "A base test case.",
+      "id": "symbol:tests.base.BaseTestCase",
+      "kind": "class",
+      "location": {
+        "end_col": 21,
+        "end_line": 23,
+        "path": "tests/base.py",
+        "start_col": 0,
+        "start_line": 7
+      },
+      "module": "tests.base",
+      "name": "BaseTestCase",
+      "signature": "class BaseTestCase(TestCase)",
+      "summary": "A base test case."
+    },
+    {
+      "id": "symbol:tests.base.BaseTestCase.create_app",
+      "kind": "method",
+      "location": {
+        "end_col": 18,
+        "end_line": 12,
+        "path": "tests/base.py",
+        "start_col": 4,
+        "start_line": 10
+      },
+      "module": "tests.base",
+      "name": "create_app",
+      "signature": "def create_app(self)",
+      "summary": ""
+    },
+    {
+      "id": "symbol:tests.base.BaseTestCase.setUp",
+      "kind": "method",
+      "location": {
+        "end_col": 27,
+        "end_line": 19,
+        "path": "tests/base.py",
+        "start_col": 4,
+        "start_line": 14
+      },
+      "module": "tests.base",
+      "name": "setUp",
+      "signature": "def setUp(self)",
+      "summary": ""
+    },
+    {
+      "id": "symbol:tests.base.BaseTestCase.tearDown",
+      "kind": "method",
+      "location": {
+        "end_col": 21,
+        "end_line": 23,
+        "path": "tests/base.py",
+        "start_col": 4,
+        "start_line": 21
+      },
+      "module": "tests.base",
+      "name": "tearDown",
+      "signature": "def tearDown(self)",
+      "summary": ""
+    },
+    {
+      "id": "symbol:tests.test_blog.BlogPostTests",
+      "kind": "class",
+      "location": {
+        "end_col": 40,
+        "end_line": 25,
+        "path": "tests/test_blog.py",
+        "start_col": 0,
+        "start_line": 8
+      },
+      "module": "tests.test_blog",
+      "name": "BlogPostTests",
+      "signature": "class BlogPostTests(BaseTestCase)",
+      "summary": ""
+    },
+    {
+      "id": "symbol:tests.test_blog.BlogPostTests.test_user_can_post",
+      "kind": "method",
+      "location": {
+        "end_col": 40,
+        "end_line": 25,
+        "path": "tests/test_blog.py",
+        "start_col": 4,
+        "start_line": 11
+      },
+      "module": "tests.test_blog",
+      "name": "test_user_can_post",
+      "signature": "def test_user_can_post(self)",
+      "summary": ""
+    },
+    {
+      "id": "symbol:project.models.BlogPost",
+      "kind": "class",
+      "location": {
+        "end_col": 45,
+        "end_line": 23,
+        "path": "project/models.py",
+        "start_col": 0,
+        "start_line": 8
+      },
+      "module": "project.models",
+      "name": "BlogPost",
+      "signature": "class BlogPost(db.Model)",
+      "summary": ""
+    },
+    {
+      "id": "symbol:project.models.BlogPost.__init__",
+      "kind": "method",
+      "location": {
+        "end_col": 34,
+        "end_line": 20,
+        "path": "project/models.py",
+        "start_col": 4,
+        "start_line": 17
+      },
+      "module": "project.models",
+      "name": "__init__",
+      "signature": "def __init__(self, title, description, author_id)",
+      "summary": ""
+    },
+    {
+      "id": "symbol:project.models.BlogPost.__repr__",
+      "kind": "method",
+      "location": {
+        "end_col": 45,
+        "end_line": 23,
+        "path": "project/models.py",
+        "start_col": 4,
+        "start_line": 22
+      },
+      "module": "project.models",
+      "name": "__repr__",
+      "signature": "def __repr__(self)",
+      "summary": ""
+    },
+    {
+      "id": "symbol:project.models.User",
+      "kind": "class",
+      "location": {
+        "end_col": 46,
+        "end_line": 54,
+        "path": "project/models.py",
+        "start_col": 0,
+        "start_line": 26
+      },
+      "module": "project.models",
+      "name": "User",
+      "signature": "class User(db.Model)",
+      "summary": ""
+    },
+    {
+      "id": "symbol:project.models.User.__init__",
+      "kind": "method",
+      "location": {
+        "end_col": 63,
+        "end_line": 39,
+        "path": "project/models.py",
+        "start_col": 4,
+        "start_line": 36
+      },
+      "module": "project.models",
+      "name": "__init__",
+      "signature": "def __init__(self, name, email, password)",
+      "summary": ""
+    },
+    {
+      "id": "symbol:project.models.User.is_authenticated",
+      "kind": "method",
+      "location": {
+        "end_col": 19,
+        "end_line": 42,
+        "path": "project/models.py",
+        "start_col": 4,
+        "start_line": 41
+      },
+      "module": "project.models",
+      "name": "is_authenticated",
+      "signature": "def is_authenticated(self)",
+      "summary": ""
+    },
+    {
+      "id": "symbol:project.models.User.is_active",
+      "kind": "method",
+      "location": {
+        "end_col": 19,
+        "end_line": 45,
+        "path": "project/models.py",
+        "start_col": 4,
+        "start_line": 44
+      },
+      "module": "project.models",
+      "name": "is_active",
+      "signature": "def is_active(self)",
+      "summary": ""
+    },
+    {
+      "id": "symbol:project.models.User.is_anonymous",
+      "kind": "method",
+      "location": {
+        "end_col": 20,
+        "end_line": 48,
+        "path": "project/models.py",
+        "start_col": 4,
+        "start_line": 47
+      },
+      "module": "project.models",
+      "name": "is_anonymous",
+      "signature": "def is_anonymous(self)",
+      "summary": ""
+    },
+    {
+      "id": "symbol:project.models.User.get_id",
+      "kind": "method",
+      "location": {
+        "end_col": 31,
+        "end_line": 51,
+        "path": "project/models.py",
+        "start_col": 4,
+        "start_line": 50
+      },
+      "module": "project.models",
+      "name": "get_id",
+      "signature": "def get_id(self)",
+      "summary": ""
+    },
+    {
+      "id": "symbol:project.models.User.__repr__",
+      "kind": "method",
+      "location": {
+        "end_col": 46,
+        "end_line": 54,
+        "path": "project/models.py",
+        "start_col": 4,
+        "start_line": 53
+      },
+      "module": "project.models",
+      "name": "__repr__",
+      "signature": "def __repr__(self)",
+      "summary": ""
+    },
+    {
+      "id": "symbol:project.load_user",
+      "kind": "function",
+      "location": {
+        "end_col": 61,
+        "end_line": 37,
+        "path": "project/__init__.py",
+        "start_col": 0,
+        "start_line": 36
+      },
+      "module": "project",
+      "name": "load_user",
+      "signature": "def load_user(user_id)",
+      "summary": ""
+    },
+    {
+      "id": "symbol:project.home.forms.MessageForm",
+      "kind": "class",
+      "location": {
+        "end_col": 68,
+        "end_line": 9,
+        "path": "project/home/forms.py",
+        "start_col": 0,
+        "start_line": 6
+      },
+      "module": "project.home.forms",
+      "name": "MessageForm",
+      "signature": "class MessageForm(Form)",
+      "summary": ""
+    },
+    {
+      "id": "blueprint:home_blueprint",
+      "kind": "blueprint",
+      "location": {
+        "end_col": 1,
+        "end_line": 20,
+        "path": "project/home/views.py",
+        "start_col": 0,
+        "start_line": 17
+      },
+      "module": "project.home.views",
+      "name": "home_blueprint",
+      "summary": ""
+    },
+    {
+      "id": "symbol:project.home.views.home",
+      "kind": "function",
+      "location": {
+        "end_col": 62,
+        "end_line": 46,
+        "path": "project/home/views.py",
+        "start_col": 0,
+        "start_line": 30
+      },
+      "module": "project.home.views",
+      "name": "home",
+      "signature": "def home()",
+      "summary": ""
+    },
+    {
+      "id": "symbol:project.home.views.welcome",
+      "kind": "function",
+      "location": {
+        "end_col": 42,
+        "end_line": 51,
+        "path": "project/home/views.py",
+        "start_col": 0,
+        "start_line": 50
+      },
+      "module": "project.home.views",
+      "name": "welcome",
+      "signature": "def welcome()",
+      "summary": ""
+    },
+    {
+      "id": "symbol:project.users.forms.LoginForm",
+      "kind": "class",
+      "location": {
+        "end_col": 69,
+        "end_line": 8,
+        "path": "project/users/forms.py",
+        "start_col": 0,
+        "start_line": 6
+      },
+      "module": "project.users.forms",
+      "name": "LoginForm",
+      "signature": "class LoginForm(Form)",
+      "summary": ""
+    },
+    {
+      "id": "symbol:project.users.forms.RegisterForm",
+      "kind": "class",
+      "location": {
+        "end_col": 5,
+        "end_line": 29,
+        "path": "project/users/forms.py",
+        "start_col": 0,
+        "start_line": 11
+      },
+      "module": "project.users.forms",
+      "name": "RegisterForm",
+      "signature": "class RegisterForm(Form)",
+      "summary": ""
+    },
+    {
+      "id": "blueprint:users_blueprint",
+      "kind": "blueprint",
+      "location": {
+        "end_col": 1,
+        "end_line": 21,
+        "path": "project/users/views.py",
+        "start_col": 0,
+        "start_line": 18
+      },
+      "module": "project.users.views",
+      "name": "users_blueprint",
+      "summary": ""
+    },
+    {
+      "id": "symbol:project.users.views.login",
+      "kind": "function",
+      "location": {
+        "end_col": 64,
+        "end_line": 44,
+        "path": "project/users/views.py",
+        "start_col": 0,
+        "start_line": 29
+      },
+      "module": "project.users.views",
+      "name": "login",
+      "signature": "def login()",
+      "summary": ""
+    },
+    {
+      "id": "symbol:project.users.views.logout",
+      "kind": "function",
+      "location": {
+        "end_col": 44,
+        "end_line": 52,
+        "path": "project/users/views.py",
+        "start_col": 0,
+        "start_line": 49
+      },
+      "module": "project.users.views",
+      "name": "logout",
+      "signature": "def logout()",
+      "summary": ""
+    },
+    {
+      "id": "symbol:project.users.views.register",
+      "kind": "function",
+      "location": {
+        "end_col": 54,
+        "end_line": 69,
+        "path": "project/users/views.py",
+        "start_col": 0,
+        "start_line": 57
+      },
+      "module": "project.users.views",
+      "name": "register",
+      "signature": "def register()",
+      "summary": ""
+    },
+    {
+      "id": "external:os",
+      "kind": "external",
+      "name": "os",
+      "summary": ""
+    },
+    {
+      "id": "external:sqlite3",
+      "kind": "external",
+      "name": "sqlite3",
+      "summary": ""
+    },
+    {
+      "id": "external:__future__",
+      "kind": "external",
+      "name": "__future__",
+      "summary": ""
+    },
+    {
+      "id": "external:alembic",
+      "kind": "external",
+      "name": "alembic",
+      "summary": ""
+    },
+    {
+      "id": "external:sqlalchemy",
+      "kind": "external",
+      "name": "sqlalchemy",
+      "summary": ""
+    },
+    {
+      "id": "external:logging.config",
+      "kind": "external",
+      "name": "logging.config",
+      "summary": ""
+    },
+    {
+      "id": "external:flask",
+      "kind": "external",
+      "name": "flask",
+      "summary": ""
+    },
+    {
+      "id": "external:unittest",
+      "kind": "external",
+      "name": "unittest",
+      "summary": ""
+    },
+    {
+      "id": "external:base",
+      "kind": "external",
+      "name": "base",
+      "summary": ""
+    },
+    {
+      "id": "external:flask.ext.login",
+      "kind": "external",
+      "name": "flask.ext.login",
+      "summary": ""
+    },
+    {
+      "id": "external:flask.ext.testing",
+      "kind": "external",
+      "name": "flask.ext.testing",
+      "summary": ""
+    },
+    {
+      "id": "external:sqlalchemy.orm",
+      "kind": "external",
+      "name": "sqlalchemy.orm",
+      "summary": ""
+    },
+    {
+      "id": "external:flask.ext.sqlalchemy",
+      "kind": "external",
+      "name": "flask.ext.sqlalchemy",
+      "summary": ""
+    },
+    {
+      "id": "external:flask.ext.bcrypt",
+      "kind": "external",
+      "name": "flask.ext.bcrypt",
+      "summary": ""
+    },
+    {
+      "id": "external:models",
+      "kind": "external",
+      "name": "models",
+      "summary": ""
+    },
+    {
+      "id": "external:flask_wtf",
+      "kind": "external",
+      "name": "flask_wtf",
+      "summary": ""
+    },
+    {
+      "id": "external:wtforms",
+      "kind": "external",
+      "name": "wtforms",
+      "summary": ""
+    },
+    {
+      "id": "external:wtforms.validators",
+      "kind": "external",
+      "name": "wtforms.validators",
+      "summary": ""
+    },
+    {
+      "id": "external:object",
+      "kind": "external",
+      "name": "object",
+      "summary": ""
+    },
+    {
+      "id": "external:BaseConfig",
+      "kind": "external",
+      "name": "BaseConfig",
+      "summary": ""
+    },
+    {
+      "id": "external:config.get_main_option",
+      "kind": "external",
+      "name": "config.get_main_option",
+      "summary": ""
+    },
+    {
+      "id": "external:alembic.context",
+      "kind": "external",
+      "name": "alembic.context",
+      "summary": ""
+    },
+    {
+      "id": "external:sqlalchemy.engine_from_config",
+      "kind": "external",
+      "name": "sqlalchemy.engine_from_config",
+      "summary": ""
+    },
+    {
+      "id": "external:engine.connect",
+      "kind": "external",
+      "name": "engine.connect",
+      "summary": ""
+    },
+    {
+      "id": "external:config.get_section",
+      "kind": "external",
+      "name": "config.get_section",
+      "summary": ""
+    },
+    {
+      "id": "external:connection.close",
+      "kind": "external",
+      "name": "connection.close",
+      "summary": ""
+    },
+    {
+      "id": "external:alembic.op",
+      "kind": "external",
+      "name": "alembic.op",
+      "summary": ""
+    },
+    {
+      "id": "external:BaseTestCase",
+      "kind": "external",
+      "name": "BaseTestCase",
+      "summary": ""
+    },
+    {
+      "id": "external:get",
+      "kind": "external",
+      "name": "get",
+      "summary": ""
+    },
+    {
+      "id": "external:self.assertEqual",
+      "kind": "external",
+      "name": "self.assertEqual",
+      "summary": ""
+    },
+    {
+      "id": "external:self.assertIn",
+      "kind": "external",
+      "name": "self.assertIn",
+      "summary": ""
+    },
+    {
+      "id": "external:post",
+      "kind": "external",
+      "name": "post",
+      "summary": ""
+    },
+    {
+      "id": "external:dict",
+      "kind": "external",
+      "name": "dict",
+      "summary": ""
+    },
+    {
+      "id": "external:self.assertTrue",
+      "kind": "external",
+      "name": "self.assertTrue",
+      "summary": ""
+    },
+    {
+      "id": "external:first",
+      "kind": "external",
+      "name": "first",
+      "summary": ""
+    },
+    {
+      "id": "external:flask.ext.login.current_user",
+      "kind": "external",
+      "name": "flask.ext.login.current_user",
+      "summary": ""
+    },
+    {
+      "id": "external:filter_by",
+      "kind": "external",
+      "name": "filter_by",
+      "summary": ""
+    },
+    {
+      "id": "external:str",
+      "kind": "external",
+      "name": "str",
+      "summary": ""
+    },
+    {
+      "id": "external:self.assertFalse",
+      "kind": "external",
+      "name": "self.assertFalse",
+      "summary": ""
+    },
+    {
+      "id": "external:project.bcrypt",
+      "kind": "external",
+      "name": "project.bcrypt",
+      "summary": ""
+    },
+    {
+      "id": "external:TestCase",
+      "kind": "external",
+      "name": "TestCase",
+      "summary": ""
+    },
+    {
+      "id": "external:from_object",
+      "kind": "external",
+      "name": "from_object",
+      "summary": ""
+    },
+    {
+      "id": "external:project.db",
+      "kind": "external",
+      "name": "project.db",
+      "summary": ""
+    },
+    {
+      "id": "external:add",
+      "kind": "external",
+      "name": "add",
+      "summary": ""
+    },
+    {
+      "id": "external:commit",
+      "kind": "external",
+      "name": "commit",
+      "summary": ""
+    },
+    {
+      "id": "external:remove",
+      "kind": "external",
+      "name": "remove",
+      "summary": ""
+    },
+    {
+      "id": "external:Model",
+      "kind": "external",
+      "name": "Model",
+      "summary": ""
+    },
+    {
+      "id": "external:format",
+      "kind": "external",
+      "name": "format",
+      "summary": ""
+    },
+    {
+      "id": "external:unicode",
+      "kind": "external",
+      "name": "unicode",
+      "summary": ""
+    },
+    {
+      "id": "external:filter",
+      "kind": "external",
+      "name": "filter",
+      "summary": ""
+    },
+    {
+      "id": "external:int",
+      "kind": "external",
+      "name": "int",
+      "summary": ""
+    },
+    {
+      "id": "external:Form",
+      "kind": "external",
+      "name": "Form",
+      "summary": ""
+    },
+    {
+      "id": "external:home_blueprint.route",
+      "kind": "external",
+      "name": "home_blueprint.route",
+      "summary": ""
+    },
+    {
+      "id": "external:form.validate_on_submit",
+      "kind": "external",
+      "name": "form.validate_on_submit",
+      "summary": ""
+    },
+    {
+      "id": "external:flask.flash",
+      "kind": "external",
+      "name": "flask.flash",
+      "summary": ""
+    },
+    {
+      "id": "external:flask.redirect",
+      "kind": "external",
+      "name": "flask.redirect",
+      "summary": ""
+    },
+    {
+      "id": "external:all",
+      "kind": "external",
+      "name": "all",
+      "summary": ""
+    },
+    {
+      "id": "external:flask.render_template",
+      "kind": "external",
+      "name": "flask.render_template",
+      "summary": ""
+    },
+    {
+      "id": "external:flask.url_for",
+      "kind": "external",
+      "name": "flask.url_for",
+      "summary": ""
+    },
+    {
+      "id": "external:query",
+      "kind": "external",
+      "name": "query",
+      "summary": ""
+    },
+    {
+      "id": "external:users_blueprint.route",
+      "kind": "external",
+      "name": "users_blueprint.route",
+      "summary": ""
+    },
+    {
+      "id": "external:project.models.bcrypt",
+      "kind": "external",
+      "name": "project.models.bcrypt",
+      "summary": ""
+    },
+    {
+      "id": "external:flask.ext.login.login_user",
+      "kind": "external",
+      "name": "flask.ext.login.login_user",
+      "summary": ""
+    },
+    {
+      "id": "external:flask.ext.login.logout_user",
+      "kind": "external",
+      "name": "flask.ext.login.logout_user",
+      "summary": ""
+    }
+  ],
+  "repo_id": "https---github.com-realpython-discover-flask-fab78c931973",
+  "root_path": "/Users/steven/Documents/gitreader/instance/gitreader/repos/https---github.com-realpython-discover-flask-fab78c931973",
+  "stats": {
+    "edges": 275,
+    "nodes": 141,
+    "python_files": 23,
+    "skipped_files": 0,
+    "total_bytes": 161393,
+    "total_files": 38,
+    "warnings": 1
+  },
+  "toc": [
+    {
+      "id": "group:root",
+      "summary": "5 files",
+      "title": "Root files"
+    },
+    {
+      "id": "group:migrations",
+      "summary": "4 files",
+      "title": "Package: migrations"
+    },
+    {
+      "id": "group:project",
+      "summary": "8 files",
+      "title": "Package: project"
+    },
+    {
+      "id": "group:tests",
+      "summary": "5 files",
+      "title": "Package: tests"
+    }
+  ],
+  "warnings": [
+    {
+      "code": "syntax_error",
+      "line": 38,
+      "message": "Missing parentheses in call to 'print'. Did you mean print(...)?",
+      "path": "manage.py"
+    }
+  ]
+}

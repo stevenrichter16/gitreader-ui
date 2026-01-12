@@ -6,6 +6,7 @@ from . import gitreader
 from .models import GraphEdge, RepoSpec, SourceLocation, SymbolNode
 from .narrator import load_cached_narration, narrate_symbol
 from .service import get_repo_index, get_story_arcs, get_symbol_snippet
+from .tour import start_tour, step_tour
 
 
 @gitreader.route('/')
@@ -120,6 +121,59 @@ def story():
         'arcs': arcs,
         'stats': stats,
         'warnings': [warning.to_dict() for warning in warnings],
+    })
+
+
+@gitreader.route('/api/tour/start', methods=['POST'])
+def tour_start():
+    payload = request.get_json(silent=True) or {}
+    mode = payload.get('mode', 'story')
+    arc_id = payload.get('arc_id')
+    spec = _repo_spec_from_request()
+    try:
+        cache_root = os.path.join(current_app.instance_path, 'gitreader')
+        state, step, warnings = start_tour(spec, cache_root=cache_root, mode=mode, arc_id=arc_id)
+    except ValueError as exc:
+        return _error_response('bad_request', str(exc), status=400)
+    except Exception:
+        current_app.logger.exception('gitreader tour start failed')
+        return _error_response('server_error', 'Failed to start tour', status=500)
+    return jsonify({
+        'state': state,
+        'step': step,
+        'warnings': warnings,
+    })
+
+
+@gitreader.route('/api/tour/step', methods=['POST'])
+def tour_step():
+    payload = request.get_json(silent=True) or {}
+    state = payload.get('state')
+    if not isinstance(state, dict):
+        return _error_response('bad_request', 'Missing tour state', status=400)
+    action = payload.get('action', 'next')
+    target_node_id = payload.get('target_node_id')
+    target_arc_id = payload.get('target_arc_id')
+    spec = _repo_spec_from_request()
+    try:
+        cache_root = os.path.join(current_app.instance_path, 'gitreader')
+        state, step, warnings = step_tour(
+            spec,
+            cache_root=cache_root,
+            state=state,
+            action=action,
+            target_node_id=target_node_id,
+            target_arc_id=target_arc_id,
+        )
+    except ValueError as exc:
+        return _error_response('bad_request', str(exc), status=400)
+    except Exception:
+        current_app.logger.exception('gitreader tour step failed')
+        return _error_response('server_error', 'Failed to advance tour', status=500)
+    return jsonify({
+        'state': state,
+        'step': step,
+        'warnings': warnings,
     })
 
 

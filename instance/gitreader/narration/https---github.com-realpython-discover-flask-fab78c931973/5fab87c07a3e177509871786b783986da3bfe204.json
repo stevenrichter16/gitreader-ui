@@ -1,0 +1,34 @@
+{
+  "created_at": 1768193780.8986409,
+  "response": {
+    "cached": false,
+    "connections": [
+      "contains -> BaseConfig (class)",
+      "contains -> TestConfig (class)",
+      "contains -> DevelopmentConfig (class)",
+      "contains -> ProductionConfig (class)"
+    ],
+    "hook": "File config.py in config.py:1-24.",
+    "key_lines": [
+      {
+        "line": 1,
+        "text": "Snippet Start"
+      },
+      {
+        "line": 24,
+        "text": "Snippet End"
+      }
+    ],
+    "mode": "hook",
+    "model": "gpt-5.2",
+    "next_thread": "Follow BaseConfig to continue the thread.",
+    "prompt_version": "v1",
+    "source": "fallback",
+    "summary": [
+      "File config.py in config.py:1-24.",
+      "Contains: BaseConfig, TestConfig, DevelopmentConfig..."
+    ],
+    "symbol_id": "file:config.py",
+    "symbol_name": "config.py"
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "created_at": 1768194282.7339451,
+  "response": {
+    "cached": false,
+    "connections": [
+      "imports -> os (external)",
+      "imports -> app (external)"
+    ],
+    "hook": "File src/run.py in src/run.py:1-10.",
+    "key_lines": [
+      {
+        "line": 1,
+        "text": "Snippet Start"
+      },
+      {
+        "line": 10,
+        "text": "Snippet End"
+      }
+    ],
+    "mode": "summary",
+    "model": "gpt-5.2",
+    "next_thread": "Follow os to continue the thread.",
+    "prompt_version": "v1",
+    "source": "fallback",
+    "summary": [
+      "File src/run.py in src/run.py:1-10."
+    ],
+    "symbol_id": "file:src/run.py",
+    "symbol_name": "src/run.py"
+  }
+}

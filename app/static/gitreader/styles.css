@@ -623,6 +623,12 @@ body {
     margin-top: 6px;
 }
 
+.tour-pitfall {
+    color: var(--accent-2);
+    font-size: 12px;
+    margin-top: 6px;
+}
+
 .route-picker {
     display: flex;
     align-items: center;
@@ -630,7 +636,28 @@ body {
     flex-wrap: wrap;
 }
 
+.tour-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.tour-controls .tour-status {
+    font-size: 12px;
+    color: var(--muted-ink);
+}
+
+.tour-controls.is-active .tour-status {
+    color: var(--accent);
+    font-weight: 600;
+}
+
 .route-picker.is-hidden {
+    display: none;
+}
+
+.tour-controls.is-hidden {
     display: none;
 }
 
