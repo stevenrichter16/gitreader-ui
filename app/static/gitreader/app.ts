@@ -177,6 +177,20 @@ interface TourRelatedArc {
     title: string;
 }
 
+interface TourContextLink {
+    label: string;
+    file_path?: string;
+    line?: number;
+    node_id?: string;
+}
+
+interface TourFocus {
+    file_path?: string;
+    start_line?: number;
+    end_line?: number;
+    node_id?: string;
+}
+
 interface TourStep {
     step_index: number;
     total_steps?: number;
@@ -187,11 +201,18 @@ interface TourStep {
     hook: string;
     explanation: string[];
     why_it_matters: string;
+    concept?: string;
+    why_here?: string;
+    remember?: string;
     next_click: string;
     pitfall?: string;
     confidence?: EdgeConfidence;
     related_nodes?: TourRelatedNode[];
     related_arcs?: TourRelatedArc[];
+    context_links?: TourContextLink[];
+    story_so_far?: string[];
+    focus?: TourFocus;
+    allowed_node_ids?: string[];
     cached?: boolean;
     source?: string;
     model?: string;
@@ -207,6 +228,13 @@ interface TourResponse {
 type SnippetMode = 'body' | 'full';
 
 type GraphLayoutMode = 'cluster' | 'layer' | 'free';
+
+interface FileTreeNode {
+    name: string;
+    path: string;
+    isFile: boolean;
+    children: Map<string, FileTreeNode>;
+}
 
 interface GraphView {
     nodes: SymbolNode[];
@@ -226,6 +254,7 @@ class GitReaderApp {
     private canvasSurface: HTMLElement;
     private canvasOverlay: HTMLElement;
     private narratorOutput: HTMLElement;
+    private narratorFileTree: HTMLElement;
     private modeButtons: NodeListOf<HTMLButtonElement>;
     private layoutButtons: NodeListOf<HTMLButtonElement>;
     private tocModeButtons: NodeListOf<HTMLButtonElement>;
@@ -270,6 +299,10 @@ class GitReaderApp {
     private tourState: TourState | null = null;
     private tourStep: TourStep | null = null;
     private tourMode: TourMode = 'story';
+    private guidedAllowedNodeIds: Set<string> | null = null;
+    private fileTreeRoot: FileTreeNode | null = null;
+    private fileTreeFocusPath: string | null = null;
+    private fileTreeCollapsed: Set<string> = new Set();
     private graphNodes: SymbolNode[] = [];
     private graphEdges: GraphEdge[] = [];
     private nodeById: Map<string, SymbolNode> = new Map();
@@ -308,6 +341,7 @@ class GitReaderApp {
         this.canvasSurface = this.getElement('canvas-surface');
         this.canvasOverlay = this.getElement('canvas-overlay');
         this.narratorOutput = this.getElement('narrator-output');
+        this.narratorFileTree = this.getElement('narrator-file-tree');
         this.modeButtons = document.querySelectorAll<HTMLButtonElement>('.mode-btn');
         this.layoutButtons = document.querySelectorAll<HTMLButtonElement>('.nav-btn[data-layout]');
         this.tocModeButtons = document.querySelectorAll<HTMLButtonElement>('.nav-btn[data-toc-mode]');
@@ -470,6 +504,9 @@ class GitReaderApp {
 
     private bindEvents(): void {
         this.tocList.addEventListener('click', (event) => {
+            if (this.tourActive) {
+                return;
+            }
             const target = (event.target as HTMLElement).closest<HTMLLIElement>('.toc-item');
             if (!target) {
                 return;
@@ -482,6 +519,9 @@ class GitReaderApp {
 
         this.tocModeButtons.forEach((button) => {
             button.addEventListener('click', () => {
+                if (this.tourActive) {
+                    return;
+                }
                 const mode = button.dataset.tocMode as TocMode | undefined;
                 if (mode) {
                     void this.setTocMode(mode);
@@ -580,6 +620,9 @@ class GitReaderApp {
         });
 
         this.routeSelect.addEventListener('change', () => {
+            if (this.tourActive) {
+                return;
+            }
             const arcId = this.routeSelect.value;
             if (!arcId) {
                 return;
@@ -588,6 +631,9 @@ class GitReaderApp {
         });
 
         this.routeJump.addEventListener('click', () => {
+            if (this.tourActive) {
+                return;
+            }
             const arcId = this.routeSelect.value;
             if (!arcId) {
                 return;
@@ -662,6 +708,28 @@ class GitReaderApp {
             const arcId = target.dataset.tourArc;
             if (arcId) {
                 void this.advanceTour('branch', undefined, arcId);
+            }
+        });
+
+        this.narratorOutput.addEventListener('click', (event) => {
+            const target = (event.target as HTMLElement).closest<HTMLElement>('[data-context-link]');
+            if (!target) {
+                return;
+            }
+            const nodeId = target.dataset.contextNode;
+            const filePath = target.dataset.contextFile;
+            const line = target.dataset.contextLine ? Number(target.dataset.contextLine) : undefined;
+            this.handleContextLink(nodeId, filePath, line);
+        });
+
+        this.narratorFileTree.addEventListener('click', (event) => {
+            const target = (event.target as HTMLElement).closest<HTMLElement>('[data-tree-toggle]');
+            if (!target) {
+                return;
+            }
+            const path = target.dataset.treeToggle;
+            if (path) {
+                this.toggleFileTreePath(path);
             }
         });
 
@@ -811,6 +879,7 @@ class GitReaderApp {
             `;
             this.tocList.appendChild(item);
         });
+        this.applyGuidedToc();
     }
 
     private async loadChapter(chapterId: string): Promise<void> {
@@ -1037,6 +1106,12 @@ class GitReaderApp {
             this.graphRevealButton.disabled = true;
             return;
         }
+        if (this.tourActive) {
+            this.graphNodeStatus.textContent = `Guided view: ${graphView.visibleNodes}/${graphView.totalNodes}`;
+            this.graphRevealButton.disabled = true;
+            this.graphRevealButton.textContent = 'Guided';
+            return;
+        }
         if (!graphView.isCapped) {
             this.graphNodeStatus.textContent = `Showing ${graphView.visibleNodes} nodes`;
             this.graphRevealButton.disabled = true;
@@ -1086,6 +1161,9 @@ class GitReaderApp {
             }
             this.fileNodesByPath.set(this.normalizePath(node.location.path), node);
         });
+        if (this.currentScope === 'full' || this.tourActive) {
+            this.refreshFileTree();
+        }
     }
 
     private async loadSymbolSnippet(symbol: SymbolNode, shouldNarrate: boolean = true): Promise<void> {
@@ -1195,6 +1273,173 @@ class GitReaderApp {
 
     private normalizePath(path: string): string {
         return path.replace(/\\/g, '/');
+    }
+
+    private refreshFileTree(): void {
+        if (!this.narratorFileTree) {
+            return;
+        }
+        this.fileTreeRoot = this.buildFileTreeFromNodes(this.graphNodes);
+        this.renderFileTree(this.fileTreeFocusPath);
+    }
+
+    private buildFileTreeFromNodes(nodes: SymbolNode[]): FileTreeNode {
+        const root: FileTreeNode = {
+            name: '',
+            path: '',
+            isFile: false,
+            children: new Map(),
+        };
+        nodes.forEach((node) => {
+            if (node.kind !== 'file' || !node.location?.path) {
+                return;
+            }
+            const normalized = this.normalizePath(node.location.path);
+            const parts = normalized.split('/').filter(Boolean);
+            let cursor = root;
+            let currentPath = '';
+            parts.forEach((part, index) => {
+                currentPath = currentPath ? `${currentPath}/${part}` : part;
+                const isFile = index === parts.length - 1;
+                let next = cursor.children.get(part);
+                if (!next) {
+                    next = {
+                        name: part,
+                        path: currentPath,
+                        isFile,
+                        children: new Map(),
+                    };
+                    cursor.children.set(part, next);
+                }
+                if (isFile) {
+                    next.isFile = true;
+                }
+                cursor = next;
+            });
+        });
+        return root;
+    }
+
+    private renderFileTree(focusPath?: string | null): void {
+        if (!this.narratorFileTree) {
+            return;
+        }
+        const normalizedFocus = focusPath ? this.normalizePath(focusPath) : '';
+        this.fileTreeFocusPath = normalizedFocus || null;
+        if (normalizedFocus) {
+            this.expandFileTreePath(normalizedFocus);
+        }
+        if (!this.fileTreeRoot || this.fileTreeRoot.children.size === 0) {
+            this.narratorFileTree.innerHTML = '<p class="file-tree-empty">No files loaded yet.</p>';
+            return;
+        }
+        const focusParentPath = this.getParentPath(normalizedFocus);
+        const collapsedFocusParents = this.getCollapsedFocusParents(normalizedFocus);
+        const treeHtml = this.renderFileTreeNode(
+            this.fileTreeRoot,
+            normalizedFocus,
+            focusParentPath,
+            collapsedFocusParents,
+        );
+        this.narratorFileTree.innerHTML = treeHtml || '<p class="file-tree-empty">No files loaded yet.</p>';
+    }
+
+    private renderFileTreeNode(
+        node: FileTreeNode,
+        focusPath: string,
+        focusParentPath: string | null,
+        collapsedFocusParents: Set<string>,
+    ): string {
+        const entries = Array.from(node.children.values());
+        if (entries.length === 0) {
+            return '';
+        }
+        entries.sort((a, b) => {
+            if (a.isFile !== b.isFile) {
+                return a.isFile ? 1 : -1;
+            }
+            return a.name.localeCompare(b.name);
+        });
+        const items = entries.map((child) => {
+            const isFocus = child.isFile && focusPath && child.path === focusPath;
+            const isFocusParent = !child.isFile && focusParentPath && child.path === focusParentPath;
+            if (child.isFile) {
+                return `
+                    <li class="file-tree-item${isFocus ? ' is-focus' : ''}">
+                        <span class="file-tree-name">${this.escapeHtml(child.name)}</span>
+                    </li>
+                `;
+            }
+            const isCollapsed = this.fileTreeCollapsed.has(child.path);
+            const isCollapsedFocusParent = isCollapsed && collapsedFocusParents.has(child.path);
+            const childrenHtml = this.renderFileTreeNode(
+                child,
+                focusPath,
+                focusParentPath,
+                collapsedFocusParents,
+            );
+            return `
+                <li class="file-tree-item is-dir${isCollapsed ? ' is-collapsed' : ''}${isCollapsedFocusParent ? ' is-focus' : ''}">
+                    <button class="file-tree-toggle" type="button" data-tree-toggle="${this.escapeHtml(child.path)}">
+                        <span class="file-tree-caret"></span>
+                        <span class="file-tree-name">${this.escapeHtml(child.name)}/</span>
+                    </button>
+                    <div class="file-tree-children">${childrenHtml}</div>
+                </li>
+            `;
+        });
+        return `<ul class="file-tree-list">${items.join('')}</ul>`;
+    }
+
+    private toggleFileTreePath(path: string): void {
+        if (this.fileTreeCollapsed.has(path)) {
+            this.fileTreeCollapsed.delete(path);
+        } else {
+            this.fileTreeCollapsed.add(path);
+        }
+        this.renderFileTree(this.fileTreeFocusPath);
+    }
+
+    private expandFileTreePath(path: string): void {
+        const normalized = this.normalizePath(path);
+        const parts = normalized.split('/').filter(Boolean);
+        let current = '';
+        for (const part of parts.slice(0, -1)) {
+            current = current ? `${current}/${part}` : part;
+            if (this.fileTreeCollapsed.has(current)) {
+                break;
+            }
+            this.fileTreeCollapsed.delete(current);
+        }
+    }
+
+    private getParentPath(path: string): string | null {
+        if (!path) {
+            return null;
+        }
+        const normalized = this.normalizePath(path);
+        const parts = normalized.split('/').filter(Boolean);
+        if (parts.length <= 1) {
+            return null;
+        }
+        return parts.slice(0, -1).join('/');
+    }
+
+    private getCollapsedFocusParents(path: string): Set<string> {
+        const collapsed = new Set<string>();
+        if (!path) {
+            return collapsed;
+        }
+        const normalized = this.normalizePath(path);
+        const parts = normalized.split('/').filter(Boolean);
+        let current = '';
+        for (const part of parts.slice(0, -1)) {
+            current = current ? `${current}/${part}` : part;
+            if (this.fileTreeCollapsed.has(current)) {
+                collapsed.add(current);
+            }
+        }
+        return collapsed;
     }
 
     private getFileNodeForSymbol(symbol: SymbolNode): SymbolNode | null {
@@ -1372,6 +1617,7 @@ class GitReaderApp {
                 </details>
             </article>
         `;
+        this.applyGuidedCodeFocus();
     }
 
     private getDisplayRange(
@@ -1485,6 +1731,10 @@ class GitReaderApp {
                 return;
             }
             if (this.tourActive) {
+                if (!this.isGuidedNodeAllowed(nodeId)) {
+                    this.flashGuidedMessage('Follow the guide to unlock this step.');
+                    return;
+                }
                 void this.advanceTour('jump', nodeId);
                 return;
             }
@@ -1713,6 +1963,24 @@ class GitReaderApp {
                 },
             },
             {
+                selector: 'node.is-guided-focus',
+                style: {
+                    'border-width': 3,
+                    'border-color': '#c75c2a',
+                    'shadow-blur': 22,
+                    'shadow-color': '#c75c2a',
+                    'shadow-opacity': 0.6,
+                    'z-index': 12,
+                },
+            },
+            {
+                selector: 'node.is-guided-hidden',
+                style: {
+                    'opacity': 0,
+                    'text-opacity': 0,
+                },
+            },
+            {
                 selector: 'edge',
                 style: {
                     'line-color': '#bcae9c',
@@ -1756,6 +2024,10 @@ class GitReaderApp {
                 selector: 'edge[confidence = "low"]',
                 style: { 'line-style': 'dashed', 'opacity': 0.15 },
             },
+            {
+                selector: 'edge.is-guided-hidden',
+                style: { 'opacity': 0 },
+            },
         ];
     }
 
@@ -1783,8 +2055,12 @@ class GitReaderApp {
         }
         const zoom = this.graphInstance.zoom();
         const showAll = zoom >= this.labelZoomThreshold;
+        const guidedAllowed = this.tourActive && this.guidedAllowedNodeIds ? this.guidedAllowedNodeIds : null;
         this.graphInstance.nodes().forEach((node: any) => {
-            const shouldShow = showAll || node.selected() || node.hasClass('is-hovered');
+            const shouldShow = showAll
+                || node.selected()
+                || node.hasClass('is-hovered')
+                || (guidedAllowed ? guidedAllowed.has(node.id()) : false);
             node.data('labelVisible', shouldShow ? 'true' : 'false');
         });
     }
@@ -2265,11 +2541,20 @@ class GitReaderApp {
     }
 
     private updateTourControls(): void {
+        document.body.classList.toggle('is-guided', this.tourActive);
         this.tourControls.classList.toggle('is-active', this.tourActive);
         this.tourStartButton.disabled = this.tourActive;
         this.tourPrevButton.disabled = !this.tourActive;
         this.tourNextButton.disabled = !this.tourActive;
         this.tourEndButton.disabled = !this.tourActive;
+        if (this.tourActive) {
+            this.routeSelect.disabled = true;
+            this.routeJump.disabled = true;
+        } else {
+            const hasRoutes = this.storyArcs.length > 0;
+            this.routeSelect.disabled = !hasRoutes;
+            this.routeJump.disabled = !hasRoutes;
+        }
         if (this.tourState && this.tourStep) {
             const total = this.tourStep.total_steps ?? 0;
             const label = total > 0
@@ -2279,6 +2564,7 @@ class GitReaderApp {
         } else {
             this.tourStatus.textContent = '';
         }
+        this.applyGuidedState();
     }
 
     private async startTour(): Promise<void> {
@@ -2338,6 +2624,7 @@ class GitReaderApp {
         this.tourActive = false;
         this.tourState = null;
         this.tourStep = null;
+        this.guidedAllowedNodeIds = null;
         this.updateTourControls();
         if (this.activeStoryArc) {
             this.renderStoryArc(this.activeStoryArc);
@@ -2364,26 +2651,89 @@ class GitReaderApp {
     }
 
     private async syncTourFocus(step: TourStep): Promise<void> {
-        if (!step?.node_id) {
-            return;
-        }
-        const node = this.nodeById.get(step.node_id);
-        if (!node) {
+        if (!step) {
             return;
         }
         await this.loadGraphForScope('full');
+        const focus = step.focus;
+        const nodeId = step.node_id || focus?.node_id;
+        const node = nodeId ? this.nodeById.get(nodeId) ?? null : null;
+        const focusPath = focus?.file_path ? this.normalizePath(focus.file_path) : '';
+        const fileNode = focusPath ? this.fileNodesByPath.get(focusPath) ?? null : null;
+        const targetNode = node || fileNode;
+        if (!targetNode) {
+            return;
+        }
         if (this.graphInstance) {
             this.graphInstance.$('node:selected').unselect();
-            const element = this.graphInstance.$id(node.id);
+            const element = this.graphInstance.$id(targetNode.id);
             if (element && typeof element.select === 'function') {
                 element.select();
             }
         }
         try {
-            await this.loadSymbolSnippet(node, false);
+            await this.loadSymbolSnippet(targetNode, false);
         } catch {
-            this.renderCode(node);
+            this.renderCode(targetNode);
         }
+        if (focus?.start_line) {
+            this.jumpToLine(focus.start_line);
+        }
+    }
+
+    private handleContextLink(nodeId?: string, filePath?: string, line?: number): void {
+        if (nodeId) {
+            if (this.tourActive) {
+                if (!this.isGuidedNodeAllowed(nodeId)) {
+                    this.flashGuidedMessage('Follow the guide to unlock this step.');
+                    return;
+                }
+                void this.advanceTour('jump', nodeId);
+                return;
+            }
+            const node = this.nodeById.get(nodeId);
+            if (node) {
+                void this.loadSymbolSnippet(node, false).catch(() => {
+                    this.renderCode(node);
+                }).then(() => {
+                    if (line) {
+                        this.jumpToLine(line);
+                    }
+                });
+            }
+            return;
+        }
+
+        if (!filePath) {
+            return;
+        }
+        const normalized = this.normalizePath(filePath);
+        const fileNode = this.fileNodesByPath.get(normalized) ?? null;
+        if (fileNode) {
+            void this.loadSymbolSnippet(fileNode, false).catch(() => {
+                this.renderCode(fileNode);
+            }).then(() => {
+                if (line) {
+                    this.jumpToLine(line);
+                }
+            });
+            return;
+        }
+        if (line && this.currentSymbol?.location?.path && this.normalizePath(this.currentSymbol.location.path) === normalized) {
+            this.jumpToLine(line);
+        }
+    }
+
+    private flashGuidedMessage(message: string): void {
+        this.setCanvasOverlay(message, true);
+        window.setTimeout(() => this.setCanvasOverlay('', false), 1400);
+    }
+
+    private isGuidedNodeAllowed(nodeId: string): boolean {
+        if (!this.tourActive || !this.guidedAllowedNodeIds) {
+            return true;
+        }
+        return this.guidedAllowedNodeIds.has(nodeId);
     }
 
     private renderTourStep(step: TourStep): void {
@@ -2396,15 +2746,44 @@ class GitReaderApp {
         const relatedArcButtons = relatedArcs.map((item) => (
             `<button class="ghost-btn arc-jump" data-tour-arc="${this.escapeHtml(item.arc_id)}">${this.escapeHtml(item.title)}</button>`
         ));
+        const concept = step.concept ? `<p><strong>Concept:</strong> ${this.escapeHtml(step.concept)}</p>` : '';
+        const whyHere = step.why_here ? `<p><strong>Why here:</strong> ${this.escapeHtml(step.why_here)}</p>` : '';
+        const remember = step.remember ? `<p><strong>Remember:</strong> ${this.escapeHtml(step.remember)}</p>` : '';
+        const focus = step.focus?.file_path ? (() => {
+            const start = step.focus?.start_line;
+            const end = step.focus?.end_line;
+            const range = start ? `${start}${end && end !== start ? `-${end}` : ''}` : '';
+            return `<p class="tour-focus">Focus: ${this.escapeHtml(step.focus.file_path)}${range ? `:${range}` : ''}</p>`;
+        })() : '';
         const pitfall = step.pitfall ? `<p class="tour-pitfall">${this.escapeHtml(step.pitfall)}</p>` : '';
+        const contextLinks = step.context_links ?? [];
+        const contextButtons = contextLinks.map((link) => {
+            const attrs = [
+                'data-context-link',
+                link.node_id ? `data-context-node="${this.escapeHtml(link.node_id)}"` : '',
+                link.file_path ? `data-context-file="${this.escapeHtml(link.file_path)}"` : '',
+                typeof link.line === 'number' ? `data-context-line="${link.line}"` : '',
+            ].filter(Boolean).join(' ');
+            return `<button class="ghost-btn context-link" ${attrs}>${this.escapeHtml(link.label)}</button>`;
+        });
+        const storySoFarItems = (step.story_so_far ?? []).map((item) => `<li>${this.escapeHtml(item)}</li>`).join('');
+        const storySoFar = storySoFarItems
+            ? `<div class="tour-story"><p class="eyebrow">Story so far</p><ul>${storySoFarItems}</ul></div>`
+            : '';
         this.narratorOutput.innerHTML = `
             <p class="eyebrow">Tour: ${this.escapeHtml(this.tourMode)}</p>
             <h3>${this.escapeHtml(step.title)}</h3>
             <p>${this.escapeHtml(step.hook)}</p>
+            ${focus}
+            ${concept}
+            ${whyHere}
+            ${remember}
             ${explanation ? `<ul>${explanation}</ul>` : ''}
             <p><strong>Why it matters:</strong> ${this.escapeHtml(step.why_it_matters)}</p>
             <p><strong>Next:</strong> ${this.escapeHtml(step.next_click)}</p>
             ${pitfall}
+            ${contextButtons.length > 0 ? `<div class="context-link-list">${contextButtons.join('')}</div>` : ''}
+            ${storySoFar}
             ${relatedNodeButtons.length > 0 || relatedArcButtons.length > 0 ? `
                 <div class="arc-jump-list">
                     ${relatedNodeButtons.join('')}
@@ -2420,6 +2799,100 @@ class GitReaderApp {
             <h3>Tour unavailable</h3>
             <p>${this.escapeHtml(message)}</p>
         `;
+    }
+
+    private applyGuidedState(): void {
+        if (!this.tourActive || !this.tourStep) {
+            this.guidedAllowedNodeIds = null;
+            this.applyGuidedToc();
+            this.applyGuidedCodeFocus();
+            this.applyGraphFilters();
+            this.renderFileTree(null);
+            return;
+        }
+        const allowed = new Set(this.tourStep.allowed_node_ids ?? []);
+        const focusPath = this.tourStep.focus?.file_path;
+        if (focusPath) {
+            const normalized = this.normalizePath(focusPath);
+            const fileNode = this.fileNodesByPath.get(normalized);
+            if (fileNode) {
+                allowed.add(fileNode.id);
+            }
+        }
+        this.guidedAllowedNodeIds = allowed.size > 0 ? allowed : null;
+        this.applyGuidedToc();
+        this.applyGraphFilters();
+        this.applyGuidedCodeFocus();
+        this.renderFileTree(this.tourStep.focus?.file_path ?? null);
+    }
+
+    private applyGuidedToc(): void {
+        const items = Array.from(this.tocList.querySelectorAll<HTMLElement>('.toc-item'));
+        if (!this.tourActive || !this.tourStep) {
+            items.forEach((item) => item.classList.remove('is-guided-hidden'));
+            return;
+        }
+        items.forEach((item) => {
+            const isActive = item.dataset.chapterId === this.currentChapterId;
+            item.classList.toggle('is-guided-hidden', !isActive);
+        });
+    }
+
+    private applyGuidedGraphFilter(): void {
+        if (!this.graphInstance) {
+            return;
+        }
+        const cy = this.graphInstance;
+        cy.elements().removeClass('is-guided-hidden');
+        cy.nodes().removeClass('is-guided-focus');
+        if (!this.tourActive || !this.guidedAllowedNodeIds || !this.tourStep) {
+            return;
+        }
+        const allowed = this.guidedAllowedNodeIds;
+        cy.nodes().forEach((node: any) => {
+            const isAllowed = allowed.has(node.id());
+            node.toggleClass('is-guided-hidden', !isAllowed);
+            node.toggleClass('is-guided-focus', node.id() === this.tourStep?.node_id);
+        });
+        cy.edges().forEach((edge: any) => {
+            const sourceId = edge.data('source');
+            const targetId = edge.data('target');
+            const isAllowed = allowed.has(sourceId) && allowed.has(targetId);
+            edge.toggleClass('is-guided-hidden', !isAllowed);
+        });
+        cy.elements('.is-guided-hidden').hide();
+    }
+
+    private applyGuidedCodeFocus(): void {
+        const lines = Array.from(this.codeSurface.querySelectorAll<HTMLElement>('.code-line'));
+        lines.forEach((line) => line.classList.remove('is-guided-dim', 'is-guided-focus'));
+        if (!this.tourActive || !this.tourStep?.focus) {
+            return;
+        }
+        const focus = this.tourStep.focus;
+        if (!focus?.start_line) {
+            return;
+        }
+        if (focus.file_path && this.currentSymbol?.location?.path) {
+            const currentPath = this.normalizePath(this.currentSymbol.location.path);
+            const focusPath = this.normalizePath(focus.file_path);
+            if (currentPath !== focusPath) {
+                return;
+            }
+        }
+        const start = focus.start_line;
+        const end = focus.end_line && focus.end_line >= start ? focus.end_line : start;
+        lines.forEach((line) => {
+            const lineNumber = Number(line.dataset.line);
+            if (!Number.isFinite(lineNumber)) {
+                return;
+            }
+            if (lineNumber >= start && lineNumber <= end) {
+                line.classList.add('is-guided-focus');
+            } else {
+                line.classList.add('is-guided-dim');
+            }
+        });
     }
 
     private setCanvasOverlay(message: string, visible: boolean): void {
@@ -2568,6 +3041,7 @@ class GitReaderApp {
                 edge.hide();
             }
         });
+        this.applyGuidedGraphFilter();
         this.applyFocus();
         this.refreshEdgeHighlights();
         this.updateLabelVisibility();
@@ -2594,7 +3068,7 @@ class GitReaderApp {
     }
 
     private applyFocus(): void {
-        if (!this.graphInstance || !this.focusedNodeId) {
+        if (!this.graphInstance || !this.focusedNodeId || this.tourActive) {
             return;
         }
         const cy = this.graphInstance;

@@ -25,6 +25,7 @@
         this.canvasSurface = getElement('canvas-surface');
         this.canvasOverlay = getElement('canvas-overlay');
         this.narratorOutput = getElement('narrator-output');
+        this.narratorFileTree = getElement('narrator-file-tree');
         this.modeButtons = document.querySelectorAll('.mode-btn');
         this.layoutButtons = document.querySelectorAll('.nav-btn[data-layout]');
         this.tocModeButtons = document.querySelectorAll('.nav-btn[data-toc-mode]');
@@ -77,6 +78,10 @@
         this.tourState = null;
         this.tourStep = null;
         this.tourMode = 'story';
+        this.guidedAllowedNodeIds = null;
+        this.fileTreeRoot = null;
+        this.fileTreeFocusPath = null;
+        this.fileTreeCollapsed = new Set();
         this.graphNodes = [];
         this.graphEdges = [];
         this.nodeById = new Map();
@@ -224,6 +229,9 @@
     GitReaderApp.prototype.bindEvents = function () {
         var _this = this;
         this.tocList.addEventListener('click', function (event) {
+            if (_this.tourActive) {
+                return;
+            }
             var target = event.target.closest('.toc-item');
             if (!target) {
                 return;
@@ -236,6 +244,9 @@
 
         this.tocModeButtons.forEach(function (button) {
             button.addEventListener('click', function () {
+                if (_this.tourActive) {
+                    return;
+                }
                 var mode = button.dataset.tocMode;
                 if (mode) {
                     _this.setTocMode(mode);
@@ -334,6 +345,9 @@
         });
 
         this.routeSelect.addEventListener('change', function () {
+            if (_this.tourActive) {
+                return;
+            }
             var arcId = _this.routeSelect.value;
             if (!arcId) {
                 return;
@@ -342,6 +356,9 @@
         });
 
         this.routeJump.addEventListener('click', function () {
+            if (_this.tourActive) {
+                return;
+            }
             var arcId = _this.routeSelect.value;
             if (!arcId) {
                 return;
@@ -416,6 +433,28 @@
             var arcId = target.dataset.tourArc;
             if (arcId) {
                 _this.advanceTour('branch', undefined, arcId);
+            }
+        });
+
+        this.narratorOutput.addEventListener('click', function (event) {
+            var target = event.target.closest('[data-context-link]');
+            if (!target) {
+                return;
+            }
+            var nodeId = target.dataset.contextNode;
+            var filePath = target.dataset.contextFile;
+            var line = target.dataset.contextLine ? Number(target.dataset.contextLine) : undefined;
+            _this.handleContextLink(nodeId, filePath, line);
+        });
+
+        this.narratorFileTree.addEventListener('click', function (event) {
+            var target = event.target.closest('[data-tree-toggle]');
+            if (!target) {
+                return;
+            }
+            var path = target.dataset.treeToggle;
+            if (path) {
+                _this.toggleFileTreePath(path);
             }
         });
 
@@ -569,6 +608,7 @@
                 '<p class="toc-summary">' + escapeHtml(chapter.summary) + '</p>';
             _this.tocList.appendChild(item);
         });
+        this.applyGuidedToc();
     };
 
     GitReaderApp.prototype.loadChapter = function (chapterId) {
@@ -801,6 +841,12 @@
             this.graphRevealButton.disabled = true;
             return;
         }
+        if (this.tourActive) {
+            this.graphNodeStatus.textContent = 'Guided view: ' + graphView.visibleNodes + '/' + graphView.totalNodes;
+            this.graphRevealButton.disabled = true;
+            this.graphRevealButton.textContent = 'Guided';
+            return;
+        }
         if (!graphView.isCapped) {
             this.graphNodeStatus.textContent = 'Showing ' + graphView.visibleNodes + ' nodes';
             this.graphRevealButton.disabled = true;
@@ -851,6 +897,9 @@
             }
             _this.fileNodesByPath.set(_this.normalizePath(node.location.path), node);
         });
+        if (this.currentScope === 'full' || this.tourActive) {
+            this.refreshFileTree();
+        }
     };
 
     GitReaderApp.prototype.loadSymbolSnippet = function (symbol, shouldNarrate) {
@@ -958,6 +1007,164 @@
 
     GitReaderApp.prototype.normalizePath = function (path) {
         return path.replace(/\\/g, '/');
+    };
+
+    GitReaderApp.prototype.refreshFileTree = function () {
+        if (!this.narratorFileTree) {
+            return;
+        }
+        this.fileTreeRoot = this.buildFileTreeFromNodes(this.graphNodes);
+        this.renderFileTree(this.fileTreeFocusPath);
+    };
+
+    GitReaderApp.prototype.buildFileTreeFromNodes = function (nodes) {
+        var _this = this;
+        var root = {
+            name: '',
+            path: '',
+            isFile: false,
+            children: new Map()
+        };
+        nodes.forEach(function (node) {
+            var _a;
+            if (node.kind !== 'file' || !((_a = node.location) && _a.path)) {
+                return;
+            }
+            var normalized = _this.normalizePath(node.location.path);
+            var parts = normalized.split('/').filter(Boolean);
+            var cursor = root;
+            var currentPath = '';
+            parts.forEach(function (part, index) {
+                currentPath = currentPath ? currentPath + '/' + part : part;
+                var isFile = index === parts.length - 1;
+                var next = cursor.children.get(part);
+                if (!next) {
+                    next = {
+                        name: part,
+                        path: currentPath,
+                        isFile: isFile,
+                        children: new Map()
+                    };
+                    cursor.children.set(part, next);
+                }
+                if (isFile) {
+                    next.isFile = true;
+                }
+                cursor = next;
+            });
+        });
+        return root;
+    };
+
+    GitReaderApp.prototype.renderFileTree = function (focusPath) {
+        if (!this.narratorFileTree) {
+            return;
+        }
+        var normalizedFocus = focusPath ? this.normalizePath(focusPath) : '';
+        this.fileTreeFocusPath = normalizedFocus || null;
+        if (normalizedFocus) {
+            this.expandFileTreePath(normalizedFocus);
+        }
+        if (!this.fileTreeRoot || this.fileTreeRoot.children.size === 0) {
+            this.narratorFileTree.innerHTML = '<p class="file-tree-empty">No files loaded yet.</p>';
+            return;
+        }
+        var focusParentPath = this.getParentPath(normalizedFocus);
+        var collapsedFocusParents = this.getCollapsedFocusParents(normalizedFocus);
+        var treeHtml = this.renderFileTreeNode(this.fileTreeRoot, normalizedFocus, focusParentPath, collapsedFocusParents);
+        this.narratorFileTree.innerHTML = treeHtml || '<p class="file-tree-empty">No files loaded yet.</p>';
+    };
+
+    GitReaderApp.prototype.renderFileTreeNode = function (node, focusPath, focusParentPath, collapsedFocusParents) {
+        var _this = this;
+        var entries = Array.from(node.children.values());
+        if (entries.length === 0) {
+            return '';
+        }
+        entries.sort(function (a, b) {
+            if (a.isFile !== b.isFile) {
+                return a.isFile ? 1 : -1;
+            }
+            return a.name.localeCompare(b.name);
+        });
+        var items = entries.map(function (child) {
+            var isFocus = child.isFile && focusPath && child.path === focusPath;
+            var isFocusParent = !child.isFile && focusParentPath && child.path === focusParentPath;
+            if (child.isFile) {
+                return '\
+                    <li class="file-tree-item' + (isFocus ? ' is-focus' : '') + '">\
+                        <span class="file-tree-name">' + escapeHtml(child.name) + '</span>\
+                    </li>\
+                ';
+            }
+            var isCollapsed = _this.fileTreeCollapsed.has(child.path);
+            var isCollapsedFocusParent = isCollapsed && collapsedFocusParents.has(child.path);
+            var childrenHtml = _this.renderFileTreeNode(child, focusPath, focusParentPath, collapsedFocusParents);
+            return '\
+                <li class="file-tree-item is-dir' + (isCollapsed ? ' is-collapsed' : '') + (isCollapsedFocusParent ? ' is-focus' : '') + '">\
+                    <button class="file-tree-toggle" type="button" data-tree-toggle="' + escapeHtml(child.path) + '">\
+                        <span class="file-tree-caret"></span>\
+                        <span class="file-tree-name">' + escapeHtml(child.name) + '/</span>\
+                    </button>\
+                    <div class="file-tree-children">' + childrenHtml + '</div>\
+                </li>\
+            ';
+        });
+        return '<ul class="file-tree-list">' + items.join('') + '</ul>';
+    };
+
+    GitReaderApp.prototype.toggleFileTreePath = function (path) {
+        if (this.fileTreeCollapsed.has(path)) {
+            this.fileTreeCollapsed.delete(path);
+        } else {
+            this.fileTreeCollapsed.add(path);
+        }
+        this.renderFileTree(this.fileTreeFocusPath);
+    };
+
+    GitReaderApp.prototype.expandFileTreePath = function (path) {
+        var normalized = this.normalizePath(path);
+        var parts = normalized.split('/').filter(Boolean);
+        var current = '';
+        var parentParts = parts.slice(0, -1);
+        for (var i = 0; i < parentParts.length; i += 1) {
+            var part = parentParts[i];
+            current = current ? current + '/' + part : part;
+            if (this.fileTreeCollapsed.has(current)) {
+                break;
+            }
+            this.fileTreeCollapsed.delete(current);
+        }
+    };
+
+    GitReaderApp.prototype.getParentPath = function (path) {
+        if (!path) {
+            return null;
+        }
+        var normalized = this.normalizePath(path);
+        var parts = normalized.split('/').filter(Boolean);
+        if (parts.length <= 1) {
+            return null;
+        }
+        return parts.slice(0, -1).join('/');
+    };
+
+    GitReaderApp.prototype.getCollapsedFocusParents = function (path) {
+        var collapsed = new Set();
+        if (!path) {
+            return collapsed;
+        }
+        var normalized = this.normalizePath(path);
+        var parts = normalized.split('/').filter(Boolean);
+        var current = '';
+        for (var i = 0; i < parts.length - 1; i += 1) {
+            var part = parts[i];
+            current = current ? current + '/' + part : part;
+            if (this.fileTreeCollapsed.has(current)) {
+                collapsed.add(current);
+            }
+        }
+        return collapsed;
     };
 
     GitReaderApp.prototype.getFileNodeForSymbol = function (symbol) {
@@ -1142,6 +1349,7 @@
             '<pre><code class="' + codeClass + '">' + snippetHtml + '</code></pre>' +
             '</details>' +
             '</article>';
+        this.applyGuidedCodeFocus();
     };
 
     GitReaderApp.prototype.getDisplayRange = function (symbol, snippet) {
@@ -1252,6 +1460,10 @@
                 return;
             }
             if (_this.tourActive) {
+                if (!_this.isGuidedNodeAllowed(nodeId)) {
+                    _this.flashGuidedMessage('Follow the guide to unlock this step.');
+                    return;
+                }
                 _this.advanceTour('jump', nodeId);
                 return;
             }
@@ -1483,6 +1695,24 @@
                 }
             },
             {
+                selector: 'node.is-guided-focus',
+                style: {
+                    'border-width': 3,
+                    'border-color': '#c75c2a',
+                    'shadow-blur': 22,
+                    'shadow-color': '#c75c2a',
+                    'shadow-opacity': 0.6,
+                    'z-index': 12
+                }
+            },
+            {
+                selector: 'node.is-guided-hidden',
+                style: {
+                    'opacity': 0,
+                    'text-opacity': 0
+                }
+            },
+            {
                 selector: 'edge',
                 style: {
                     'line-color': '#bcae9c',
@@ -1525,6 +1755,10 @@
             {
                 selector: 'edge[confidence = "low"]',
                 style: { 'line-style': 'dashed', 'opacity': 0.15 }
+            },
+            {
+                selector: 'edge.is-guided-hidden',
+                style: { 'opacity': 0 }
             }
         ];
     };
@@ -1553,8 +1787,9 @@
         }
         var zoom = this.graphInstance.zoom();
         var showAll = zoom >= this.labelZoomThreshold;
+        var guidedAllowed = this.tourActive && this.guidedAllowedNodeIds ? this.guidedAllowedNodeIds : null;
         this.graphInstance.nodes().forEach(function (node) {
-            var shouldShow = showAll || node.selected() || node.hasClass('is-hovered');
+            var shouldShow = showAll || node.selected() || node.hasClass('is-hovered') || (guidedAllowed ? guidedAllowed.has(node.id()) : false);
             node.data('labelVisible', shouldShow ? 'true' : 'false');
         });
     };
@@ -1750,6 +1985,7 @@
                 edge.hide();
             }
         });
+        this.applyGuidedGraphFilter();
         this.applyFocus();
         this.refreshEdgeHighlights();
         this.updateLabelVisibility();
@@ -1776,7 +2012,7 @@
     };
 
     GitReaderApp.prototype.applyFocus = function () {
-        if (!this.graphInstance || !this.focusedNodeId) {
+        if (!this.graphInstance || !this.focusedNodeId || this.tourActive) {
             return;
         }
         var cy = this.graphInstance;
@@ -2264,11 +2500,20 @@
     };
 
     GitReaderApp.prototype.updateTourControls = function () {
+        document.body.classList.toggle('is-guided', this.tourActive);
         this.tourControls.classList.toggle('is-active', this.tourActive);
         this.tourStartButton.disabled = this.tourActive;
         this.tourPrevButton.disabled = !this.tourActive;
         this.tourNextButton.disabled = !this.tourActive;
         this.tourEndButton.disabled = !this.tourActive;
+        if (this.tourActive) {
+            this.routeSelect.disabled = true;
+            this.routeJump.disabled = true;
+        } else {
+            var hasRoutes = this.storyArcs.length > 0;
+            this.routeSelect.disabled = !hasRoutes;
+            this.routeJump.disabled = !hasRoutes;
+        }
         if (this.tourState && this.tourStep) {
             var total = this.tourStep.total_steps || 0;
             var label = total > 0
@@ -2278,6 +2523,7 @@
         } else {
             this.tourStatus.textContent = '';
         }
+        this.applyGuidedState();
     };
 
     GitReaderApp.prototype.startTour = function () {
@@ -2337,6 +2583,7 @@
         this.tourActive = false;
         this.tourState = null;
         this.tourStep = null;
+        this.guidedAllowedNodeIds = null;
         this.updateTourControls();
         if (this.activeStoryArc) {
             this.renderStoryArc(this.activeStoryArc);
@@ -2364,25 +2611,92 @@
 
     GitReaderApp.prototype.syncTourFocus = function (step) {
         var _this = this;
-        if (!step || !step.node_id) {
-            return Promise.resolve();
-        }
-        var node = this.nodeById.get(step.node_id);
-        if (!node) {
+        if (!step) {
             return Promise.resolve();
         }
         return this.loadGraphForScope('full').then(function () {
+            var focus = step.focus;
+            var nodeId = step.node_id || (focus && focus.node_id);
+            var node = nodeId ? _this.nodeById.get(nodeId) || null : null;
+            var focusPath = focus && focus.file_path ? _this.normalizePath(focus.file_path) : '';
+            var fileNode = focusPath ? _this.fileNodesByPath.get(focusPath) || null : null;
+            var targetNode = node || fileNode;
+            if (!targetNode) {
+                return;
+            }
             if (_this.graphInstance) {
                 _this.graphInstance.$('node:selected').unselect();
-                var element = _this.graphInstance.$id(node.id);
+                var element = _this.graphInstance.$id(targetNode.id);
                 if (element && typeof element.select === 'function') {
                     element.select();
                 }
             }
-            return _this.loadSymbolSnippet(node, false).catch(function () {
-                _this.renderCode(node);
+            return _this.loadSymbolSnippet(targetNode, false).catch(function () {
+                _this.renderCode(targetNode);
+            }).then(function () {
+                if (focus && focus.start_line) {
+                    _this.jumpToLine(focus.start_line);
+                }
             });
         });
+    };
+
+    GitReaderApp.prototype.handleContextLink = function (nodeId, filePath, line) {
+        var _this = this;
+        if (nodeId) {
+            if (this.tourActive) {
+                if (!this.isGuidedNodeAllowed(nodeId)) {
+                    this.flashGuidedMessage('Follow the guide to unlock this step.');
+                    return;
+                }
+                this.advanceTour('jump', nodeId);
+                return;
+            }
+            var node = this.nodeById.get(nodeId);
+            if (node) {
+                this.loadSymbolSnippet(node, false).catch(function () {
+                    _this.renderCode(node);
+                }).then(function () {
+                    if (line) {
+                        _this.jumpToLine(line);
+                    }
+                });
+            }
+            return;
+        }
+        if (!filePath) {
+            return;
+        }
+        var normalized = this.normalizePath(filePath);
+        var fileNode = this.fileNodesByPath.get(normalized) || null;
+        if (fileNode) {
+            this.loadSymbolSnippet(fileNode, false).catch(function () {
+                _this.renderCode(fileNode);
+            }).then(function () {
+                if (line) {
+                    _this.jumpToLine(line);
+                }
+            });
+            return;
+        }
+        if (line && this.currentSymbol && this.currentSymbol.location && this.currentSymbol.location.path) {
+            if (this.normalizePath(this.currentSymbol.location.path) === normalized) {
+                this.jumpToLine(line);
+            }
+        }
+    };
+
+    GitReaderApp.prototype.flashGuidedMessage = function (message) {
+        var _this = this;
+        this.setCanvasOverlay(message, true);
+        window.setTimeout(function () { return _this.setCanvasOverlay('', false); }, 1400);
+    };
+
+    GitReaderApp.prototype.isGuidedNodeAllowed = function (nodeId) {
+        if (!this.tourActive || !this.guidedAllowedNodeIds) {
+            return true;
+        }
+        return this.guidedAllowedNodeIds.has(nodeId);
     };
 
     GitReaderApp.prototype.renderTourStep = function (step) {
@@ -2395,15 +2709,44 @@
         var relatedArcButtons = relatedArcs.map(function (item) {
             return '<button class="ghost-btn arc-jump" data-tour-arc="' + escapeHtml(item.arc_id) + '">' + escapeHtml(item.title) + '</button>';
         });
+        var concept = step.concept ? '<p><strong>Concept:</strong> ' + escapeHtml(step.concept) + '</p>' : '';
+        var whyHere = step.why_here ? '<p><strong>Why here:</strong> ' + escapeHtml(step.why_here) + '</p>' : '';
+        var remember = step.remember ? '<p><strong>Remember:</strong> ' + escapeHtml(step.remember) + '</p>' : '';
+        var focus = step.focus && step.focus.file_path ? (function () {
+            var start = step.focus.start_line;
+            var end = step.focus.end_line;
+            var range = start ? '' + start + (end && end !== start ? '-' + end : '') : '';
+            return '<p class="tour-focus">Focus: ' + escapeHtml(step.focus.file_path) + (range ? ':' + range : '') + '</p>';
+        })() : '';
         var pitfall = step.pitfall ? '<p class="tour-pitfall">' + escapeHtml(step.pitfall) + '</p>' : '';
+        var contextLinks = step.context_links || [];
+        var contextButtons = contextLinks.map(function (link) {
+            var attrs = [
+                'data-context-link',
+                link.node_id ? 'data-context-node="' + escapeHtml(link.node_id) + '"' : '',
+                link.file_path ? 'data-context-file="' + escapeHtml(link.file_path) + '"' : '',
+                typeof link.line === 'number' ? 'data-context-line="' + link.line + '"' : '',
+            ].filter(Boolean).join(' ');
+            return '<button class="ghost-btn context-link" ' + attrs + '>' + escapeHtml(link.label) + '</button>';
+        });
+        var storySoFarItems = (step.story_so_far || []).map(function (item) { return '<li>' + escapeHtml(item) + '</li>'; }).join('');
+        var storySoFar = storySoFarItems
+            ? '<div class="tour-story"><p class="eyebrow">Story so far</p><ul>' + storySoFarItems + '</ul></div>'
+            : '';
         this.narratorOutput.innerHTML =
             '<p class="eyebrow">Tour: ' + escapeHtml(this.tourMode) + '</p>' +
             '<h3>' + escapeHtml(step.title) + '</h3>' +
             '<p>' + escapeHtml(step.hook) + '</p>' +
+            focus +
+            concept +
+            whyHere +
+            remember +
             (explanation ? '<ul>' + explanation + '</ul>' : '') +
             '<p><strong>Why it matters:</strong> ' + escapeHtml(step.why_it_matters) + '</p>' +
             '<p><strong>Next:</strong> ' + escapeHtml(step.next_click) + '</p>' +
             pitfall +
+            (contextButtons.length > 0 ? '<div class="context-link-list">' + contextButtons.join('') + '</div>' : '') +
+            storySoFar +
             (relatedNodeButtons.length > 0 || relatedArcButtons.length > 0
                 ? '<div class="arc-jump-list">' + relatedNodeButtons.join('') + relatedArcButtons.join('') + '</div>'
                 : '');
@@ -2414,6 +2757,103 @@
             '<p class="eyebrow">Tour</p>' +
             '<h3>Tour unavailable</h3>' +
             '<p>' + escapeHtml(message) + '</p>';
+    };
+
+    GitReaderApp.prototype.applyGuidedState = function () {
+        if (!this.tourActive || !this.tourStep) {
+            this.guidedAllowedNodeIds = null;
+            this.applyGuidedToc();
+            this.applyGuidedCodeFocus();
+            this.applyGraphFilters();
+            this.renderFileTree(null);
+            return;
+        }
+        var allowed = new Set(this.tourStep.allowed_node_ids || []);
+        var focusPath = this.tourStep.focus && this.tourStep.focus.file_path;
+        if (focusPath) {
+            var normalized = this.normalizePath(focusPath);
+            var fileNode = this.fileNodesByPath.get(normalized);
+            if (fileNode) {
+                allowed.add(fileNode.id);
+            }
+        }
+        this.guidedAllowedNodeIds = allowed.size > 0 ? allowed : null;
+        this.applyGuidedToc();
+        this.applyGraphFilters();
+        this.applyGuidedCodeFocus();
+        this.renderFileTree((this.tourStep.focus && this.tourStep.focus.file_path) || null);
+    };
+
+    GitReaderApp.prototype.applyGuidedToc = function () {
+        var _this = this;
+        var items = Array.from(this.tocList.querySelectorAll('.toc-item'));
+        if (!this.tourActive || !this.tourStep) {
+            items.forEach(function (item) { return item.classList.remove('is-guided-hidden'); });
+            return;
+        }
+        items.forEach(function (item) {
+            var isActive = item.dataset.chapterId === _this.currentChapterId;
+            item.classList.toggle('is-guided-hidden', !isActive);
+        });
+    };
+
+    GitReaderApp.prototype.applyGuidedGraphFilter = function () {
+        if (!this.graphInstance) {
+            return;
+        }
+        var cy = this.graphInstance;
+        cy.elements().removeClass('is-guided-hidden');
+        cy.nodes().removeClass('is-guided-focus');
+        if (!this.tourActive || !this.guidedAllowedNodeIds || !this.tourStep) {
+            return;
+        }
+        var allowed = this.guidedAllowedNodeIds;
+        var focusId = this.tourStep.node_id;
+        cy.nodes().forEach(function (node) {
+            var isAllowed = allowed.has(node.id());
+            node.toggleClass('is-guided-hidden', !isAllowed);
+            node.toggleClass('is-guided-focus', node.id() === focusId);
+        });
+        cy.edges().forEach(function (edge) {
+            var sourceId = edge.data('source');
+            var targetId = edge.data('target');
+            var isAllowed = allowed.has(sourceId) && allowed.has(targetId);
+            edge.toggleClass('is-guided-hidden', !isAllowed);
+        });
+        cy.elements('.is-guided-hidden').hide();
+    };
+
+    GitReaderApp.prototype.applyGuidedCodeFocus = function () {
+        var _this = this;
+        var lines = Array.from(this.codeSurface.querySelectorAll('.code-line'));
+        lines.forEach(function (line) { return line.classList.remove('is-guided-dim', 'is-guided-focus'); });
+        if (!this.tourActive || !this.tourStep || !this.tourStep.focus) {
+            return;
+        }
+        var focus = this.tourStep.focus;
+        if (!focus || !focus.start_line) {
+            return;
+        }
+        if (focus.file_path && this.currentSymbol && this.currentSymbol.location && this.currentSymbol.location.path) {
+            var currentPath = this.normalizePath(this.currentSymbol.location.path);
+            var focusPath = this.normalizePath(focus.file_path);
+            if (currentPath !== focusPath) {
+                return;
+            }
+        }
+        var start = focus.start_line;
+        var end = focus.end_line && focus.end_line >= start ? focus.end_line : start;
+        lines.forEach(function (line) {
+            var lineNumber = Number(line.dataset.line);
+            if (!Number.isFinite(lineNumber)) {
+                return;
+            }
+            if (lineNumber >= start && lineNumber <= end) {
+                line.classList.add('is-guided-focus');
+            } else {
+                line.classList.add('is-guided-dim');
+            }
+        });
     };
 
     GitReaderApp.prototype.setCanvasOverlay = function (message, visible) {

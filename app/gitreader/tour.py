@@ -12,7 +12,7 @@ from .signals import extract_signals, format_signals, signal_summary
 
 
 LOGGER = logging.getLogger(__name__)
-PROMPT_VERSION = 'tour-v2'
+PROMPT_VERSION = 'tour-v3'
 MAX_CONTEXT_WINDOW = 3
 MAX_SNIPPET_LINES = 20
 
@@ -206,7 +206,7 @@ def _generate_tour_step(
         'context_window': context_window[-MAX_CONTEXT_WINDOW:],
     }
 
-    fallback = _fallback_tour_step(arc, node, scene, step_index, signals)
+    fallback = _fallback_tour_step(arc, node, scene, step_index, signals, snippet, context_window)
     api_key = os.getenv('GITREADER_LLM_API_KEY') or os.getenv('OPENAI_API_KEY')
     model = os.getenv('GITREADER_LLM_MODEL', 'gpt-4o-mini')
     base_url = os.getenv('OPENAI_BASE_URL', 'https://api.openai.com/v1').rstrip('/')
@@ -337,17 +337,23 @@ def _fallback_tour_step(
     scene: dict,
     step_index: int,
     signals: Dict[str, List[str]],
+    snippet: dict,
+    context_window: List[dict],
 ) -> Dict[str, object]:
     node_name = node.name if node else scene.get('name', 'Unknown')
     arc_title = arc.get('title', 'Route')
     next_click = _next_click(arc, step_index)
     signal_lines = _signal_lines(signals)
+    concept, why_here, remember = _build_explanatory_context(arc, node, scene, signals)
     explanation = [
         f'{node_name} appears in this route’s main flow.',
         'Use the next step to continue along the path.',
     ]
     if signal_lines:
         explanation.insert(0, signal_lines[0])
+    focus = _build_focus(scene, node, snippet)
+    allowed_node_ids = _allowed_node_ids(arc, step_index)
+    context_links = _build_context_links(arc, scene, step_index)
     return {
         'step_index': step_index,
         'total_steps': len(arc.get('scenes') or []),
@@ -358,11 +364,18 @@ def _fallback_tour_step(
         'hook': f'Follow {node_name} in the {arc_title} flow.',
         'explanation': explanation[:3],
         'why_it_matters': 'It keeps the request moving through its core path.',
+        'concept': concept,
+        'why_here': why_here,
+        'remember': remember,
         'next_click': next_click,
         'pitfall': '',
         'confidence': scene.get('confidence', 'medium'),
         'related_nodes': _fallback_related_nodes(arc, step_index),
         'related_arcs': _fallback_related_arcs(arc),
+        'focus': focus,
+        'allowed_node_ids': allowed_node_ids,
+        'context_links': context_links,
+        'story_so_far': _story_so_far(context_window),
         'source': 'fallback',
         'prompt_version': PROMPT_VERSION,
     }
@@ -383,6 +396,158 @@ def _fallback_related_nodes(arc: dict, step_index: int) -> List[dict]:
 def _fallback_related_arcs(arc: dict) -> List[dict]:
     related = arc.get('related_ids') if isinstance(arc.get('related_ids'), list) else []
     return [{'arc_id': arc_id, 'title': arc_id} for arc_id in related]
+
+
+def _build_explanatory_context(
+    arc: dict,
+    node: Optional[SymbolNode],
+    scene: dict,
+    signals: Dict[str, List[str]],
+) -> tuple[str, str, str]:
+    route_label = _route_label(arc)
+    node_name = node.name if node else scene.get('name', 'this step')
+    role = scene.get('role') if isinstance(scene, dict) else ''
+    templates = signals.get('templates') or []
+    responses = signals.get('responses') or []
+    redirects = signals.get('redirects') or []
+    auth = signals.get('auth') or []
+    request = signals.get('request') or []
+    db = signals.get('db') or []
+
+    if role == 'entry' and route_label:
+        concept = f'This is the entry handler for {route_label}.'
+        why_here = f'The story starts at {route_label} before any downstream logic.'
+        remember = f'Entering {route_label} puts us inside {node_name}.'
+        return concept, why_here, remember
+
+    if auth:
+        concept = f'Authentication gate: {", ".join(auth[:2])}.'
+        why_here = f'{node_name} decides who can proceed in this flow.'
+        remember = 'If auth fails, the request diverts away from the main path.'
+        return concept, why_here, remember
+
+    if db:
+        concept = f'Database access: {", ".join(db[:2])}.'
+        why_here = f'{node_name} needs data to decide the next step.'
+        remember = 'The query result becomes the data the rest of the flow uses.'
+        return concept, why_here, remember
+
+    if templates:
+        concept = f'Render step: {templates[0]}.'
+        why_here = f'This is where the flow turns into a user-facing response.'
+        remember = f'The output template is {templates[0]}.'
+        return concept, why_here, remember
+
+    if responses or redirects:
+        response_label = ', '.join((responses + redirects)[:2])
+        concept = f'Response decision: {response_label}.'
+        why_here = f'{node_name} ends or redirects the request.'
+        remember = 'Once we return/redirect, the current flow is done.'
+        return concept, why_here, remember
+
+    if request:
+        concept = f'Request input: {", ".join(request[:2])}.'
+        why_here = f'{node_name} reads input to shape the next action.'
+        remember = 'Input here controls the branch we follow.'
+        return concept, why_here, remember
+
+    if node and node.kind == 'class':
+        concept = f'Class focus: {node_name}.'
+        why_here = f'This class groups behavior used by the current flow.'
+        remember = 'Instances of this class carry the state downstream.'
+        return concept, why_here, remember
+
+    if node and node.summary:
+        concept = f'Concept: {node.summary}'
+        why_here = f'{node_name} is part of the main route flow.'
+        remember = 'Keep this name in mind; it reappears later.'
+        return concept, why_here, remember
+
+    return (
+        f'Concept: {node_name} advances the route flow.',
+        'Why here: this is the next concrete step in the path.',
+        'Remember: each step sets up the next move.',
+    )
+
+
+def _route_label(arc: dict) -> str:
+    route = arc.get('route') if isinstance(arc.get('route'), dict) else {}
+    methods = route.get('methods') if isinstance(route.get('methods'), list) else []
+    path = route.get('path') or ''
+    if not methods:
+        methods = ['ANY']
+    label = f'{"|".join(methods)} {path}'.strip()
+    return label if label.strip() else ''
+
+
+def _build_focus(scene: dict, node: Optional[SymbolNode], snippet: dict) -> dict:
+    file_path = ''
+    if node and node.location and node.location.path:
+        file_path = node.location.path
+    elif isinstance(scene, dict):
+        file_path = scene.get('file_path') or ''
+    start_line = snippet.get('start_line') if isinstance(snippet.get('start_line'), int) else None
+    end_line = snippet.get('end_line') if isinstance(snippet.get('end_line'), int) else None
+    if start_line is None and isinstance(scene.get('line'), int):
+        start_line = scene.get('line')
+    if end_line is None:
+        end_line = start_line
+    return {
+        'file_path': file_path,
+        'start_line': start_line,
+        'end_line': end_line,
+        'node_id': node.id if node else scene.get('id'),
+    }
+
+
+def _allowed_node_ids(arc: dict, step_index: int) -> List[str]:
+    scenes = arc.get('scenes') if isinstance(arc.get('scenes'), list) else []
+    ids: List[str] = []
+    entry_id = arc.get('entry_id')
+    if entry_id:
+        ids.append(entry_id)
+    for idx in (step_index - 1, step_index, step_index + 1):
+        if 0 <= idx < len(scenes):
+            node_id = scenes[idx].get('id')
+            if node_id:
+                ids.append(node_id)
+    deduped: List[str] = []
+    seen = set()
+    for node_id in ids:
+        if node_id in seen:
+            continue
+        seen.add(node_id)
+        deduped.append(node_id)
+    return deduped
+
+
+def _build_context_links(arc: dict, scene: dict, step_index: int) -> List[dict]:
+    scenes = arc.get('scenes') if isinstance(arc.get('scenes'), list) else []
+    links: List[dict] = []
+
+    def add_link(label: str, source: Optional[dict]) -> None:
+        if not source:
+            return
+        node_id = source.get('id')
+        file_path = source.get('file_path')
+        line = source.get('line')
+        if not (file_path or node_id):
+            return
+        if not isinstance(line, int) or line <= 0:
+            line = None
+        links.append({
+            'label': label,
+            'file_path': file_path,
+            'line': line,
+            'node_id': node_id,
+        })
+
+    add_link(f'Current: {scene.get("name", "step")}', scene)
+    if step_index - 1 >= 0:
+        add_link(f'Previous: {scenes[step_index - 1].get("name", "step")}', scenes[step_index - 1])
+    if step_index + 1 < len(scenes):
+        add_link(f'Next: {scenes[step_index + 1].get("name", "step")}', scenes[step_index + 1])
+    return links[:4]
 
 
 def _signal_lines(signals: Dict[str, List[str]]) -> List[str]:
@@ -417,9 +582,12 @@ def _build_messages(payload: dict) -> List[Dict[str, str]]:
         f'Recent context:\n{json.dumps(payload.get("context_window"), ensure_ascii=True, indent=2)}\n'
         'Return JSON with keys: '
         'title, hook, explanation (array of 2-3 strings), why_it_matters, '
-        'next_click, pitfall (string or empty), confidence (high|medium|low), '
+        'concept, why_here, remember, next_click, pitfall (string or empty), '
+        'confidence (high|medium|low), '
         'related_nodes (array of {"node_id": "...", "label": "..."}) '
-        'and related_arcs (array of {"arc_id": "...", "title": "..."}).'
+        'related_arcs (array of {"arc_id": "...", "title": "..."}), '
+        'context_links (array of {"label": "...", "file_path": "...", "line": number, "node_id": "..."?}), '
+        'story_so_far (array of short strings).'
     )
     return [
         {'role': 'system', 'content': system},
@@ -483,7 +651,17 @@ def _parse_step(content: str) -> Dict[str, object]:
 
 def _merge_step(primary: Dict[str, object], fallback: Dict[str, object]) -> Dict[str, object]:
     merged = dict(fallback)
-    for key in ('title', 'hook', 'why_it_matters', 'next_click', 'pitfall', 'confidence'):
+    for key in (
+        'title',
+        'hook',
+        'why_it_matters',
+        'next_click',
+        'pitfall',
+        'confidence',
+        'concept',
+        'why_here',
+        'remember',
+    ):
         value = primary.get(key)
         if isinstance(value, str) and value.strip():
             merged[key] = value.strip()
@@ -498,6 +676,12 @@ def _merge_step(primary: Dict[str, object], fallback: Dict[str, object]) -> Dict
     related_arcs = primary.get('related_arcs')
     if isinstance(related_arcs, list) and related_arcs:
         merged['related_arcs'] = _normalize_related_arcs(related_arcs)
+    context_links = primary.get('context_links')
+    if isinstance(context_links, list) and context_links:
+        merged['context_links'] = _normalize_context_links(context_links)
+    story_so_far = primary.get('story_so_far')
+    if isinstance(story_so_far, list) and story_so_far:
+        merged['story_so_far'] = _normalize_story_so_far(story_so_far)
     merged['prompt_version'] = PROMPT_VERSION
     return merged
 
@@ -524,6 +708,49 @@ def _normalize_related_arcs(raw: List[object]) -> List[dict]:
         if arc_id and title:
             results.append({'arc_id': arc_id, 'title': title})
     return results[:4]
+
+
+def _normalize_context_links(raw: List[object]) -> List[dict]:
+    results: List[dict] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        label = str(item.get('label') or '').strip()
+        file_path = str(item.get('file_path') or '').strip()
+        node_id = str(item.get('node_id') or '').strip()
+        line = item.get('line')
+        if not label:
+            continue
+        if file_path or node_id:
+            entry: Dict[str, object] = {'label': label}
+            if file_path:
+                entry['file_path'] = file_path
+            if node_id:
+                entry['node_id'] = node_id
+            if isinstance(line, int) and line > 0:
+                entry['line'] = line
+            results.append(entry)
+    return results[:6]
+
+
+def _normalize_story_so_far(raw: List[object]) -> List[str]:
+    results: List[str] = []
+    for item in raw:
+        text = str(item).strip()
+        if text:
+            results.append(text)
+    return results[:6]
+
+
+def _story_so_far(context_window: List[dict]) -> List[str]:
+    summary: List[str] = []
+    for item in context_window[-3:]:
+        if not isinstance(item, dict):
+            continue
+        text = str(item.get('summary') or '').strip()
+        if text:
+            summary.append(text)
+    return summary
 
 
 def _tour_cache_key(index: RepoIndex, arc: dict, step_index: int, mode: str, node_id: str) -> str:
