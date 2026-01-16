@@ -504,24 +504,24 @@ class GitReaderApp {
 
     private bindEvents(): void {
         this.tocList.addEventListener('click', (event) => {
-            if (this.tourActive) {
-                return;
-            }
             const target = (event.target as HTMLElement).closest<HTMLLIElement>('.toc-item');
             if (!target) {
                 return;
             }
             const chapterId = target.dataset.chapterId;
             if (chapterId) {
+                if (this.tourActive) {
+                    if (this.tocMode === 'routes') {
+                        void this.setTocMode('routes', chapterId);
+                    }
+                    return;
+                }
                 this.scheduleChapterLoad(chapterId);
             }
         });
 
         this.tocModeButtons.forEach((button) => {
             button.addEventListener('click', () => {
-                if (this.tourActive) {
-                    return;
-                }
                 const mode = button.dataset.tocMode as TocMode | undefined;
                 if (mode) {
                     void this.setTocMode(mode);
@@ -620,7 +620,7 @@ class GitReaderApp {
         });
 
         this.routeSelect.addEventListener('change', () => {
-            if (this.tourActive) {
+            if (this.tourActive && this.tocMode !== 'routes') {
                 return;
             }
             const arcId = this.routeSelect.value;
@@ -631,7 +631,7 @@ class GitReaderApp {
         });
 
         this.routeJump.addEventListener('click', () => {
-            if (this.tourActive) {
+            if (this.tourActive && this.tocMode !== 'routes') {
                 return;
             }
             const arcId = this.routeSelect.value;
@@ -756,14 +756,63 @@ class GitReaderApp {
     private async setTocMode(mode: TocMode, targetChapterId?: string): Promise<void> {
         if (this.tocMode === mode) {
             if (targetChapterId) {
+                if (this.tourActive) {
+                    this.currentChapterId = targetChapterId;
+                    this.setActiveToc(targetChapterId);
+                    this.resetNarratorForTocMode(mode, targetChapterId);
+                    this.updateTourControls();
+                    return;
+                }
                 await this.loadChapter(targetChapterId);
+                return;
+            }
+            if (this.tourActive) {
+                this.resetNarratorForTocMode(mode);
+                this.updateTourControls();
             }
             return;
         }
         this.tocList.innerHTML = '<li class="toc-item"><div class="toc-title">Loading chapters</div><p class="toc-summary">Switching TOC view...</p></li>';
         await this.loadToc(mode);
         const defaultChapterId = targetChapterId ?? (this.chapters.length > 0 ? this.chapters[0].id : '');
+        if (this.tourActive) {
+            this.currentChapterId = defaultChapterId;
+            this.setActiveToc(defaultChapterId);
+            this.resetNarratorForTocMode(mode, defaultChapterId);
+            this.updateTourControls();
+            return;
+        }
         await this.loadChapter(defaultChapterId);
+    }
+
+    private resetNarratorForTocMode(mode: TocMode, targetChapterId?: string): void {
+        if (!this.tourActive) {
+            return;
+        }
+        if (mode === 'routes') {
+            const arcId = targetChapterId || this.currentChapterId || this.routeSelect.value || '';
+            const arc = arcId ? this.storyArcsById.get(arcId) : undefined;
+            if (arc) {
+                this.activeStoryArc = arc;
+                this.renderStoryArc(arc);
+                return;
+            }
+            this.activeStoryArc = null;
+            if (arcId) {
+                this.renderStoryArcMissing();
+                return;
+            }
+            this.renderStoryArcEmpty();
+            return;
+        }
+        this.activeStoryArc = null;
+        if (mode === 'tree') {
+            this.renderFileTreeNarrator();
+            return;
+        }
+        if (this.tourStep) {
+            this.renderTourStep(this.tourStep);
+        }
     }
 
     private async loadToc(mode: TocMode): Promise<void> {
@@ -2267,6 +2316,16 @@ class GitReaderApp {
         `;
     }
 
+    private renderFileTreeNarrator(): void {
+        const fileCount = this.fileNodesByPath.size;
+        const countLabel = fileCount > 0 ? `${fileCount} files indexed.` : 'No files indexed yet.';
+        this.narratorOutput.innerHTML = `
+            <p class="eyebrow">File tree</p>
+            <h3>Browse the repository layout</h3>
+            <p>Expand folders in the tree to explore the structure. ${this.escapeHtml(countLabel)}</p>
+        `;
+    }
+
     private formatStoryArc(arc: StoryArc, mode: NarrationMode): { eyebrow: string; title: string; body: string } {
         const routeLabel = this.escapeHtml(this.formatArcTitle(arc));
         const scenes = Array.isArray(arc.scenes) ? arc.scenes : [];
@@ -2476,9 +2535,23 @@ class GitReaderApp {
         this.modeButtons.forEach((button) => {
             button.classList.toggle('is-active', button.dataset.mode === mode);
         });
-        if (this.tourActive && this.tourStep) {
-            this.renderTourStep(this.tourStep);
-            return;
+        if (this.tourActive) {
+            if (this.tocMode === 'routes') {
+                if (this.activeStoryArc) {
+                    this.renderStoryArc(this.activeStoryArc);
+                } else {
+                    this.renderStoryArcEmpty();
+                }
+                return;
+            }
+            if (this.tocMode === 'tree') {
+                this.renderFileTreeNarrator();
+                return;
+            }
+            if (this.tourStep) {
+                this.renderTourStep(this.tourStep);
+                return;
+            }
         }
         if (this.activeStoryArc) {
             this.renderStoryArc(this.activeStoryArc);
@@ -2547,11 +2620,12 @@ class GitReaderApp {
         this.tourPrevButton.disabled = !this.tourActive;
         this.tourNextButton.disabled = !this.tourActive;
         this.tourEndButton.disabled = !this.tourActive;
+        const hasRoutes = this.storyArcs.length > 0;
         if (this.tourActive) {
-            this.routeSelect.disabled = true;
-            this.routeJump.disabled = true;
+            const allowRoutePicker = this.tocMode === 'routes';
+            this.routeSelect.disabled = !allowRoutePicker || !hasRoutes;
+            this.routeJump.disabled = !allowRoutePicker || !hasRoutes;
         } else {
-            const hasRoutes = this.storyArcs.length > 0;
             this.routeSelect.disabled = !hasRoutes;
             this.routeJump.disabled = !hasRoutes;
         }
@@ -2663,6 +2737,19 @@ class GitReaderApp {
         const targetNode = node || fileNode;
         if (!targetNode) {
             return;
+        }
+        if (this.tourActive && (!this.graphInstance || this.graphInstance.$id(targetNode.id).empty())) {
+            const nodes = this.graphNodes;
+            const edges = this.filterEdgesForNodes(nodes);
+            const graphView: GraphView = {
+                nodes,
+                edges,
+                totalNodes: nodes.length,
+                visibleNodes: nodes.length,
+                isCapped: false,
+            };
+            this.renderGraph(graphView.nodes, graphView.edges);
+            this.updateGraphNodeStatus(graphView);
         }
         if (this.graphInstance) {
             this.graphInstance.$('node:selected').unselect();
@@ -2828,7 +2915,7 @@ class GitReaderApp {
 
     private applyGuidedToc(): void {
         const items = Array.from(this.tocList.querySelectorAll<HTMLElement>('.toc-item'));
-        if (!this.tourActive || !this.tourStep) {
+        if (!this.tourActive || !this.tourStep || this.tocMode !== 'story') {
             items.forEach((item) => item.classList.remove('is-guided-hidden'));
             return;
         }

@@ -229,24 +229,24 @@
     GitReaderApp.prototype.bindEvents = function () {
         var _this = this;
         this.tocList.addEventListener('click', function (event) {
-            if (_this.tourActive) {
-                return;
-            }
             var target = event.target.closest('.toc-item');
             if (!target) {
                 return;
             }
             var chapterId = target.dataset.chapterId;
             if (chapterId) {
+                if (_this.tourActive) {
+                    if (_this.tocMode === 'routes') {
+                        _this.setTocMode('routes', chapterId);
+                    }
+                    return;
+                }
                 _this.scheduleChapterLoad(chapterId);
             }
         });
 
         this.tocModeButtons.forEach(function (button) {
             button.addEventListener('click', function () {
-                if (_this.tourActive) {
-                    return;
-                }
                 var mode = button.dataset.tocMode;
                 if (mode) {
                     _this.setTocMode(mode);
@@ -345,7 +345,7 @@
         });
 
         this.routeSelect.addEventListener('change', function () {
-            if (_this.tourActive) {
+            if (_this.tourActive && _this.tocMode !== 'routes') {
                 return;
             }
             var arcId = _this.routeSelect.value;
@@ -356,7 +356,7 @@
         });
 
         this.routeJump.addEventListener('click', function () {
-            if (_this.tourActive) {
+            if (_this.tourActive && _this.tocMode !== 'routes') {
                 return;
             }
             var arcId = _this.routeSelect.value;
@@ -483,15 +483,63 @@
         var _this = this;
         if (this.tocMode === mode) {
             if (targetChapterId) {
+                if (this.tourActive) {
+                    this.currentChapterId = targetChapterId;
+                    this.setActiveToc(targetChapterId);
+                    this.resetNarratorForTocMode(mode, targetChapterId);
+                    this.updateTourControls();
+                    return Promise.resolve();
+                }
                 return this.loadChapter(targetChapterId);
+            }
+            if (this.tourActive) {
+                this.resetNarratorForTocMode(mode);
+                this.updateTourControls();
             }
             return Promise.resolve();
         }
         this.tocList.innerHTML = '<li class="toc-item"><div class="toc-title">Loading chapters</div><p class="toc-summary">Switching TOC view...</p></li>';
         return this.loadToc(mode).then(function () {
             var defaultChapterId = targetChapterId || (_this.chapters.length > 0 ? _this.chapters[0].id : '');
+            if (_this.tourActive) {
+                _this.currentChapterId = defaultChapterId;
+                _this.setActiveToc(defaultChapterId);
+                _this.resetNarratorForTocMode(mode, defaultChapterId);
+                _this.updateTourControls();
+                return;
+            }
             return _this.loadChapter(defaultChapterId);
         });
+    };
+
+    GitReaderApp.prototype.resetNarratorForTocMode = function (mode, targetChapterId) {
+        if (!this.tourActive) {
+            return;
+        }
+        if (mode === 'routes') {
+            var arcId = targetChapterId || this.currentChapterId || this.routeSelect.value || '';
+            var arc = arcId ? this.storyArcsById.get(arcId) : undefined;
+            if (arc) {
+                this.activeStoryArc = arc;
+                this.renderStoryArc(arc);
+                return;
+            }
+            this.activeStoryArc = null;
+            if (arcId) {
+                this.renderStoryArcMissing();
+                return;
+            }
+            this.renderStoryArcEmpty();
+            return;
+        }
+        this.activeStoryArc = null;
+        if (mode === 'tree') {
+            this.renderFileTreeNarrator();
+            return;
+        }
+        if (this.tourStep) {
+            this.renderTourStep(this.tourStep);
+        }
     };
 
     GitReaderApp.prototype.loadToc = function (mode) {
@@ -2239,6 +2287,15 @@
             '<p>Choose another route to continue.</p>';
     };
 
+    GitReaderApp.prototype.renderFileTreeNarrator = function () {
+        var fileCount = this.fileNodesByPath.size;
+        var countLabel = fileCount > 0 ? fileCount + ' files indexed.' : 'No files indexed yet.';
+        this.narratorOutput.innerHTML =
+            '<p class="eyebrow">File tree</p>' +
+            '<h3>Browse the repository layout</h3>' +
+            '<p>Expand folders in the tree to explore the structure. ' + escapeHtml(countLabel) + '</p>';
+    };
+
     GitReaderApp.prototype.formatStoryArc = function (arc, mode) {
         var routeLabel = escapeHtml(this.formatArcTitle(arc));
         var scenes = Array.isArray(arc.scenes) ? arc.scenes : [];
@@ -2444,9 +2501,23 @@
         this.modeButtons.forEach(function (button) {
             button.classList.toggle('is-active', button.dataset.mode === mode);
         });
-        if (this.tourActive && this.tourStep) {
-            this.renderTourStep(this.tourStep);
-            return;
+        if (this.tourActive) {
+            if (this.tocMode === 'routes') {
+                if (this.activeStoryArc) {
+                    this.renderStoryArc(this.activeStoryArc);
+                } else {
+                    this.renderStoryArcEmpty();
+                }
+                return;
+            }
+            if (this.tocMode === 'tree') {
+                this.renderFileTreeNarrator();
+                return;
+            }
+            if (this.tourStep) {
+                this.renderTourStep(this.tourStep);
+                return;
+            }
         }
         if (this.activeStoryArc) {
             this.renderStoryArc(this.activeStoryArc);
@@ -2506,11 +2577,12 @@
         this.tourPrevButton.disabled = !this.tourActive;
         this.tourNextButton.disabled = !this.tourActive;
         this.tourEndButton.disabled = !this.tourActive;
+        var hasRoutes = this.storyArcs.length > 0;
         if (this.tourActive) {
-            this.routeSelect.disabled = true;
-            this.routeJump.disabled = true;
+            var allowRoutePicker = this.tocMode === 'routes';
+            this.routeSelect.disabled = !allowRoutePicker || !hasRoutes;
+            this.routeJump.disabled = !allowRoutePicker || !hasRoutes;
         } else {
-            var hasRoutes = this.storyArcs.length > 0;
             this.routeSelect.disabled = !hasRoutes;
             this.routeJump.disabled = !hasRoutes;
         }
@@ -2623,6 +2695,19 @@
             var targetNode = node || fileNode;
             if (!targetNode) {
                 return;
+            }
+            if (_this.tourActive && (!_this.graphInstance || _this.graphInstance.$id(targetNode.id).empty())) {
+                var nodes = _this.graphNodes;
+                var edges = _this.filterEdgesForNodes(nodes);
+                var graphView = {
+                    nodes: nodes,
+                    edges: edges,
+                    totalNodes: nodes.length,
+                    visibleNodes: nodes.length,
+                    isCapped: false
+                };
+                _this.renderGraph(graphView.nodes, graphView.edges);
+                _this.updateGraphNodeStatus(graphView);
             }
             if (_this.graphInstance) {
                 _this.graphInstance.$('node:selected').unselect();
@@ -2787,7 +2872,7 @@
     GitReaderApp.prototype.applyGuidedToc = function () {
         var _this = this;
         var items = Array.from(this.tocList.querySelectorAll('.toc-item'));
-        if (!this.tourActive || !this.tourStep) {
+        if (!this.tourActive || !this.tourStep || this.tocMode !== 'story') {
             items.forEach(function (item) { return item.classList.remove('is-guided-hidden'); });
             return;
         }
