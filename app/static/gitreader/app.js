@@ -1367,9 +1367,10 @@
         var displayRange = this.getDisplayRange(symbol, snippet);
         var locationLabel = this.formatLocation(symbol.location, displayRange.startLine, displayRange.endLine);
         var truncationLabel = snippet && snippet.truncated ? ' (truncated)' : '';
-        var snippetHtml = this.renderSnippetLines(snippet);
+        var language = this.getHighlightLanguage(symbol.location && symbol.location.path);
+        var snippetHtml = this.renderSnippetLines(snippet, language);
         var revealLabel = snippet && snippet.section === 'body' ? 'Show body' : 'Show code';
-        var codeClass = this.hasHighlightSupport() ? 'hljs language-python' : '';
+        var codeClass = this.hasHighlightSupport() && language ? 'hljs language-' + language : '';
         this.currentSymbol = symbol;
         this.currentSnippetText = (snippet && snippet.snippet) || '';
         this.codeSurface.innerHTML =
@@ -1420,12 +1421,12 @@
         return {};
     };
 
-    GitReaderApp.prototype.renderSnippetLines = function (snippet) {
+    GitReaderApp.prototype.renderSnippetLines = function (snippet, language) {
         var rawBody = (snippet && snippet.snippet) || '';
         var body = rawBody.trim().length > 0 ? rawBody : '# body not loaded yet';
         var startLine = (snippet && snippet.start_line) || 1;
         var highlightSet = this.buildHighlightSet((snippet && snippet.highlights) || []);
-        var rendered = this.highlightSnippet(body);
+        var rendered = this.highlightSnippet(body, language);
         var lines = rendered.replace(/\n$/, '').split('\n');
         return lines.map(function (line, index) {
             var lineNumber = startLine + index;
@@ -1899,15 +1900,37 @@
         return typeof hljs !== 'undefined' && typeof hljs.highlight === 'function';
     };
 
-    GitReaderApp.prototype.highlightSnippet = function (body) {
+    GitReaderApp.prototype.highlightSnippet = function (body, language) {
         if (!this.hasHighlightSupport()) {
             return escapeHtml(body);
         }
-        var language = hljs.getLanguage && hljs.getLanguage('python') ? 'python' : undefined;
-        if (language) {
+        if (language && hljs.getLanguage && hljs.getLanguage(language)) {
             return hljs.highlight(body, { language: language }).value;
         }
         return hljs.highlightAuto(body).value;
+    };
+
+    GitReaderApp.prototype.getHighlightLanguage = function (path) {
+        if (!path) {
+            return undefined;
+        }
+        var lower = path.toLowerCase();
+        if (lower.endsWith('.py')) {
+            return 'python';
+        }
+        if (lower.endsWith('.js') || lower.endsWith('.jsx')) {
+            return 'javascript';
+        }
+        if (lower.endsWith('.ts')) {
+            return 'typescript';
+        }
+        if (lower.endsWith('.tsx')) {
+            return 'tsx';
+        }
+        if (lower.endsWith('.swift')) {
+            return 'swift';
+        }
+        return undefined;
     };
 
     GitReaderApp.prototype.setSnippetMode = function (mode) {

@@ -16,17 +16,37 @@ DEFAULT_SKIP_DIRS = {
     '.venv',
     'dist',
     'build',
+    'DerivedData',
+    '.swiftpm',
+    '.build',
+    'Pods',
+    'Carthage',
 }
 
 
 @dataclass
 class ScanResult:
     python_files: List[str] = field(default_factory=list)
+    js_files: List[str] = field(default_factory=list)
+    jsx_files: List[str] = field(default_factory=list)
+    ts_files: List[str] = field(default_factory=list)
+    tsx_files: List[str] = field(default_factory=list)
+    swift_files: List[str] = field(default_factory=list)
     extension_counts: Dict[str, int] = field(default_factory=dict)
     skipped_files: List[str] = field(default_factory=list)
     warnings: List[ParseWarning] = field(default_factory=list)
     total_files: int = 0
     total_bytes: int = 0
+
+    def source_file_count(self) -> int:
+        return (
+            len(self.python_files)
+            + len(self.js_files)
+            + len(self.jsx_files)
+            + len(self.ts_files)
+            + len(self.tsx_files)
+            + len(self.swift_files)
+        )
 
 
 def scan_repo(root_path: str, max_file_size: int, max_files: Optional[int] = None) -> ScanResult:
@@ -34,7 +54,7 @@ def scan_repo(root_path: str, max_file_size: int, max_files: Optional[int] = Non
     for dirpath, dirnames, filenames in os.walk(root_path):
         dirnames[:] = [d for d in dirnames if d not in DEFAULT_SKIP_DIRS]
         for filename in filenames:
-            if max_files is not None and len(result.python_files) >= max_files:
+            if max_files is not None and result.source_file_count() >= max_files:
                 return result
             full_path = os.path.join(dirpath, filename)
             rel_path = os.path.relpath(full_path, root_path)
@@ -70,6 +90,16 @@ def scan_repo(root_path: str, max_file_size: int, max_files: Optional[int] = Non
             result.extension_counts[ext] = result.extension_counts.get(ext, 0) + 1
             if ext == '.py':
                 result.python_files.append(rel_path)
+            elif ext == '.js':
+                result.js_files.append(rel_path)
+            elif ext == '.jsx':
+                result.jsx_files.append(rel_path)
+            elif ext == '.ts':
+                result.ts_files.append(rel_path)
+            elif ext == '.tsx':
+                result.tsx_files.append(rel_path)
+            elif ext == '.swift':
+                result.swift_files.append(rel_path)
     return result
 
 

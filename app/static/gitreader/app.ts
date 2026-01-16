@@ -1635,9 +1635,10 @@ class GitReaderApp {
         const displayRange = this.getDisplayRange(symbol, snippet);
         const locationLabel = this.formatLocation(symbol.location, displayRange.startLine, displayRange.endLine);
         const truncationLabel = snippet?.truncated ? ' (truncated)' : '';
-        const snippetHtml = this.renderSnippetLines(snippet);
+        const language = this.getHighlightLanguage(symbol.location?.path);
+        const snippetHtml = this.renderSnippetLines(snippet, language);
         const revealLabel = snippet?.section === 'body' ? 'Show body' : 'Show code';
-        const codeClass = this.hasHighlightSupport() ? 'hljs language-python' : '';
+        const codeClass = this.hasHighlightSupport() && language ? `hljs language-${language}` : '';
         this.currentSymbol = symbol;
         this.currentSnippetText = snippet?.snippet ?? '';
         this.codeSurface.innerHTML = `
@@ -1691,12 +1692,12 @@ class GitReaderApp {
         return {};
     }
 
-    private renderSnippetLines(snippet?: SymbolSnippetResponse): string {
+    private renderSnippetLines(snippet?: SymbolSnippetResponse, language?: string): string {
         const rawBody = snippet?.snippet ?? '';
         const body = rawBody.trim().length > 0 ? rawBody : '# body not loaded yet';
         const startLine = snippet?.start_line ?? 1;
         const highlightSet = this.buildHighlightSet(snippet?.highlights ?? []);
-        const rendered = this.highlightSnippet(body);
+        const rendered = this.highlightSnippet(body, language);
         const lines = rendered.replace(/\n$/, '').split('\n');
         return lines
             .map((line, index) => {
@@ -3000,15 +3001,37 @@ class GitReaderApp {
         return typeof hljs !== 'undefined' && typeof hljs.highlight === 'function';
     }
 
-    private highlightSnippet(body: string): string {
+    private highlightSnippet(body: string, language?: string): string {
         if (!this.hasHighlightSupport()) {
             return this.escapeHtml(body);
         }
-        const language = hljs.getLanguage && hljs.getLanguage('python') ? 'python' : undefined;
-        if (language) {
+        if (language && hljs.getLanguage && hljs.getLanguage(language)) {
             return hljs.highlight(body, { language }).value;
         }
         return hljs.highlightAuto(body).value;
+    }
+
+    private getHighlightLanguage(path?: string): string | undefined {
+        if (!path) {
+            return undefined;
+        }
+        const lower = path.toLowerCase();
+        if (lower.endsWith('.py')) {
+            return 'python';
+        }
+        if (lower.endsWith('.js') || lower.endsWith('.jsx')) {
+            return 'javascript';
+        }
+        if (lower.endsWith('.ts')) {
+            return 'typescript';
+        }
+        if (lower.endsWith('.tsx')) {
+            return 'tsx';
+        }
+        if (lower.endsWith('.swift')) {
+            return 'swift';
+        }
+        return undefined;
     }
 
     private async setSnippetMode(mode: SnippetMode): Promise<void> {

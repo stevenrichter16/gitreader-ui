@@ -5,9 +5,13 @@ import time
 from typing import Optional
 
 from . import ingest, scan, storage
-from .graph import build_graph
+from .graph import build_graph, build_toc
+from .graph_js import build_graph_js
+from .graph_swift import build_graph_swift
 from .models import ParseWarning, RepoIndex, RepoSpec
+from .parse_js import parse_js_files
 from .parse_python import parse_files
+from .parse_swift import parse_swift_files
 from .story import build_story_arcs
 
 
@@ -48,12 +52,18 @@ def get_repo_index(
     if cached and cached.content_signature == content_signature:
         total_elapsed = time.perf_counter() - start_time
         LOGGER.info(
-            'gitreader index cache hit repo=%s commit=%s files=%s python=%s nodes=%s edges=%s warnings=%s skipped=%s '
+            'gitreader index cache hit repo=%s commit=%s files=%s python=%s js=%s jsx=%s ts=%s tsx=%s swift=%s nodes=%s '
+            'edges=%s warnings=%s skipped=%s '
             'timing repo=%.3fs scan=%.3fs total=%.3fs',
             handle.repo_id,
             handle.commit_sha or 'unknown',
             scan_result.total_files,
             len(scan_result.python_files),
+            len(scan_result.js_files),
+            len(scan_result.jsx_files),
+            len(scan_result.ts_files),
+            len(scan_result.tsx_files),
+            len(scan_result.swift_files),
             cached.stats.get('nodes', len(cached.nodes)),
             cached.stats.get('edges', len(cached.edges)),
             cached.stats.get('warnings', len(cached.warnings)),
@@ -66,29 +76,59 @@ def get_repo_index(
 
     parse_start = time.perf_counter()
     parsed = parse_files(scan_root, scan_result.python_files)
+    script_files = (
+        scan_result.js_files
+        + scan_result.jsx_files
+        + scan_result.ts_files
+        + scan_result.tsx_files
+    )
+    parsed_js = parse_js_files(scan_root, script_files)
+    parsed_swift = parse_swift_files(scan_root, scan_result.swift_files)
     parse_elapsed = time.perf_counter() - parse_start
     graph_start = time.perf_counter()
     graph = build_graph(parsed.files)
+    graph_js = build_graph_js(parsed_js.files)
+    graph_swift = build_graph_swift(parsed_swift.files)
     graph_elapsed = time.perf_counter() - graph_start
 
-    warnings = scan_result.warnings + parsed.warnings
+    nodes = dict(graph.nodes)
+    _merge_nodes(nodes, graph_js.nodes)
+    _merge_nodes(nodes, graph_swift.nodes)
+    edges = list(graph.edges)
+    edges.extend(graph_js.edges)
+    edges.extend(graph_swift.edges)
+
+    warnings = scan_result.warnings + parsed.warnings + parsed_js.warnings + parsed_swift.warnings
     stats = {
         'total_files': scan_result.total_files,
         'total_bytes': scan_result.total_bytes,
         'python_files': len(scan_result.python_files),
+        'js_files': len(scan_result.js_files),
+        'jsx_files': len(scan_result.jsx_files),
+        'ts_files': len(scan_result.ts_files),
+        'tsx_files': len(scan_result.tsx_files),
+        'swift_files': len(scan_result.swift_files),
         'skipped_files': len(scan_result.skipped_files),
-        'nodes': len(graph.nodes),
-        'edges': len(graph.edges),
+        'nodes': len(nodes),
+        'edges': len(edges),
         'warnings': len(warnings),
     }
+    toc_paths = list({
+        *scan_result.python_files,
+        *scan_result.js_files,
+        *scan_result.jsx_files,
+        *scan_result.ts_files,
+        *scan_result.tsx_files,
+        *scan_result.swift_files,
+    })
 
     index = RepoIndex(
         repo_id=handle.repo_id,
         root_path=scan_root,
         commit_sha=handle.commit_sha,
-        nodes=graph.nodes,
-        edges=graph.edges,
-        toc=graph.toc,
+        nodes=nodes,
+        edges=edges,
+        toc=build_toc(toc_paths),
         warnings=warnings,
         stats=stats,
         content_signature=content_signature,
@@ -100,14 +140,20 @@ def get_repo_index(
     storage_elapsed = time.perf_counter() - storage_start
     total_elapsed = time.perf_counter() - start_time
     LOGGER.info(
-        'gitreader index built repo=%s commit=%s files=%s python=%s nodes=%s edges=%s warnings=%s skipped=%s '
+        'gitreader index built repo=%s commit=%s files=%s python=%s js=%s jsx=%s ts=%s tsx=%s swift=%s nodes=%s '
+        'edges=%s warnings=%s skipped=%s '
         'timing repo=%.3fs scan=%.3fs parse=%.3fs graph=%.3fs store=%.3fs total=%.3fs',
         handle.repo_id,
         handle.commit_sha or 'unknown',
         scan_result.total_files,
         len(scan_result.python_files),
-        len(graph.nodes),
-        len(graph.edges),
+        len(scan_result.js_files),
+        len(scan_result.jsx_files),
+        len(scan_result.ts_files),
+        len(scan_result.tsx_files),
+        len(scan_result.swift_files),
+        len(nodes),
+        len(edges),
         len(warnings),
         len(scan_result.skipped_files),
         repo_elapsed,
@@ -234,8 +280,20 @@ def build_symbol_snippet(
 
 def _compute_signature(commit_sha: Optional[str], scan_result: scan.ScanResult) -> str:
     extensions = sorted(scan_result.extension_counts.items())
-    payload = f'{commit_sha or ""}|{scan_result.total_files}|{scan_result.total_bytes}|{len(scan_result.python_files)}|{extensions}'
+    payload = (
+        f'{commit_sha or ""}|{scan_result.total_files}|{scan_result.total_bytes}|'
+        f'{len(scan_result.python_files)}|{len(scan_result.js_files)}|{len(scan_result.jsx_files)}|'
+        f'{len(scan_result.ts_files)}|{len(scan_result.tsx_files)}|{len(scan_result.swift_files)}|'
+        f'{extensions}'
+    )
     return hashlib.sha1(payload.encode('utf-8', errors='replace')).hexdigest()
+
+
+def _merge_nodes(target: dict, incoming: dict) -> None:
+    for node_id, node in incoming.items():
+        if node_id in target:
+            continue
+        target[node_id] = node
 
 
 def _read_source_lines(path: str) -> list[str]:
