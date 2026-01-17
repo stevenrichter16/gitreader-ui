@@ -1,6 +1,5 @@
 import { renderImportBreadcrumbs } from './breadcrumbs';
-import { buildFileTreeFromNodes, renderFileTreeMarkup, type FileTreeNode, type FileTreeRow } from './fileTree';
-import { expandFileTreeForFocus } from './fileTreeInteractions';
+import type { FileTreeView } from './fileTreeView';
 import { escapeHtml, normalizePath } from '../utils/strings';
 import type { FoldRange, SymbolNode, SymbolSnippetResponse } from '../types';
 import type { ReaderStateUpdate } from './reader';
@@ -33,14 +32,6 @@ export interface ReaderInteractionState {
     getGraphNodes(): SymbolNode[];
     // Returns the map of file nodes keyed by normalized path.
     getFileNodesByPath(): Map<string, SymbolNode>;
-    // Reads the cached file tree root used by reader/narrator file trees.
-    getFileTreeRoot(): FileTreeNode | null;
-    // Updates the cached file tree root after a rebuild.
-    setFileTreeRoot(root: FileTreeNode | null): void;
-    // Returns the collapsed folder set shared by the file tree views.
-    getFileTreeCollapsed(): Set<string>;
-    // Stores the rendered reader file tree rows for later lookups.
-    setReaderFileTreeRows(rows: FileTreeRow[]): void;
 }
 
 // Dependencies and callbacks required for reader-side interactions.
@@ -73,8 +64,8 @@ export interface ReaderInteractionDependencies {
     copySnippet: () => void;
     // Jumps to a user-entered line number inside the reader.
     jumpToInputLine: () => void;
-    // Toggles a folder node in the shared file tree.
-    toggleFileTreePath: (path: string) => void;
+    // Shared file tree view that renders narrator + reader trees and owns collapse state.
+    fileTreeView: FileTreeView;
     // Reader state accessors/mutators wired from GitReaderApp.
     state: ReaderInteractionState;
 }
@@ -87,7 +78,7 @@ export class ReaderInteractions {
     // Captures app dependencies so reader handlers can orchestrate navigation and UI updates.
     constructor(private deps: ReaderInteractionDependencies) {}
 
-    // Handles reader click interactions (folds, breadcrumbs, imports, file tree, cmd-click).
+    // Handles reader click interactions (folds, breadcrumbs, imports, cmd-click).
     handleCodeSurfaceClick(event: MouseEvent): void {
         const target = event.target as HTMLElement;
         const foldToggle = target.closest<HTMLElement>('[data-fold-toggle]');
@@ -103,14 +94,6 @@ export class ReaderInteractions {
             const path = breadcrumbTarget.dataset.breadcrumbPath;
             if (path) {
                 this.navigateBreadcrumb(path);
-            }
-            return;
-        }
-        const treeToggle = target.closest<HTMLElement>('[data-tree-toggle]');
-        if (treeToggle) {
-            const path = treeToggle.dataset.treeToggle;
-            if (path) {
-                this.deps.toggleFileTreePath(path);
             }
             return;
         }
@@ -177,26 +160,13 @@ export class ReaderInteractions {
     renderReaderFileTree(focusPath: string): void {
         const normalized = normalizePath(focusPath);
         const state = this.deps.state;
-        let root = state.getFileTreeRoot();
-        if (!root) {
-            root = buildFileTreeFromNodes(state.getGraphNodes());
-            state.setFileTreeRoot(root);
-        }
         state.setReaderState({
             readerTreeFocusPath: normalized || null,
             currentSymbol: null,
             currentSnippetText: '',
             currentSnippetStartLine: 1,
         });
-        if (normalized) {
-            expandFileTreeForFocus(state.getFileTreeCollapsed(), normalized, state.getFileNodesByPath());
-        }
-        const { html, rows } = renderFileTreeMarkup(
-            root,
-            normalized,
-            state.getFileTreeCollapsed(),
-        );
-        state.setReaderFileTreeRows(rows);
+        const { html } = this.deps.fileTreeView.renderReaderTree(normalized);
         const treeHtml = html;
         this.deps.codeSurface.innerHTML = `
             <article class="code-card">

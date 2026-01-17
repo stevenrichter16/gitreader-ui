@@ -165,7 +165,7 @@ function renderFileTreeNode(
                 isCollapsedFocusParent: false,
             });
             return `
-                <li class="file-tree-item${isFocusFile ? ' is-focus' : ''}">
+                <li class="file-tree-item${isFocusFile ? ' is-focus' : ''}" data-tree-file="${escapeHtml(child.path)}">
                     <span class="file-tree-name">${escapeHtml(child.name)}</span>
                 </li>
             `;

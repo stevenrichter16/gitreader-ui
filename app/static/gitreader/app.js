@@ -204,7 +204,7 @@
           isCollapsedFocusParent: false
         });
         return `
-                <li class="file-tree-item${isFocusFile ? " is-focus" : ""}">
+                <li class="file-tree-item${isFocusFile ? " is-focus" : ""}" data-tree-file="${escapeHtml(child.path)}">
                     <span class="file-tree-name">${escapeHtml(child.name)}</span>
                 </li>
             `;
@@ -243,42 +243,32 @@
     return `<ul class="file-tree-list">${items.join("")}</ul>`;
   }
 
-  // app/static/gitreader/modules/ui/fileTreeInteractions.ts
-  function toggleFileTreePath(collapsed, path) {
-    if (collapsed.has(path)) {
-      collapsed.delete(path);
-    } else {
-      collapsed.add(path);
-    }
-  }
-  function expandFileTreePath(collapsed, path) {
-    const normalized = normalizePath(path);
-    const parts = normalized.split("/").filter(Boolean);
-    let current = "";
-    for (const part of parts.slice(0, -1)) {
-      current = current ? `${current}/${part}` : part;
-      if (collapsed.has(current)) {
-        break;
-      }
-      collapsed.delete(current);
-    }
-  }
-  function expandFileTreeForFocus(collapsed, path, fileNodesByPath) {
-    const normalized = normalizePath(path);
-    if (fileNodesByPath.has(normalized)) {
-      expandFileTreePath(collapsed, normalized);
+  // app/static/gitreader/modules/ui/fileTreeEvents.ts
+  var boundContainers = /* @__PURE__ */ new WeakSet();
+  function bindFileTreeEvents(container, handlers) {
+    if (!container || boundContainers.has(container)) {
       return;
     }
-    expandFileTreeFolder(collapsed, normalized);
-  }
-  function expandFileTreeFolder(collapsed, path) {
-    const normalized = normalizePath(path);
-    const parts = normalized.split("/").filter(Boolean);
-    let current = "";
-    for (const part of parts) {
-      current = current ? `${current}/${part}` : part;
-      collapsed.delete(current);
-    }
+    boundContainers.add(container);
+    container.addEventListener("click", (event) => {
+      const toggleTarget = event.target.closest("[data-tree-toggle]");
+      if (toggleTarget) {
+        const path = toggleTarget.dataset.treeToggle;
+        if (path) {
+          handlers.onToggle(path);
+        }
+        return;
+      }
+      const fileTarget = event.target.closest("[data-tree-file]");
+      if (!fileTarget) {
+        return;
+      }
+      const filePath = fileTarget.dataset.treeFile;
+      if (!filePath) {
+        return;
+      }
+      handlers.onSelectFile(filePath);
+    });
   }
 
   // app/static/gitreader/modules/ui/graphEvents.ts
@@ -445,6 +435,121 @@ ${secondPart}`;
         <div class="tooltip-meta">${escapeHtml(String(details))}</div>
     `;
   }
+
+  // app/static/gitreader/modules/ui/fileTreeInteractions.ts
+  function expandFileTreePath(collapsed, path) {
+    const normalized = normalizePath(path);
+    const parts = normalized.split("/").filter(Boolean);
+    let current = "";
+    for (const part of parts.slice(0, -1)) {
+      current = current ? `${current}/${part}` : part;
+      if (collapsed.has(current)) {
+        break;
+      }
+      collapsed.delete(current);
+    }
+  }
+  function expandFileTreeForFocus(collapsed, path, fileNodesByPath) {
+    const normalized = normalizePath(path);
+    if (fileNodesByPath.has(normalized)) {
+      expandFileTreePath(collapsed, normalized);
+      return;
+    }
+    expandFileTreeFolder(collapsed, normalized);
+  }
+  function expandFileTreeFolder(collapsed, path) {
+    const normalized = normalizePath(path);
+    const parts = normalized.split("/").filter(Boolean);
+    let current = "";
+    for (const part of parts) {
+      current = current ? `${current}/${part}` : part;
+      collapsed.delete(current);
+    }
+  }
+
+  // app/static/gitreader/modules/ui/fileTreeView.ts
+  var FileTreeView = class {
+    // Captures rendering helpers so the view can be reused by app and reader modules.
+    constructor(deps) {
+      this.deps = deps;
+      __publicField(this, "root", null);
+      __publicField(this, "nodes", []);
+      __publicField(this, "fileNodesByPath", /* @__PURE__ */ new Map());
+      __publicField(this, "collapsed", /* @__PURE__ */ new Set());
+      __publicField(this, "narratorFocusPath", null);
+      __publicField(this, "narratorRows", []);
+      __publicField(this, "readerRows", []);
+    }
+    // Rebuilds the tree model when graph nodes change and keeps file-node lookups in sync.
+    setNodes(nodes, fileNodesByPath) {
+      this.nodes = nodes;
+      this.fileNodesByPath = fileNodesByPath;
+      this.root = this.deps.buildTree(nodes);
+    }
+    // Returns the latest narrator rows (primarily for debugging or future use).
+    getNarratorRows() {
+      return this.narratorRows;
+    }
+    // Returns the latest reader rows (primarily for debugging or future use).
+    getReaderRows() {
+      return this.readerRows;
+    }
+    // Reads the current narrator focus path so callers can restore focus after updates.
+    getNarratorFocusPath() {
+      return this.narratorFocusPath;
+    }
+    // Toggles a folder path in the collapsed set to expand/collapse descendants.
+    toggle(path) {
+      const normalized = this.deps.normalizePath(path);
+      if (this.collapsed.has(normalized)) {
+        this.collapsed.delete(normalized);
+      } else {
+        this.collapsed.add(normalized);
+      }
+    }
+    // Renders the narrator file tree, expanding the focus path when provided.
+    renderNarratorTree(focusPath) {
+      var _a;
+      const normalized = typeof focusPath === "undefined" ? (_a = this.narratorFocusPath) != null ? _a : "" : this.normalizeFocusPath(focusPath);
+      this.narratorFocusPath = normalized || null;
+      if (normalized) {
+        this.deps.expandForFocus(this.collapsed, normalized, this.fileNodesByPath);
+      }
+      const result = this.renderTree(normalized);
+      this.narratorRows = result.rows;
+      return result;
+    }
+    // Renders the reader file tree for a specific focus path.
+    renderReaderTree(focusPath) {
+      const normalized = this.normalizeFocusPath(focusPath);
+      if (normalized) {
+        this.deps.expandForFocus(this.collapsed, normalized, this.fileNodesByPath);
+      }
+      const result = this.renderTree(normalized);
+      this.readerRows = result.rows;
+      return result;
+    }
+    // Ensures the tree model exists before rendering so empty graphs still render gracefully.
+    renderTree(focusPath) {
+      if (!this.root) {
+        this.root = this.nodes.length > 0 ? this.deps.buildTree(this.nodes) : null;
+      }
+      return this.deps.renderTree(this.root, focusPath, this.collapsed);
+    }
+    // Normalizes focus paths to avoid mismatched separators or empty values.
+    normalizeFocusPath(path) {
+      if (!path) {
+        return "";
+      }
+      return this.deps.normalizePath(path);
+    }
+  };
+  var fileTreeViewDefaults = {
+    buildTree: buildFileTreeFromNodes,
+    renderTree: renderFileTreeMarkup,
+    expandForFocus: expandFileTreeForFocus,
+    normalizePath
+  };
 
   // app/static/gitreader/modules/ui/readerController.ts
   var ReaderController = class {
@@ -692,7 +797,7 @@ ${secondPart}`;
       __publicField(this, "importModal", null);
       __publicField(this, "importModalMessage", null);
     }
-    // Handles reader click interactions (folds, breadcrumbs, imports, file tree, cmd-click).
+    // Handles reader click interactions (folds, breadcrumbs, imports, cmd-click).
     handleCodeSurfaceClick(event) {
       const target = event.target;
       const foldToggle = target.closest("[data-fold-toggle]");
@@ -708,14 +813,6 @@ ${secondPart}`;
         const path = breadcrumbTarget.dataset.breadcrumbPath;
         if (path) {
           this.navigateBreadcrumb(path);
-        }
-        return;
-      }
-      const treeToggle = target.closest("[data-tree-toggle]");
-      if (treeToggle) {
-        const path = treeToggle.dataset.treeToggle;
-        if (path) {
-          this.deps.toggleFileTreePath(path);
         }
         return;
       }
@@ -780,26 +877,13 @@ ${secondPart}`;
     renderReaderFileTree(focusPath) {
       const normalized = normalizePath(focusPath);
       const state = this.deps.state;
-      let root = state.getFileTreeRoot();
-      if (!root) {
-        root = buildFileTreeFromNodes(state.getGraphNodes());
-        state.setFileTreeRoot(root);
-      }
       state.setReaderState({
         readerTreeFocusPath: normalized || null,
         currentSymbol: null,
         currentSnippetText: "",
         currentSnippetStartLine: 1
       });
-      if (normalized) {
-        expandFileTreeForFocus(state.getFileTreeCollapsed(), normalized, state.getFileNodesByPath());
-      }
-      const { html, rows } = renderFileTreeMarkup(
-        root,
-        normalized,
-        state.getFileTreeCollapsed()
-      );
-      state.setReaderFileTreeRows(rows);
+      const { html } = this.deps.fileTreeView.renderReaderTree(normalized);
       const treeHtml = html;
       this.deps.codeSurface.innerHTML = `
             <article class="code-card">
@@ -2363,6 +2447,7 @@ ${secondPart}`;
       __publicField(this, "api");
       __publicField(this, "currentMode", "hook");
       __publicField(this, "tocMode", "story");
+      __publicField(this, "fileTreeView");
       __publicField(this, "readerView");
       __publicField(this, "readerInteractions");
       __publicField(this, "readerController");
@@ -2376,12 +2461,7 @@ ${secondPart}`;
       __publicField(this, "tourStep", null);
       __publicField(this, "tourMode", "story");
       __publicField(this, "guidedAllowedNodeIds", null);
-      __publicField(this, "fileTreeRoot", null);
-      __publicField(this, "fileTreeFocusPath", null);
       __publicField(this, "readerTreeFocusPath", null);
-      __publicField(this, "fileTreeCollapsed", /* @__PURE__ */ new Set());
-      __publicField(this, "fileTreeRows", []);
-      __publicField(this, "readerFileTreeRows", []);
       __publicField(this, "graphNodes", []);
       __publicField(this, "graphEdges", []);
       __publicField(this, "nodeById", /* @__PURE__ */ new Map());
@@ -2408,6 +2488,8 @@ ${secondPart}`;
       __publicField(this, "currentSnippetText", "");
       __publicField(this, "currentSnippetStartLine", 1);
       __publicField(this, "clusterExpanded", /* @__PURE__ */ new Set());
+      __publicField(this, "clusterAutoExpanded", /* @__PURE__ */ new Set());
+      __publicField(this, "clusterFocusPath", null);
       __publicField(this, "tocDebounceTimer", null);
       __publicField(this, "tocDebounceDelay", 200);
       __publicField(this, "pendingChapterId", null);
@@ -2472,6 +2554,7 @@ ${secondPart}`;
       this.subdirInput = this.getElement("subdir-input");
       this.repoParams = this.buildRepoParams();
       this.api = createApiClient(this.repoParams);
+      this.fileTreeView = new FileTreeView(fileTreeViewDefaults);
       const setReaderState = (update) => {
         var _a, _b, _c, _d, _e, _f;
         if (Object.prototype.hasOwnProperty.call(update, "currentSymbol")) {
@@ -2527,7 +2610,7 @@ ${secondPart}`;
         },
         copySnippet: () => this.copySnippet(),
         jumpToInputLine: () => this.jumpToInputLine(),
-        toggleFileTreePath: (path) => this.toggleFileTreePath(path),
+        fileTreeView: this.fileTreeView,
         state: {
           getCurrentSymbol: () => this.currentSymbol,
           getCurrentSnippetText: () => this.currentSnippetText,
@@ -2547,15 +2630,7 @@ ${secondPart}`;
             this.currentFoldPath = path;
           },
           getGraphNodes: () => this.graphNodes,
-          getFileNodesByPath: () => this.fileNodesByPath,
-          getFileTreeRoot: () => this.fileTreeRoot,
-          setFileTreeRoot: (root) => {
-            this.fileTreeRoot = root;
-          },
-          getFileTreeCollapsed: () => this.fileTreeCollapsed,
-          setReaderFileTreeRows: (rows) => {
-            this.readerFileTreeRows = rows;
-          }
+          getFileNodesByPath: () => this.fileNodesByPath
         }
       });
       this.readerView = new ReaderView({
@@ -2855,15 +2930,13 @@ ${secondPart}`;
         const line = target.dataset.contextLine ? Number(target.dataset.contextLine) : void 0;
         this.handleContextLink(nodeId, filePath, line);
       });
-      this.narratorFileTree.addEventListener("click", (event) => {
-        const target = event.target.closest("[data-tree-toggle]");
-        if (!target) {
-          return;
-        }
-        const path = target.dataset.treeToggle;
-        if (path) {
-          this.toggleFileTreePath(path);
-        }
+      bindFileTreeEvents(this.narratorFileTree, {
+        onToggle: (path) => this.toggleFileTreePath(path),
+        onSelectFile: (path) => this.handleFileTreeFileSelection(path)
+      });
+      bindFileTreeEvents(this.codeSurface, {
+        onToggle: (path) => this.toggleFileTreePath(path),
+        onSelectFile: (path) => this.handleFileTreeFileSelection(path)
       });
       this.repoForm.addEventListener("submit", (event) => {
         event.preventDefault();
@@ -3322,7 +3395,20 @@ ${secondPart}`;
         });
       };
       const visitTree = (treeNode, parentFolderId) => {
-        const entries = Array.from(treeNode.children.values());
+        let entries = Array.from(treeNode.children.values());
+        const currentPath = treeNode.path;
+        if (currentPath) {
+          const currentFolderId = this.getFolderClusterId(currentPath);
+          const isUserExpanded = this.clusterExpanded.has(currentFolderId);
+          const isAutoExpanded = this.clusterAutoExpanded.has(currentFolderId);
+          const isFocusFolder = this.clusterFocusPath === currentPath;
+          if (isAutoExpanded && !isUserExpanded && !isFocusFolder) {
+            const focusChildName = this.getClusterFocusChildName(currentPath);
+            if (focusChildName) {
+              entries = entries.filter((entry) => entry.name === focusChildName);
+            }
+          }
+        }
         entries.sort((a, b) => {
           if (a.isFile !== b.isFile) {
             return a.isFile ? 1 : -1;
@@ -3361,7 +3447,7 @@ ${secondPart}`;
           if (parentFolderId) {
             addFolderEdge(parentFolderId, folderId);
           }
-          if (this.clusterExpanded.has(folderId)) {
+          if (this.isClusterFolderExpanded(folderId)) {
             visitTree(child, folderId);
           }
         });
@@ -3412,6 +3498,15 @@ ${secondPart}`;
           return visibleNodeIds.has(node.id) ? node.id : null;
         }
         const normalized = this.normalizePath(path);
+        if (this.clusterFocusPath && !this.isPathWithinFocus(normalized)) {
+          const divergencePath = this.getClusterFocusDivergencePath(normalized);
+          if (divergencePath) {
+            const divergenceId = this.getFolderClusterId(divergencePath);
+            if (visibleNodeIds.has(divergenceId)) {
+              return divergenceId;
+            }
+          }
+        }
         const fileNode = pathToFileNode.get(normalized);
         const fileId = fileNode == null ? void 0 : fileNode.id;
         const fileVisible = Boolean(fileId && visibleNodeIds.has(fileId));
@@ -3524,6 +3619,7 @@ ${secondPart}`;
         }
         this.fileNodesByPath.set(this.normalizePath(node.location.path), node);
       });
+      this.fileTreeView.setNodes(this.graphNodes, this.fileNodesByPath);
       if (this.currentScope === "full" || this.tourActive) {
         this.refreshFileTree();
       }
@@ -3637,6 +3733,10 @@ ${secondPart}`;
     getFolderClusterId(path) {
       return `cluster:folder:${path}`;
     }
+    // Checks whether a folder is expanded either by user action or auto-focus.
+    isClusterFolderExpanded(folderId) {
+      return this.clusterExpanded.has(folderId) || this.clusterAutoExpanded.has(folderId);
+    }
     findCollapsedFolderId(path) {
       const normalized = this.normalizePath(path);
       const parts = normalized.split("/").filter(Boolean);
@@ -3644,7 +3744,7 @@ ${secondPart}`;
       for (const part of parts.slice(0, -1)) {
         current = current ? `${current}/${part}` : part;
         const folderId = this.getFolderClusterId(current);
-        if (!this.clusterExpanded.has(folderId)) {
+        if (!this.isClusterFolderExpanded(folderId)) {
           return folderId;
         }
       }
@@ -3654,41 +3754,115 @@ ${secondPart}`;
       if (!this.narratorFileTree) {
         return;
       }
-      this.fileTreeRoot = buildFileTreeFromNodes(this.graphNodes);
-      this.renderFileTree(this.fileTreeFocusPath);
+      const { html } = this.fileTreeView.renderNarratorTree();
+      this.narratorFileTree.innerHTML = html;
     }
     renderFileTree(focusPath) {
       if (!this.narratorFileTree) {
         return;
       }
-      const normalizedFocus = focusPath ? this.normalizePath(focusPath) : "";
-      this.fileTreeFocusPath = normalizedFocus || null;
-      if (normalizedFocus) {
-        this.expandFileTreeForFocus(normalizedFocus);
-      }
-      const { html, rows } = renderFileTreeMarkup(
-        this.fileTreeRoot,
-        normalizedFocus,
-        this.fileTreeCollapsed
-      );
-      this.fileTreeRows = rows;
+      const { html } = this.fileTreeView.renderNarratorTree(focusPath);
       this.narratorFileTree.innerHTML = html;
     }
     toggleFileTreePath(path) {
-      toggleFileTreePath(this.fileTreeCollapsed, path);
-      this.renderFileTree(this.fileTreeFocusPath);
+      this.fileTreeView.toggle(path);
+      this.renderFileTree(this.fileTreeView.getNarratorFocusPath());
       if (this.readerTreeFocusPath) {
         this.readerController.showFileTree(this.readerTreeFocusPath);
       }
     }
-    expandFileTreePath(path) {
-      expandFileTreePath(this.fileTreeCollapsed, path);
+    // Loads a file from the file tree into the reader while keeping graph selection in sync.
+    handleFileTreeFileSelection(path) {
+      const normalized = this.normalizePath(path);
+      const fileNode = this.fileNodesByPath.get(normalized);
+      if (!fileNode) {
+        this.setCodeStatus("File not found in graph.");
+        return;
+      }
+      const folderPath = normalized.split("/").slice(0, -1).join("/");
+      this.setClusterFocusPath(folderPath);
+      if (this.graphLayoutMode === "cluster") {
+        this.refreshGraphView();
+      }
+      if (this.graphInstance) {
+        this.graphInstance.$("node:selected").unselect();
+        const fileElement = this.graphInstance.$id(fileNode.id);
+        if (fileElement && !fileElement.empty()) {
+          fileElement.select();
+        }
+      }
+      this.loadSymbolSnippet(fileNode, false).catch(() => {
+        this.readerController.render(fileNode);
+      });
+      this.renderFileTree(normalized);
     }
-    expandFileTreeForFocus(path) {
-      expandFileTreeForFocus(this.fileTreeCollapsed, path, this.fileNodesByPath);
+    // Marks a folder path for auto-expansion while remembering the focused folder scope.
+    setClusterFocusPath(path) {
+      const normalized = this.normalizePath(path);
+      this.clusterFocusPath = normalized || null;
+      this.clusterAutoExpanded.clear();
+      if (!normalized) {
+        return;
+      }
+      const parts = normalized.split("/").filter(Boolean);
+      let current = "";
+      for (const part of parts) {
+        current = current ? `${current}/${part}` : part;
+        const folderId = this.getFolderClusterId(current);
+        if (!this.clusterExpanded.has(folderId)) {
+          this.clusterAutoExpanded.add(folderId);
+        }
+      }
     }
-    expandFileTreeFolder(path) {
-      expandFileTreeFolder(this.fileTreeCollapsed, path);
+    // Checks whether a node path is inside the focused folder subtree.
+    isPathWithinFocus(path) {
+      if (!this.clusterFocusPath) {
+        return false;
+      }
+      const normalized = this.normalizePath(path);
+      if (normalized === this.clusterFocusPath) {
+        return true;
+      }
+      return normalized.startsWith(`${this.clusterFocusPath}/`);
+    }
+    // Returns the immediate focus child name for a folder so auto-expansion reveals only that branch.
+    getClusterFocusChildName(parentPath) {
+      var _a;
+      if (!this.clusterFocusPath) {
+        return null;
+      }
+      const normalizedParent = this.normalizePath(parentPath);
+      const focusParts = this.clusterFocusPath.split("/").filter(Boolean);
+      const parentParts = normalizedParent.split("/").filter(Boolean);
+      if (parentParts.length >= focusParts.length) {
+        return null;
+      }
+      for (let index = 0; index < parentParts.length; index += 1) {
+        if (parentParts[index] !== focusParts[index]) {
+          return null;
+        }
+      }
+      return (_a = focusParts[parentParts.length]) != null ? _a : null;
+    }
+    // Finds the closest shared ancestor between the focus path and a non-focus node path.
+    getClusterFocusDivergencePath(path) {
+      if (!this.clusterFocusPath) {
+        return null;
+      }
+      const focusParts = this.clusterFocusPath.split("/").filter(Boolean);
+      const targetParts = this.normalizePath(path).split("/").filter(Boolean);
+      const common = [];
+      const max = Math.min(focusParts.length, targetParts.length);
+      for (let index = 0; index < max; index += 1) {
+        if (focusParts[index] !== targetParts[index]) {
+          break;
+        }
+        common.push(focusParts[index]);
+      }
+      if (common.length === 0) {
+        return null;
+      }
+      return common.join("/");
     }
     getFileNodeForSymbol(symbol) {
       var _a, _b;
@@ -3788,8 +3962,9 @@ ${secondPart}`;
       return true;
     }
     toggleClusterExpansion(nodeId) {
-      if (this.clusterExpanded.has(nodeId)) {
+      if (this.clusterExpanded.has(nodeId) || this.clusterAutoExpanded.has(nodeId)) {
         this.clusterExpanded.delete(nodeId);
+        this.clusterAutoExpanded.delete(nodeId);
       } else {
         this.clusterExpanded.add(nodeId);
       }
