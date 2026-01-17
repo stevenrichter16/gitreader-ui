@@ -1744,7 +1744,7 @@
             var lineNumber = startLine + index;
             var isHighlighted = highlightSet.has(lineNumber);
             var classes = isHighlighted ? 'code-line is-highlight' : 'code-line';
-            return '<span class="' + classes + '" data-line="' + lineNumber + '"><span class="line-no">' + lineNumber + '</span>' + line + '</span>';
+            return '<span class="' + classes + '" data-line="' + lineNumber + '"><span class="line-no">' + lineNumber + '</span><span class="line-text">' + line + '</span></span>';
         }).join('\n');
     };
 

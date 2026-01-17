@@ -354,6 +354,10 @@ body {
     padding: 2px 6px;
 }
 
+.line-text {
+    min-width: 0;
+}
+
 .code-line.is-highlight {
     background: rgba(208, 120, 56, 0.2);
     border-radius: 8px;

@@ -21,6 +21,63 @@ TYPE_NODES = {
 }
 
 SWIFTUI_PROTOCOLS = {'View', 'App', 'Scene'}
+SWIFTUI_MODIFIERS = {
+    'accessibilityHint',
+    'accessibilityLabel',
+    'alert',
+    'animation',
+    'background',
+    'badge',
+    'bold',
+    'border',
+    'buttonStyle',
+    'clipShape',
+    'confirmationDialog',
+    'contextMenu',
+    'cornerRadius',
+    'environment',
+    'environmentObject',
+    'foregroundColor',
+    'foregroundStyle',
+    'font',
+    'fontWeight',
+    'frame',
+    'fullScreenCover',
+    'gesture',
+    'help',
+    'hidden',
+    'id',
+    'italic',
+    'keyboardShortcut',
+    'lineLimit',
+    'listStyle',
+    'mask',
+    'navigationBarTitle',
+    'navigationBarTitleDisplayMode',
+    'navigationDestination',
+    'navigationTitle',
+    'offset',
+    'onAppear',
+    'onDisappear',
+    'onLongPressGesture',
+    'onTapGesture',
+    'opacity',
+    'overlay',
+    'padding',
+    'pickerStyle',
+    'position',
+    'rotationEffect',
+    'safeAreaInset',
+    'scaleEffect',
+    'shadow',
+    'sheet',
+    'tabViewStyle',
+    'textFieldStyle',
+    'toggleStyle',
+    'toolbar',
+    'transition',
+    'underline',
+}
 
 
 def build_graph_swift(parsed_files: List[ParsedSwiftFile]) -> GraphResult:
@@ -60,6 +117,8 @@ def build_graph_swift(parsed_files: List[ParsedSwiftFile]) -> GraphResult:
             symbols_by_name,
         )
 
+    swiftui_types_by_module = _collect_swiftui_conformance(parsed_files)
+
     for parsed in parsed_files:
         _extract_imports(parsed, nodes, edges)
         _extract_inheritance(parsed, nodes, edges, types_by_module, types_by_name)
@@ -73,7 +132,7 @@ def build_graph_swift(parsed_files: List[ParsedSwiftFile]) -> GraphResult:
             symbols_by_name,
             types_by_name,
         )
-        _extract_swiftui_composition(parsed, nodes, edges, types_by_module)
+        _extract_swiftui_composition(parsed, nodes, edges, types_by_module, swiftui_types_by_module)
 
     return GraphResult(nodes=nodes, edges=edges, files=files)
 
@@ -309,12 +368,14 @@ def _extract_swiftui_composition(
     nodes: Dict[str, SymbolNode],
     edges: List[GraphEdge],
     types_by_module: Dict[str, Dict[str, str]],
+    swiftui_types_by_module: Dict[str, Set[str]],
 ) -> None:
     if not parsed.tree:
         return
     root = parsed.tree.root_node
     source_bytes = parsed.source.encode('utf-8')
     module_types = types_by_module.get(parsed.module, {})
+    module_swiftui_types = swiftui_types_by_module.get(parsed.module, set())
     for child in root.children:
         if child.type not in TYPE_NODES:
             continue
@@ -324,13 +385,13 @@ def _extract_swiftui_composition(
         type_id = module_types.get(type_name)
         if not type_id:
             continue
-        if not _is_swiftui_type(child, source_bytes):
+        if not _is_swiftui_type(child, source_bytes) and type_name not in module_swiftui_types:
             continue
         body_node = _find_swiftui_body(child, source_bytes)
         if not body_node:
             continue
-        view_names = _collect_swiftui_views(body_node, source_bytes)
-        if not view_names:
+        view_names, modifier_names = _collect_swiftui_views(body_node, source_bytes)
+        if not view_names and not modifier_names:
             continue
         for view_name in sorted(view_names):
             target_id = _ensure_external(nodes, view_name)
@@ -340,6 +401,32 @@ def _extract_swiftui_composition(
                 kind='contains',
                 confidence='low',
             ))
+        for modifier_name in sorted(modifier_names):
+            target_id = _ensure_external(nodes, f'modifier:{modifier_name}')
+            edges.append(GraphEdge(
+                source=type_id,
+                target=target_id,
+                kind='contains',
+                confidence='low',
+            ))
+
+
+def _collect_swiftui_conformance(parsed_files: List[ParsedSwiftFile]) -> Dict[str, Set[str]]:
+    swiftui_types_by_module: Dict[str, Set[str]] = {}
+    for parsed in parsed_files:
+        swiftui_types_by_module.setdefault(parsed.module, set())
+        if not parsed.tree:
+            continue
+        source_bytes = parsed.source.encode('utf-8')
+        for child in parsed.tree.root_node.children:
+            if child.type not in TYPE_NODES:
+                continue
+            type_name = _type_name(child, source_bytes)
+            if not type_name:
+                continue
+            if _is_swiftui_type(child, source_bytes):
+                swiftui_types_by_module[parsed.module].add(type_name)
+    return swiftui_types_by_module
 
 
 def _is_swiftui_type(node: object, source_bytes: bytes) -> bool:
@@ -372,8 +459,9 @@ def _find_swiftui_body(node: object, source_bytes: bytes) -> Optional[object]:
     return None
 
 
-def _collect_swiftui_views(node: object, source_bytes: bytes) -> Set[str]:
+def _collect_swiftui_views(node: object, source_bytes: bytes) -> Tuple[Set[str], Set[str]]:
     view_names: Set[str] = set()
+    modifier_names: Set[str] = set()
     stack = [node]
     while stack:
         current = stack.pop()
@@ -382,9 +470,12 @@ def _collect_swiftui_views(node: object, source_bytes: bytes) -> Set[str]:
             name = _swiftui_view_name(callee, source_bytes)
             if name:
                 view_names.add(name)
+            modifier = _swiftui_modifier_name(callee, source_bytes)
+            if modifier:
+                modifier_names.add(modifier)
         for child in getattr(current, "children", []) or []:
             stack.append(child)
-    return view_names
+    return view_names, modifier_names
 
 
 def _swiftui_view_name(callee: Optional[object], source_bytes: bytes) -> Optional[str]:
@@ -401,6 +492,48 @@ def _swiftui_view_name(callee: Optional[object], source_bytes: bytes) -> Optiona
         if prop_name[:1].isupper():
             return prop_name
     return None
+
+
+def _swiftui_modifier_name(callee: Optional[object], source_bytes: bytes) -> Optional[str]:
+    if not callee or callee.type != 'member_expression':
+        return None
+    prop = callee.child_by_field_name('name') or callee.child_by_field_name('property')
+    prop_name = _node_text(prop, source_bytes) if prop else ''
+    if not prop_name:
+        return None
+    if prop_name in SWIFTUI_MODIFIERS:
+        return prop_name
+    if not prop_name[:1].islower():
+        return None
+    candidates: List[object] = []
+    for field_name in ('expression', 'object', 'value', 'target', 'operand'):
+        base = callee.child_by_field_name(field_name)
+        if base:
+            candidates.append(base)
+    if not candidates:
+        for child in getattr(callee, "children", []) or []:
+            if prop and child == prop:
+                continue
+            candidates.append(child)
+    for base in candidates:
+        if _expression_contains_view_call(base, source_bytes):
+            return prop_name
+    return None
+
+
+def _expression_contains_view_call(node: Optional[object], source_bytes: bytes) -> bool:
+    if not node:
+        return False
+    stack = [node]
+    while stack:
+        current = stack.pop()
+        if getattr(current, "type", None) == 'function_call_expression':
+            callee = current.child_by_field_name('function') or current.child_by_field_name('called_expression')
+            if _swiftui_view_name(callee, source_bytes):
+                return True
+        for child in getattr(current, "children", []) or []:
+            stack.append(child)
+    return False
 
 
 def _contains_identifier(node: object, name: str, source_bytes: bytes) -> bool:
