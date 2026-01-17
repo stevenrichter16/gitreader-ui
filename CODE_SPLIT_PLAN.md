@@ -75,12 +75,16 @@ app/static/gitreader/
       dom.ts             # getElement, query helpers
       strings.ts         # escapeHtml, normalizePath
       format.ts          # formatLocation, labels
-    reader.ts            # reader rendering + actions
-    fileTree.ts          # file tree model + render
-    graphView.ts         # graph rendering + controls
-    narrator.ts          # narrator fetch/render
-    tour.ts              # tour state + UI
-    toc.ts               # TOC + routes
+    ui/
+      reader.ts          # reader rendering + actions
+      fileTree.ts        # file tree model + render
+      fileTreeView.ts    # tree state + narrator/reader render helpers
+      fileTreeEvents.ts  # file tree event wiring (toggles, file clicks)
+      fileTreeController.ts # narrator file-tree DOM wrapper
+      graphView.ts       # graph rendering + controls
+      narrator.ts        # narrator fetch/render
+      tour.ts            # tour state + UI
+      toc.ts             # TOC + routes
 ```
 
 ## Phase 0 — Prep
@@ -128,19 +132,20 @@ Create `modules/reader.ts`.
 - Folding
 - File System button
 
-## Phase 3 — File Tree Module
-Create `modules/fileTree.ts`.
+## Phase 3 — File Tree Modules
+Split file tree responsibilities across dedicated modules:
 
 **Move**
-- tree build from nodes
-- focus highlight, collapse state
-- render for narrator + reader
+- `fileTree.ts`: tree build + render + focus highlight
+- `fileTreeView.ts`: shared collapse/focus state + narrator/reader render helpers
+- `fileTreeEvents.ts`: DOM event wiring for toggles + file clicks
+- `fileTreeController.ts`: narrator DOM wrapper (render/refresh)
 
 **Module API**
-- `setNodes(nodes)`
-- `renderNarratorTree(focusPath)`
-- `renderReaderTree(focusPath)`
-- `toggle(path)`
+- `fileTreeView.setNodes(nodes)`
+- `fileTreeView.renderNarratorTree(focusPath)`
+- `fileTreeView.renderReaderTree(focusPath)`
+- `fileTreeView.toggle(path)`
 
 **Validation**
 - File tree renders, expands, highlights focus

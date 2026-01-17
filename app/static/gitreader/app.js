@@ -243,6 +243,24 @@
     return `<ul class="file-tree-list">${items.join("")}</ul>`;
   }
 
+  // app/static/gitreader/modules/ui/fileTreeController.ts
+  var FileTreeController = class {
+    // Captures the view + container so GitReaderApp can call refresh/render as needed.
+    constructor(deps) {
+      this.deps = deps;
+    }
+    // Re-renders the narrator file tree using the existing focus path.
+    refresh() {
+      const { html } = this.deps.fileTreeView.renderNarratorTree();
+      this.deps.narratorContainer.innerHTML = html;
+    }
+    // Renders the narrator file tree for an explicit focus path, used after selections.
+    render(focusPath) {
+      const { html } = this.deps.fileTreeView.renderNarratorTree(focusPath);
+      this.deps.narratorContainer.innerHTML = html;
+    }
+  };
+
   // app/static/gitreader/modules/ui/fileTreeEvents.ts
   var boundContainers = /* @__PURE__ */ new WeakSet();
   function bindFileTreeEvents(container, handlers) {
@@ -2448,6 +2466,7 @@ ${secondPart}`;
       __publicField(this, "currentMode", "hook");
       __publicField(this, "tocMode", "story");
       __publicField(this, "fileTreeView");
+      __publicField(this, "fileTreeController");
       __publicField(this, "readerView");
       __publicField(this, "readerInteractions");
       __publicField(this, "readerController");
@@ -2555,6 +2574,10 @@ ${secondPart}`;
       this.repoParams = this.buildRepoParams();
       this.api = createApiClient(this.repoParams);
       this.fileTreeView = new FileTreeView(fileTreeViewDefaults);
+      this.fileTreeController = new FileTreeController({
+        fileTreeView: this.fileTreeView,
+        narratorContainer: this.narratorFileTree
+      });
       const setReaderState = (update) => {
         var _a, _b, _c, _d, _e, _f;
         if (Object.prototype.hasOwnProperty.call(update, "currentSymbol")) {
@@ -2583,7 +2606,7 @@ ${secondPart}`;
         getHighlightLanguage: (path) => this.getHighlightLanguage(path),
         isModifierClick: (event) => this.isModifierClick(event),
         setCodeStatus: (message) => this.setCodeStatus(message),
-        renderFileTree: (focusPath) => this.renderFileTree(focusPath),
+        renderFileTree: (focusPath) => this.fileTreeController.render(focusPath),
         updateSnippetModeUi: () => this.readerView.updateSnippetModeUi(),
         jumpToSymbol: (symbol) => this.jumpToSymbol(symbol),
         highlightSymbolInFile: (fileNode, symbol) => this.highlightSymbolInFile(fileNode, symbol),
@@ -2773,7 +2796,7 @@ ${secondPart}`;
           return;
         }
         this.readerController.showFileTree(path);
-        this.renderFileTree(path);
+        this.fileTreeController.render(path);
       });
       this.graphLayoutButtons.forEach((button) => {
         button.addEventListener("click", () => {
@@ -3621,7 +3644,7 @@ ${secondPart}`;
       });
       this.fileTreeView.setNodes(this.graphNodes, this.fileNodesByPath);
       if (this.currentScope === "full" || this.tourActive) {
-        this.refreshFileTree();
+        this.fileTreeController.refresh();
       }
     }
     async loadSymbolSnippet(symbol, shouldNarrate = true) {
@@ -3750,23 +3773,9 @@ ${secondPart}`;
       }
       return null;
     }
-    refreshFileTree() {
-      if (!this.narratorFileTree) {
-        return;
-      }
-      const { html } = this.fileTreeView.renderNarratorTree();
-      this.narratorFileTree.innerHTML = html;
-    }
-    renderFileTree(focusPath) {
-      if (!this.narratorFileTree) {
-        return;
-      }
-      const { html } = this.fileTreeView.renderNarratorTree(focusPath);
-      this.narratorFileTree.innerHTML = html;
-    }
     toggleFileTreePath(path) {
       this.fileTreeView.toggle(path);
-      this.renderFileTree(this.fileTreeView.getNarratorFocusPath());
+      this.fileTreeController.render(this.fileTreeView.getNarratorFocusPath());
       if (this.readerTreeFocusPath) {
         this.readerController.showFileTree(this.readerTreeFocusPath);
       }
@@ -3794,7 +3803,7 @@ ${secondPart}`;
       this.loadSymbolSnippet(fileNode, false).catch(() => {
         this.readerController.render(fileNode);
       });
-      this.renderFileTree(normalized);
+      this.fileTreeController.render(normalized);
     }
     // Marks a folder path for auto-expansion while remembering the focused folder scope.
     setClusterFocusPath(path) {
@@ -3955,7 +3964,7 @@ ${secondPart}`;
         const folderPath = (_a = symbol.location) == null ? void 0 : _a.path;
         if (folderPath) {
           this.readerController.showFileTree(folderPath);
-          this.renderFileTree(folderPath);
+          this.fileTreeController.render(folderPath);
           this.renderFileTreeNarrator();
         }
       }
@@ -4850,7 +4859,7 @@ ${secondPart}`;
         this.applyGuidedToc();
         this.applyGuidedCodeFocus();
         this.applyGraphFilters();
-        this.renderFileTree(null);
+        this.fileTreeController.render(null);
         return;
       }
       const allowed = new Set((_a = this.tourStep.allowed_node_ids) != null ? _a : []);
@@ -4866,7 +4875,7 @@ ${secondPart}`;
       this.applyGuidedToc();
       this.applyGraphFilters();
       this.applyGuidedCodeFocus();
-      this.renderFileTree((_d = (_c = this.tourStep.focus) == null ? void 0 : _c.file_path) != null ? _d : null);
+      this.fileTreeController.render((_d = (_c = this.tourStep.focus) == null ? void 0 : _c.file_path) != null ? _d : null);
     }
     applyGuidedToc() {
       const items = Array.from(this.tocList.querySelectorAll(".toc-item"));

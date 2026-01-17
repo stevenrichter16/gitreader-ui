@@ -1,5 +1,6 @@
 import { createApiClient, type ApiClient } from './modules/data/api';
 import { buildFileTreeFromNodes, countFilesInTree, type FileTreeNode } from './modules/ui/fileTree';
+import { FileTreeController } from './modules/ui/fileTreeController';
 import { bindFileTreeEvents } from './modules/ui/fileTreeEvents';
 import { bindGraphEvents } from './modules/ui/graphEvents';
 import { buildGraphTooltipHtml, formatGraphNodeLabel } from './modules/ui/graphLabels';
@@ -101,6 +102,7 @@ class GitReaderApp {
     private currentMode: NarrationMode = 'hook';
     private tocMode: TocMode = 'story';
     private fileTreeView: FileTreeView;
+    private fileTreeController: FileTreeController;
     private readerView: ReaderView;
     private readerInteractions: ReaderInteractions;
     private readerController: ReaderController;
@@ -210,6 +212,10 @@ class GitReaderApp {
         this.repoParams = this.buildRepoParams();
         this.api = createApiClient(this.repoParams);
         this.fileTreeView = new FileTreeView(fileTreeViewDefaults);
+        this.fileTreeController = new FileTreeController({
+            fileTreeView: this.fileTreeView,
+            narratorContainer: this.narratorFileTree,
+        });
         const setReaderState = (update: ReaderStateUpdate): void => {
             if (Object.prototype.hasOwnProperty.call(update, 'currentSymbol')) {
                 this.currentSymbol = update.currentSymbol ?? null;
@@ -237,7 +243,7 @@ class GitReaderApp {
             getHighlightLanguage: (path) => this.getHighlightLanguage(path),
             isModifierClick: (event) => this.isModifierClick(event),
             setCodeStatus: (message) => this.setCodeStatus(message),
-            renderFileTree: (focusPath) => this.renderFileTree(focusPath),
+            renderFileTree: (focusPath) => this.fileTreeController.render(focusPath),
             updateSnippetModeUi: () => this.readerView.updateSnippetModeUi(),
             jumpToSymbol: (symbol) => this.jumpToSymbol(symbol),
             highlightSymbolInFile: (fileNode, symbol) => this.highlightSymbolInFile(fileNode, symbol),
@@ -437,7 +443,7 @@ class GitReaderApp {
                 return;
             }
             this.readerController.showFileTree(path);
-            this.renderFileTree(path);
+            this.fileTreeController.render(path);
         });
 
         this.graphLayoutButtons.forEach((button) => {
@@ -1323,7 +1329,7 @@ class GitReaderApp {
         });
         this.fileTreeView.setNodes(this.graphNodes, this.fileNodesByPath);
         if (this.currentScope === 'full' || this.tourActive) {
-            this.refreshFileTree();
+            this.fileTreeController.refresh();
         }
     }
 
@@ -1466,25 +1472,9 @@ class GitReaderApp {
         return null;
     }
 
-    private refreshFileTree(): void {
-        if (!this.narratorFileTree) {
-            return;
-        }
-        const { html } = this.fileTreeView.renderNarratorTree();
-        this.narratorFileTree.innerHTML = html;
-    }
-
-    private renderFileTree(focusPath?: string | null): void {
-        if (!this.narratorFileTree) {
-            return;
-        }
-        const { html } = this.fileTreeView.renderNarratorTree(focusPath);
-        this.narratorFileTree.innerHTML = html;
-    }
-
     private toggleFileTreePath(path: string): void {
         this.fileTreeView.toggle(path);
-        this.renderFileTree(this.fileTreeView.getNarratorFocusPath());
+        this.fileTreeController.render(this.fileTreeView.getNarratorFocusPath());
         if (this.readerTreeFocusPath) {
             this.readerController.showFileTree(this.readerTreeFocusPath);
         }
@@ -1513,7 +1503,7 @@ class GitReaderApp {
         this.loadSymbolSnippet(fileNode, false).catch(() => {
             this.readerController.render(fileNode);
         });
-        this.renderFileTree(normalized);
+        this.fileTreeController.render(normalized);
     }
 
     // Marks a folder path for auto-expansion while remembering the focused folder scope.
@@ -1680,7 +1670,7 @@ class GitReaderApp {
             const folderPath = symbol.location?.path;
             if (folderPath) {
                 this.readerController.showFileTree(folderPath);
-                this.renderFileTree(folderPath);
+                this.fileTreeController.render(folderPath);
                 this.renderFileTreeNarrator();
             }
         }
@@ -2630,7 +2620,7 @@ class GitReaderApp {
             this.applyGuidedToc();
             this.applyGuidedCodeFocus();
             this.applyGraphFilters();
-            this.renderFileTree(null);
+            this.fileTreeController.render(null);
             return;
         }
         const allowed = new Set(this.tourStep.allowed_node_ids ?? []);
@@ -2646,7 +2636,7 @@ class GitReaderApp {
         this.applyGuidedToc();
         this.applyGraphFilters();
         this.applyGuidedCodeFocus();
-        this.renderFileTree(this.tourStep.focus?.file_path ?? null);
+        this.fileTreeController.render(this.tourStep.focus?.file_path ?? null);
     }
 
     private applyGuidedToc(): void {
