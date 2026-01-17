@@ -4,7 +4,7 @@ type TocMode = 'story' | 'tree' | 'routes';
 
 type TourMode = 'story' | 'teacher' | 'expert';
 
-type SymbolKind = 'file' | 'class' | 'function' | 'method' | 'external' | 'blueprint';
+type SymbolKind = 'file' | 'folder' | 'class' | 'function' | 'method' | 'external' | 'blueprint';
 
 type EdgeKind = 'imports' | 'calls' | 'inherits' | 'contains' | 'blueprint';
 
@@ -302,10 +302,12 @@ class GitReaderApp {
     private guidedAllowedNodeIds: Set<string> | null = null;
     private fileTreeRoot: FileTreeNode | null = null;
     private fileTreeFocusPath: string | null = null;
+    private readerTreeFocusPath: string | null = null;
     private fileTreeCollapsed: Set<string> = new Set();
     private graphNodes: SymbolNode[] = [];
     private graphEdges: GraphEdge[] = [];
     private nodeById: Map<string, SymbolNode> = new Map();
+    private displayNodeById: Map<string, SymbolNode> = new Map();
     private fileNodesByPath: Map<string, SymbolNode> = new Map();
     private snippetCache: Map<string, SymbolSnippetResponse> = new Map();
     private graphCache: Map<string, ApiGraphResponse> = new Map();
@@ -326,6 +328,8 @@ class GitReaderApp {
     private focusedNodeId: string | null = null;
     private currentSymbol: SymbolNode | null = null;
     private currentSnippetText = '';
+    private currentSnippetStartLine = 1;
+    private clusterExpanded: Set<string> = new Set();
     private tocDebounceTimer: number | null = null;
     private tocDebounceDelay = 200;
     private pendingChapterId: string | null = null;
@@ -333,6 +337,11 @@ class GitReaderApp {
     private graphNodeCapStep = 200;
     private labelZoomThreshold = 0.65;
     private labelLineLength = 18;
+    private lastTapNodeId: string | null = null;
+    private lastTapAt = 0;
+    private doubleTapDelay = 320;
+    private importModal: HTMLElement | null = null;
+    private importModalMessage: HTMLElement | null = null;
 
     constructor() {
         this.tocList = this.getElement('toc-list');
@@ -562,7 +571,11 @@ class GitReaderApp {
                 if (filter === 'external') {
                     this.showExternalNodes = !this.showExternalNodes;
                     this.updateGraphControls();
-                    this.applyGraphFilters();
+                    if (this.graphLayoutMode === 'cluster') {
+                        this.refreshGraphView();
+                    } else {
+                        this.applyGraphFilters();
+                    }
                 }
             });
         });
@@ -659,6 +672,14 @@ class GitReaderApp {
 
         this.codeSurface.addEventListener('click', (event) => {
             const target = event.target as HTMLElement;
+            const treeToggle = target.closest<HTMLElement>('[data-tree-toggle]');
+            if (treeToggle) {
+                const path = treeToggle.dataset.treeToggle;
+                if (path) {
+                    this.toggleFileTreePath(path);
+                }
+                return;
+            }
             const actionTarget = target.closest<HTMLElement>('[data-reader-action]');
             if (actionTarget) {
                 const action = actionTarget.dataset.readerAction;
@@ -673,7 +694,11 @@ class GitReaderApp {
             if (importTarget) {
                 const importName = importTarget.dataset.importName;
                 if (importName) {
-                    this.highlightImportUsage(importName);
+                    if (this.isModifierClick(event as MouseEvent)) {
+                        this.handleImportJump(importName, importTarget.closest<HTMLElement>('.code-line'));
+                    } else {
+                        this.highlightImportUsage(importName);
+                    }
                 }
                 return;
             }
@@ -681,7 +706,11 @@ class GitReaderApp {
             if (importLine) {
                 const imports = (importLine.dataset.imports || '').split(',').map((value) => value.trim()).filter(Boolean);
                 if (imports.length > 0) {
-                    this.highlightImportUsage(imports[0]);
+                    if (this.isModifierClick(event as MouseEvent)) {
+                        this.handleImportJump(imports[0], importLine);
+                    } else {
+                        this.highlightImportUsage(imports[0]);
+                    }
                 }
             }
         });
@@ -1081,6 +1110,9 @@ class GitReaderApp {
     }
 
     private buildGraphView(nodes: SymbolNode[], edges: GraphEdge[], scope: string): GraphView {
+        if (this.graphLayoutMode === 'cluster') {
+            return this.buildClusterView(nodes, edges);
+        }
         const totalNodes = nodes.length;
         const cap = this.getNodeCapForScope(scope, totalNodes);
         if (cap >= totalNodes) {
@@ -1165,6 +1197,201 @@ class GitReaderApp {
         };
     }
 
+    private buildClusterView(nodes: SymbolNode[], edges: GraphEdge[]): GraphView {
+        const totalNodes = nodes.length;
+        const fileNodes = nodes.filter((node) => node.kind === 'file' && node.location?.path);
+        if (fileNodes.length === 0) {
+            return {
+                nodes,
+                edges,
+                totalNodes,
+                visibleNodes: nodes.length,
+                isCapped: false,
+            };
+        }
+        const fileTree = this.buildFileTreeFromNodes(fileNodes);
+        const pathToFileNode = new Map<string, SymbolNode>();
+        const filePathById = new Map<string, string>();
+        fileNodes.forEach((node) => {
+            const normalized = this.normalizePath(node.location?.path || '');
+            if (!normalized) {
+                return;
+            }
+            pathToFileNode.set(normalized, node);
+            filePathById.set(node.id, normalized);
+        });
+        const symbolsByFile = new Map<string, SymbolNode[]>();
+        nodes.forEach((node) => {
+            if (node.kind === 'file' || node.kind === 'external' || !node.location?.path) {
+                return;
+            }
+            const normalized = this.normalizePath(node.location.path);
+            const list = symbolsByFile.get(normalized) ?? [];
+            list.push(node);
+            symbolsByFile.set(normalized, list);
+        });
+        const visibleNodes: SymbolNode[] = [];
+        const visibleNodeIds = new Set<string>();
+        const visibleFileIds = new Set<string>();
+        const folderEdges: GraphEdge[] = [];
+        const addNode = (node: SymbolNode) => {
+            if (visibleNodeIds.has(node.id)) {
+                return;
+            }
+            visibleNodes.push(node);
+            visibleNodeIds.add(node.id);
+        };
+        const addFolderEdge = (source: string, target: string) => {
+            folderEdges.push({
+                source,
+                target,
+                kind: 'contains',
+                confidence: 'low',
+            });
+        };
+        const visitTree = (treeNode: FileTreeNode, parentFolderId: string | null) => {
+            const entries = Array.from(treeNode.children.values());
+            entries.sort((a, b) => {
+                if (a.isFile !== b.isFile) {
+                    return a.isFile ? 1 : -1;
+                }
+                return a.name.localeCompare(b.name);
+            });
+            entries.forEach((child) => {
+                if (child.isFile) {
+                    const fileNode = pathToFileNode.get(child.path);
+                    if (!fileNode) {
+                        return;
+                    }
+                    addNode(fileNode);
+                    visibleFileIds.add(fileNode.id);
+                    if (parentFolderId) {
+                        addFolderEdge(parentFolderId, fileNode.id);
+                    }
+                    return;
+                }
+                const folderId = this.getFolderClusterId(child.path);
+                const fileCount = this.countFilesInTree(child);
+                const folderNode: SymbolNode = {
+                    id: folderId,
+                    name: `(${fileCount} files) ${child.name}`,
+                    kind: 'folder',
+                    summary: '',
+                    location: {
+                        path: child.path,
+                        start_line: 0,
+                        end_line: 0,
+                        start_col: 0,
+                        end_col: 0,
+                    },
+                };
+                addNode(folderNode);
+                if (parentFolderId) {
+                    addFolderEdge(parentFolderId, folderId);
+                }
+                if (this.clusterExpanded.has(folderId)) {
+                    visitTree(child, folderId);
+                }
+            });
+        };
+        visitTree(fileTree, null);
+
+        if (this.showExternalNodes) {
+            nodes.forEach((node) => {
+                if (node.kind === 'external') {
+                    addNode(node);
+                }
+            });
+        }
+
+        visibleFileIds.forEach((fileId) => {
+            if (!this.clusterExpanded.has(fileId)) {
+                return;
+            }
+            const path = filePathById.get(fileId);
+            if (!path) {
+                return;
+            }
+            const children = symbolsByFile.get(path);
+            if (!children) {
+                return;
+            }
+            children.forEach((child) => addNode(child));
+        });
+
+        const nodeMap = new Map(nodes.map((node) => [node.id, node]));
+        const edgeMap = new Map<string, GraphEdge>();
+        const confidenceRank: Record<EdgeConfidence, number> = { low: 0, medium: 1, high: 2 };
+        const addEdge = (source: string, target: string, kind: EdgeKind, confidence: EdgeConfidence) => {
+            const key = `${source}:${target}:${kind}`;
+            const existing = edgeMap.get(key);
+            if (!existing) {
+                edgeMap.set(key, { source, target, kind, confidence });
+                return;
+            }
+            if (confidenceRank[confidence] > confidenceRank[existing.confidence]) {
+                existing.confidence = confidence;
+            }
+        };
+        const resolveRepresentative = (node: SymbolNode): string | null => {
+            if (node.kind === 'external') {
+                return this.showExternalNodes ? node.id : null;
+            }
+            const path = node.location?.path;
+            if (!path) {
+                return visibleNodeIds.has(node.id) ? node.id : null;
+            }
+            const normalized = this.normalizePath(path);
+            const fileNode = pathToFileNode.get(normalized);
+            const fileId = fileNode?.id;
+            const fileVisible = Boolean(fileId && visibleNodeIds.has(fileId));
+            if (node.kind === 'file') {
+                if (fileVisible && fileId) {
+                    return fileId;
+                }
+                const folderId = this.findCollapsedFolderId(normalized);
+                if (folderId && visibleNodeIds.has(folderId)) {
+                    return folderId;
+                }
+                return fileId ?? null;
+            }
+            if (fileVisible && fileId) {
+                if (this.clusterExpanded.has(fileId) && visibleNodeIds.has(node.id)) {
+                    return node.id;
+                }
+                return fileId;
+            }
+            const folderId = this.findCollapsedFolderId(normalized);
+            if (folderId && visibleNodeIds.has(folderId)) {
+                return folderId;
+            }
+            return fileId ?? null;
+        };
+
+        edges.forEach((edge) => {
+            const sourceNode = nodeMap.get(edge.source);
+            const targetNode = nodeMap.get(edge.target);
+            if (!sourceNode || !targetNode) {
+                return;
+            }
+            const sourceRep = resolveRepresentative(sourceNode);
+            const targetRep = resolveRepresentative(targetNode);
+            if (!sourceRep || !targetRep || sourceRep === targetRep) {
+                return;
+            }
+            addEdge(sourceRep, targetRep, edge.kind, edge.confidence);
+        });
+        folderEdges.forEach((edge) => addEdge(edge.source, edge.target, edge.kind, edge.confidence));
+
+        return {
+            nodes: visibleNodes,
+            edges: Array.from(edgeMap.values()),
+            totalNodes,
+            visibleNodes: visibleNodes.length,
+            isCapped: false,
+        };
+    }
+
     private updateGraphNodeStatus(graphView: GraphView): void {
         if (graphView.totalNodes === 0) {
             this.graphNodeStatus.textContent = '';
@@ -1175,6 +1402,12 @@ class GitReaderApp {
             this.graphNodeStatus.textContent = `Guided view: ${graphView.visibleNodes}/${graphView.totalNodes}`;
             this.graphRevealButton.disabled = true;
             this.graphRevealButton.textContent = 'Guided';
+            return;
+        }
+        if (this.graphLayoutMode === 'cluster') {
+            this.graphNodeStatus.textContent = `Cluster view: ${graphView.visibleNodes} groups from ${graphView.totalNodes}`;
+            this.graphRevealButton.disabled = true;
+            this.graphRevealButton.textContent = 'Show more';
             return;
         }
         if (!graphView.isCapped) {
@@ -1276,7 +1509,7 @@ class GitReaderApp {
         if (!symbol.id) {
             return false;
         }
-        if (symbol.kind === 'external') {
+        if (symbol.kind === 'external' || symbol.kind === 'folder') {
             return false;
         }
         return Boolean(symbol.location && symbol.location.path);
@@ -1310,7 +1543,7 @@ class GitReaderApp {
         if (nodes.length === 0) {
             return this.fallbackSymbol();
         }
-        const priority: SymbolKind[] = ['function', 'method', 'class', 'file', 'blueprint', 'external'];
+        const priority: SymbolKind[] = ['function', 'method', 'class', 'file', 'folder', 'blueprint', 'external'];
         for (const kind of priority) {
             const match = nodes.find((node) => node.kind === kind);
             if (match) {
@@ -1338,6 +1571,39 @@ class GitReaderApp {
 
     private normalizePath(path: string): string {
         return path.replace(/\\/g, '/');
+    }
+
+    private isReaderVisible(): boolean {
+        return this.workspace.dataset.layout !== 'canvas';
+    }
+
+    private getFolderClusterId(path: string): string {
+        return `cluster:folder:${path}`;
+    }
+
+    private findCollapsedFolderId(path: string): string | null {
+        const normalized = this.normalizePath(path);
+        const parts = normalized.split('/').filter(Boolean);
+        let current = '';
+        for (const part of parts.slice(0, -1)) {
+            current = current ? `${current}/${part}` : part;
+            const folderId = this.getFolderClusterId(current);
+            if (!this.clusterExpanded.has(folderId)) {
+                return folderId;
+            }
+        }
+        return null;
+    }
+
+    private countFilesInTree(node: FileTreeNode): number {
+        if (node.isFile) {
+            return 1;
+        }
+        let count = 0;
+        node.children.forEach((child) => {
+            count += this.countFilesInTree(child);
+        });
+        return count;
     }
 
     private refreshFileTree(): void {
@@ -1391,22 +1657,8 @@ class GitReaderApp {
         }
         const normalizedFocus = focusPath ? this.normalizePath(focusPath) : '';
         this.fileTreeFocusPath = normalizedFocus || null;
-        if (normalizedFocus) {
-            this.expandFileTreePath(normalizedFocus);
-        }
-        if (!this.fileTreeRoot || this.fileTreeRoot.children.size === 0) {
-            this.narratorFileTree.innerHTML = '<p class="file-tree-empty">No files loaded yet.</p>';
-            return;
-        }
-        const focusParentPath = this.getParentPath(normalizedFocus);
-        const collapsedFocusParents = this.getCollapsedFocusParents(normalizedFocus);
-        const treeHtml = this.renderFileTreeNode(
-            this.fileTreeRoot,
-            normalizedFocus,
-            focusParentPath,
-            collapsedFocusParents,
-        );
-        this.narratorFileTree.innerHTML = treeHtml || '<p class="file-tree-empty">No files loaded yet.</p>';
+        const treeHtml = this.buildFileTreeMarkup(normalizedFocus);
+        this.narratorFileTree.innerHTML = treeHtml;
     }
 
     private renderFileTreeNode(
@@ -1426,11 +1678,13 @@ class GitReaderApp {
             return a.name.localeCompare(b.name);
         });
         const items = entries.map((child) => {
-            const isFocus = child.isFile && focusPath && child.path === focusPath;
+            const isFocus = focusPath && child.path === focusPath;
+            const isFocusFile = child.isFile && isFocus;
+            const isFocusDir = !child.isFile && isFocus;
             const isFocusParent = !child.isFile && focusParentPath && child.path === focusParentPath;
             if (child.isFile) {
                 return `
-                    <li class="file-tree-item${isFocus ? ' is-focus' : ''}">
+                    <li class="file-tree-item${isFocusFile ? ' is-focus' : ''}">
                         <span class="file-tree-name">${this.escapeHtml(child.name)}</span>
                     </li>
                 `;
@@ -1444,7 +1698,7 @@ class GitReaderApp {
                 collapsedFocusParents,
             );
             return `
-                <li class="file-tree-item is-dir${isCollapsed ? ' is-collapsed' : ''}${isCollapsedFocusParent ? ' is-focus' : ''}">
+                <li class="file-tree-item is-dir${isCollapsed ? ' is-collapsed' : ''}${isFocusDir || isCollapsedFocusParent ? ' is-focus' : ''}">
                     <button class="file-tree-toggle" type="button" data-tree-toggle="${this.escapeHtml(child.path)}">
                         <span class="file-tree-caret"></span>
                         <span class="file-tree-name">${this.escapeHtml(child.name)}/</span>
@@ -1456,6 +1710,25 @@ class GitReaderApp {
         return `<ul class="file-tree-list">${items.join('')}</ul>`;
     }
 
+    private buildFileTreeMarkup(focusPath?: string | null): string {
+        const normalizedFocus = focusPath ? this.normalizePath(focusPath) : '';
+        if (normalizedFocus) {
+            this.expandFileTreeForFocus(normalizedFocus);
+        }
+        if (!this.fileTreeRoot || this.fileTreeRoot.children.size === 0) {
+            return '<p class="file-tree-empty">No files loaded yet.</p>';
+        }
+        const focusParentPath = this.getParentPath(normalizedFocus);
+        const collapsedFocusParents = this.getCollapsedFocusParents(normalizedFocus);
+        const treeHtml = this.renderFileTreeNode(
+            this.fileTreeRoot,
+            normalizedFocus,
+            focusParentPath,
+            collapsedFocusParents,
+        );
+        return treeHtml || '<p class="file-tree-empty">No files loaded yet.</p>';
+    }
+
     private toggleFileTreePath(path: string): void {
         if (this.fileTreeCollapsed.has(path)) {
             this.fileTreeCollapsed.delete(path);
@@ -1463,6 +1736,9 @@ class GitReaderApp {
             this.fileTreeCollapsed.add(path);
         }
         this.renderFileTree(this.fileTreeFocusPath);
+        if (this.readerTreeFocusPath) {
+            this.renderReaderFileTree(this.readerTreeFocusPath);
+        }
     }
 
     private expandFileTreePath(path: string): void {
@@ -1474,6 +1750,24 @@ class GitReaderApp {
             if (this.fileTreeCollapsed.has(current)) {
                 break;
             }
+            this.fileTreeCollapsed.delete(current);
+        }
+    }
+
+    private expandFileTreeForFocus(path: string): void {
+        if (this.fileNodesByPath.has(path)) {
+            this.expandFileTreePath(path);
+            return;
+        }
+        this.expandFileTreeFolder(path);
+    }
+
+    private expandFileTreeFolder(path: string): void {
+        const normalized = this.normalizePath(path);
+        const parts = normalized.split('/').filter(Boolean);
+        let current = '';
+        for (const part of parts) {
+            current = current ? `${current}/${part}` : part;
             this.fileTreeCollapsed.delete(current);
         }
     }
@@ -1571,6 +1865,68 @@ class GitReaderApp {
         return true;
     }
 
+    private handleClusterNodeToggle(symbol: SymbolNode, event?: MouseEvent): boolean {
+        if (symbol.kind === 'folder') {
+            this.toggleClusterExpansion(symbol.id);
+            return true;
+        }
+        if (symbol.kind !== 'file') {
+            return false;
+        }
+        if (this.isModifierClick(event)) {
+            return false;
+        }
+        if (!symbol.location?.path) {
+            return false;
+        }
+        if (!this.fileHasClusterChildren(symbol)) {
+            return false;
+        }
+        this.toggleClusterExpansion(symbol.id);
+        return true;
+    }
+
+    private handleClusterFolderSingleClick(symbol: SymbolNode): boolean {
+        if (symbol.kind !== 'folder') {
+            return false;
+        }
+        if (this.isReaderVisible()) {
+            const folderPath = symbol.location?.path;
+            if (folderPath) {
+                this.renderReaderFileTree(folderPath);
+                this.renderFileTree(folderPath);
+                this.renderFileTreeNarrator();
+            }
+        }
+        return true;
+    }
+
+    private toggleClusterExpansion(nodeId: string): void {
+        if (this.clusterExpanded.has(nodeId)) {
+            this.clusterExpanded.delete(nodeId);
+        } else {
+            this.clusterExpanded.add(nodeId);
+        }
+        this.refreshGraphView();
+    }
+
+    private fileHasClusterChildren(fileNode: SymbolNode): boolean {
+        const path = fileNode.location?.path;
+        if (!path) {
+            return false;
+        }
+        const normalized = this.normalizePath(path);
+        return this.graphNodes.some((node) => {
+            if (node.kind === 'file' || node.kind === 'external') {
+                return false;
+            }
+            if (!node.location?.path) {
+                return false;
+            }
+            return this.normalizePath(node.location.path) === normalized;
+        });
+    }
+
     private applyFocusHighlight(symbol: SymbolNode): void {
         const start = symbol.location?.start_line ?? 0;
         const end = symbol.location?.end_line ?? start;
@@ -1656,7 +2012,9 @@ class GitReaderApp {
         const revealLabel = snippet?.section === 'body' ? 'Show body' : 'Show code';
         const codeClass = this.hasHighlightSupport() && language ? `hljs language-${language}` : '';
         this.currentSymbol = symbol;
+        this.readerTreeFocusPath = null;
         this.currentSnippetText = snippet?.snippet ?? '';
+        this.currentSnippetStartLine = snippet?.start_line ?? symbol.location?.start_line ?? 1;
         this.codeSurface.innerHTML = `
             <article class="code-card">
                 <div class="code-meta">
@@ -1698,6 +2056,35 @@ class GitReaderApp {
         }
         const lines = raw.split('\n');
         const startLine = snippet.start_line ?? 1;
+        const isJsFamily = language === 'javascript' || language === 'typescript' || language === 'tsx';
+        if (isJsFamily) {
+            const blocks = this.findJSImportBlocks(lines);
+            if (blocks.length > 0) {
+                blocks.forEach((block) => {
+                    const normalized = block.text.replace(/\s+/g, ' ').trim();
+                    const importNames = this.extractImportNames(normalized, language);
+                    if (importNames.length === 0) {
+                        return;
+                    }
+                    for (let index = block.start; index <= block.end; index += 1) {
+                        const lineText = lines[index];
+                        const lineImports = this.filterImportNamesForLine(lineText, importNames);
+                        if (lineImports.length === 0) {
+                            continue;
+                        }
+                        const lineNumber = startLine + index;
+                        const lineEl = this.codeSurface.querySelector<HTMLElement>(`[data-line="${lineNumber}"]`);
+                        if (!lineEl) {
+                            continue;
+                        }
+                        lineEl.dataset.imports = lineImports.join(',');
+                        lineEl.dataset.importStatement = normalized;
+                        this.decorateImportLine(lineEl, lineImports);
+                    }
+                });
+                return;
+            }
+        }
         lines.forEach((lineText, index) => {
             const importNames = this.extractImportNames(lineText, language);
             if (importNames.length === 0) {
@@ -1768,6 +2155,82 @@ class GitReaderApp {
         });
     }
 
+    private findJSImportBlocks(lines: string[]): Array<{ start: number; end: number; text: string }> {
+        const blocks: Array<{ start: number; end: number; text: string }> = [];
+        let inBlock = false;
+        let blockStart = 0;
+        let blockText = '';
+        lines.forEach((line, index) => {
+            const trimmed = line.trim();
+            if (!inBlock) {
+                if (!this.isJSImportStart(trimmed)) {
+                    return;
+                }
+                inBlock = true;
+                blockStart = index;
+                blockText = trimmed;
+                if (this.isJSImportComplete(blockText)) {
+                    blocks.push({ start: blockStart, end: index, text: blockText });
+                    inBlock = false;
+                    blockText = '';
+                }
+                return;
+            }
+            if (trimmed) {
+                blockText = blockText ? `${blockText} ${trimmed}` : trimmed;
+            }
+            if (this.isJSImportComplete(blockText)) {
+                blocks.push({ start: blockStart, end: index, text: blockText });
+                inBlock = false;
+                blockText = '';
+            }
+        });
+        if (inBlock) {
+            blocks.push({ start: blockStart, end: lines.length - 1, text: blockText });
+        }
+        return blocks;
+    }
+
+    private isJSImportStart(trimmed: string): boolean {
+        if (!trimmed) {
+            return false;
+        }
+        if (trimmed.startsWith('import(')) {
+            return false;
+        }
+        return /^import\b/.test(trimmed) || /^export\b/.test(trimmed);
+    }
+
+    private isJSImportComplete(statement: string): boolean {
+        const normalized = statement.replace(/\s+/g, ' ').trim();
+        if (!normalized) {
+            return false;
+        }
+        if (/^export\b/.test(normalized) && !/\bfrom\s+['"][^'"]+['"]/.test(normalized)) {
+            return true;
+        }
+        if (/\bfrom\s+['"][^'"]+['"]/.test(normalized)) {
+            return true;
+        }
+        if (/^import\s+['"][^'"]+['"]/.test(normalized)) {
+            return true;
+        }
+        if (/\brequire\s*\(\s*['"][^'"]+['"]\s*\)/.test(normalized)) {
+            return true;
+        }
+        return normalized.endsWith(';');
+    }
+
+    private filterImportNamesForLine(lineText: string, importNames: string[]): string[] {
+        if (!lineText || importNames.length === 0) {
+            return [];
+        }
+        return importNames.filter((name) => {
+            const matcher = new RegExp(`\\b${this.escapeRegex(name)}\\b`);
+            return matcher.test(lineText);
+        });
+    }
+
     private highlightImportUsage(importName: string): void {
         if (!importName) {
             return;
@@ -1795,6 +2258,493 @@ class GitReaderApp {
         }
         this.setCodeStatus(`Found ${matchCount} usage${matchCount === 1 ? '' : 's'} of ${importName}.`);
         firstMatch.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    private handleImportJump(importName: string, lineEl?: HTMLElement | null): void {
+        const lineText = this.getLineTextForElement(lineEl ?? undefined);
+        const language = this.getHighlightLanguage(this.currentSymbol?.location?.path);
+        const currentPath = this.currentSymbol?.location?.path;
+        const statement = lineEl?.dataset.importStatement ?? lineText;
+        const target = this.resolveImportTarget(importName, statement, language, currentPath);
+        if (target) {
+            const fileNode = target.kind === 'file' ? target : this.getFileNodeForSymbol(target);
+            if (fileNode && target.kind !== 'file') {
+                if (this.graphInstance) {
+                    const fileElement = this.graphInstance.$id(fileNode.id);
+                    const symbolElement = this.graphInstance.$id(target.id);
+                    if (fileElement && !fileElement.empty()) {
+                        this.graphInstance.$('node:selected').unselect();
+                        fileElement.select();
+                        if (symbolElement && !symbolElement.empty() && symbolElement.id() !== fileElement.id()) {
+                            symbolElement.select();
+                        }
+                    } else if (symbolElement && !symbolElement.empty()) {
+                        this.graphInstance.$('node:selected').unselect();
+                        symbolElement.select();
+                    }
+                }
+                void this.highlightSymbolInFile(fileNode, target);
+                return;
+            }
+            this.jumpToSymbol(target);
+            return;
+        }
+        const sourceLabel = statement ? ` from "${statement.trim()}"` : '';
+        this.showImportModal(`"${importName}" is not defined in this project${sourceLabel}.`);
+    }
+
+    private getLineTextForElement(lineEl?: HTMLElement): string {
+        if (!lineEl) {
+            return '';
+        }
+        const lineNumber = Number(lineEl.dataset.line);
+        if (Number.isFinite(lineNumber) && this.currentSnippetText) {
+            const lines = this.currentSnippetText.replace(/\n$/, '').split('\n');
+            const index = lineNumber - this.currentSnippetStartLine;
+            if (index >= 0 && index < lines.length) {
+                return lines[index];
+            }
+        }
+        const textEl = lineEl.querySelector<HTMLElement>('.line-text');
+        return textEl?.textContent ?? '';
+    }
+
+    private resolveImportTarget(
+        importName: string,
+        lineText: string,
+        language?: string,
+        currentPath?: string,
+    ): SymbolNode | null {
+        const normalizedPath = currentPath ? this.normalizePath(currentPath) : '';
+        if (language === 'python') {
+            return this.resolvePythonImportTarget(importName, lineText, normalizedPath);
+        }
+        if (language === 'swift') {
+            return this.resolveSwiftImportTarget(importName, lineText);
+        }
+        if (language === 'javascript' || language === 'typescript' || language === 'tsx') {
+            return this.resolveJsImportTarget(importName, lineText, normalizedPath);
+        }
+        return null;
+    }
+
+    private resolvePythonImportTarget(importName: string, lineText: string, currentPath: string): SymbolNode | null {
+        const entry = this.parsePythonImportEntry(lineText, importName);
+        if (!entry) {
+            return null;
+        }
+        const candidates = this.resolvePythonModuleCandidates(entry.module, currentPath);
+        if (!entry.importedName) {
+            return this.findFileByCandidates(candidates);
+        }
+        const symbolName = entry.importedName ?? importName;
+        const symbol = this.findSymbolInFiles(symbolName, candidates);
+        if (symbol) {
+            return symbol;
+        }
+        const fileNode = this.findFileByCandidates(candidates);
+        if (fileNode) {
+            return fileNode;
+        }
+        if (entry.importedName) {
+            const extended = this.resolvePythonModuleCandidates(`${entry.module}.${entry.importedName}`, currentPath);
+            const extendedFile = this.findFileByCandidates(extended);
+            if (extendedFile) {
+                return extendedFile;
+            }
+        }
+        return null;
+    }
+
+    private resolveJsImportTarget(importName: string, lineText: string, currentPath: string): SymbolNode | null {
+        const info = this.parseJsImportEntry(lineText, importName);
+        if (!info || !info.source) {
+            return null;
+        }
+        if (!this.isRelativeImport(info.source)) {
+            return null;
+        }
+        const candidates = this.resolveJsModuleCandidates(info.source, currentPath);
+        if (candidates.length === 0) {
+            return null;
+        }
+        const importedName = info.importedName ?? importName;
+        const symbol = this.findSymbolInFiles(importedName, candidates);
+        if (symbol) {
+            return symbol;
+        }
+        return this.findFileByCandidates(candidates);
+    }
+
+    private resolveSwiftImportTarget(importName: string, lineText: string): SymbolNode | null {
+        const moduleName = this.parseSwiftImportModule(lineText);
+        if (!moduleName) {
+            return null;
+        }
+        const moduleFile = this.findSwiftModuleFile(moduleName);
+        if (moduleFile) {
+            return moduleFile;
+        }
+        if (moduleName !== importName) {
+            return this.findSwiftModuleFile(importName);
+        }
+        return null;
+    }
+
+    private parsePythonImportEntry(
+        lineText: string,
+        importName: string,
+    ): { module: string; importedName?: string } | null {
+        const trimmed = lineText.trim();
+        if (!trimmed || trimmed.startsWith('#')) {
+            return null;
+        }
+        if (trimmed.startsWith('import ')) {
+            const rest = trimmed.slice('import '.length);
+            const parts = rest.split(',');
+            for (const part of parts) {
+                const piece = part.trim();
+                if (!piece) {
+                    continue;
+                }
+                const segments = piece.split(/\s+as\s+/);
+                const modulePart = segments[0].trim();
+                const local = (segments[1] ?? modulePart).trim();
+                if (local === importName) {
+                    return { module: modulePart };
+                }
+            }
+            return null;
+        }
+        if (trimmed.startsWith('from ')) {
+            const match = trimmed.match(/^from\s+(\S+)\s+import\s+(.+)$/);
+            if (!match) {
+                return null;
+            }
+            const modulePart = match[1].trim();
+            const importPart = match[2].split('#')[0].trim();
+            const parts = importPart.split(',');
+            for (const part of parts) {
+                const piece = part.trim();
+                if (!piece || piece === '*') {
+                    continue;
+                }
+                const segments = piece.split(/\s+as\s+/);
+                const imported = segments[0].trim();
+                const local = (segments[1] ?? imported).trim();
+                if (local === importName) {
+                    return { module: modulePart, importedName: imported };
+                }
+            }
+        }
+        return null;
+    }
+
+    private parseJsImportEntry(
+        lineText: string,
+        importName: string,
+    ): { source: string; importedName?: string } | null {
+        const importMatch = lineText.match(/^import\s+(?:type\s+)?(.+?)\s+from\s+['"]([^'"]+)['"]/);
+        const exportMatch = lineText.match(/^export\s+(?:type\s+)?(.+?)\s+from\s+['"]([^'"]+)['"]/);
+        const match = importMatch ?? exportMatch;
+        if (match) {
+            const binding = match[1];
+            const source = match[2];
+            const nameMap = this.parseJsImportBindingsMap(binding);
+            if (nameMap.has(importName)) {
+                return { source, importedName: nameMap.get(importName) };
+            }
+            return { source };
+        }
+        const importEqualsMatch = lineText.match(/^import\s+([A-Za-z_$][\w$]*)\s*=\s*require\s*\(\s*['"]([^'"]+)['"]\s*\)/);
+        if (importEqualsMatch) {
+            const local = importEqualsMatch[1];
+            const source = importEqualsMatch[2];
+            if (local === importName) {
+                return { source, importedName: local };
+            }
+            return { source };
+        }
+        const requireMatch = lineText.match(/^(?:const|let|var)\s+(.+?)\s*=\s*require\s*\(\s*['"]([^'"]+)['"]\s*\)/);
+        if (requireMatch) {
+            const binding = requireMatch[1];
+            const source = requireMatch[2];
+            const nameMap = this.parseJsRequireBindingMap(binding);
+            if (nameMap.has(importName)) {
+                return { source, importedName: nameMap.get(importName) };
+            }
+            return { source };
+        }
+        return null;
+    }
+
+    private parseSwiftImportModule(lineText: string): string | null {
+        const trimmed = lineText.trim();
+        if (!trimmed.startsWith('import ')) {
+            return null;
+        }
+        const rest = trimmed.slice('import '.length).trim();
+        const moduleName = rest.split(/\s+/)[0];
+        return moduleName || null;
+    }
+
+    private parseJsImportBindingsMap(binding: string): Map<string, string> {
+        const map = new Map<string, string>();
+        const trimmed = binding.trim();
+        if (!trimmed) {
+            return map;
+        }
+        if (trimmed.startsWith('{')) {
+            this.fillBraceListMap(trimmed, map);
+            return map;
+        }
+        if (trimmed.startsWith('*')) {
+            const starMatch = trimmed.match(/\*\s+as\s+([A-Za-z_$][\w$]*)/);
+            if (starMatch) {
+                map.set(starMatch[1], starMatch[1]);
+            }
+            return map;
+        }
+        const parts = trimmed.split(',');
+        const defaultName = parts[0]?.trim();
+        if (defaultName) {
+            map.set(defaultName, defaultName);
+        }
+        if (parts.length > 1) {
+            const rest = parts.slice(1).join(',').trim();
+            if (rest.startsWith('{')) {
+                this.fillBraceListMap(rest, map);
+            } else if (rest.startsWith('*')) {
+                const starMatch = rest.match(/\*\s+as\s+([A-Za-z_$][\w$]*)/);
+                if (starMatch) {
+                    map.set(starMatch[1], starMatch[1]);
+                }
+            }
+        }
+        return map;
+    }
+
+    private parseJsRequireBindingMap(binding: string): Map<string, string> {
+        const map = new Map<string, string>();
+        const trimmed = binding.trim();
+        if (!trimmed) {
+            return map;
+        }
+        if (trimmed.startsWith('{')) {
+            this.fillBraceListMap(trimmed, map);
+            return map;
+        }
+        if (trimmed.startsWith('[')) {
+            return map;
+        }
+        const local = trimmed.split(/\s+/)[0];
+        if (local) {
+            map.set(local, local);
+        }
+        return map;
+    }
+
+    private fillBraceListMap(segment: string, map: Map<string, string>): void {
+        const content = segment.replace(/^{/, '').replace(/}.*$/, '');
+        content.split(',')
+            .map((part) => part.trim())
+            .forEach((part) => {
+                if (!part) {
+                    return;
+                }
+                if (part.includes(' as ')) {
+                    const [imported, local] = part.split(/\s+as\s+/);
+                    if (local && imported) {
+                        map.set(local.trim(), imported.trim());
+                    }
+                    return;
+                }
+                if (part.includes(':')) {
+                    const [imported, local] = part.split(':');
+                    if (local && imported) {
+                        map.set(local.trim(), imported.trim());
+                    }
+                    return;
+                }
+                map.set(part, part);
+            });
+    }
+
+    private resolvePythonModuleCandidates(modulePath: string, currentPath: string): string[] {
+        if (!modulePath) {
+            return [];
+        }
+        const normalizedCurrent = currentPath ? this.normalizePath(currentPath) : '';
+        const baseDir = normalizedCurrent.split('/').slice(0, -1).join('/');
+        const relativeMatch = modulePath.match(/^(\.+)(.*)$/);
+        let baseParts = baseDir ? baseDir.split('/').filter(Boolean) : [];
+        let remainder = modulePath;
+        if (relativeMatch) {
+            const dots = relativeMatch[1].length;
+            remainder = relativeMatch[2] || '';
+            for (let i = 1; i < dots; i += 1) {
+                baseParts = baseParts.slice(0, -1);
+            }
+        }
+        const moduleSuffix = remainder.replace(/^\./, '');
+        const modulePathParts = moduleSuffix ? moduleSuffix.split('.').filter(Boolean) : [];
+        const joined = [...baseParts, ...modulePathParts].join('/');
+        if (!joined) {
+            return [];
+        }
+        return [`${joined}.py`, `${joined}/__init__.py`];
+    }
+
+    private resolveJsModuleCandidates(modulePath: string, currentPath: string): string[] {
+        const extensions = ['.js', '.jsx', '.ts', '.tsx', '.mjs', '.cjs'];
+        const normalizedCurrent = currentPath ? this.normalizePath(currentPath) : '';
+        const baseDir = normalizedCurrent.split('/').slice(0, -1).join('/');
+        const resolved = this.resolvePath(baseDir, modulePath);
+        if (!resolved) {
+            return [];
+        }
+        const hasExtension = extensions.some((ext) => resolved.endsWith(ext));
+        if (hasExtension) {
+            return [resolved];
+        }
+        const candidates = extensions.map((ext) => `${resolved}${ext}`);
+        extensions.forEach((ext) => candidates.push(`${resolved}/index${ext}`));
+        return candidates;
+    }
+
+    private isRelativeImport(modulePath: string): boolean {
+        return modulePath.startsWith('.') || modulePath.startsWith('/');
+    }
+
+    private resolvePath(baseDir: string, relative: string): string {
+        const cleaned = relative.startsWith('/') ? relative.slice(1) : relative;
+        const parts = [...(baseDir ? baseDir.split('/').filter(Boolean) : []), ...cleaned.split('/')];
+        const stack: string[] = [];
+        parts.forEach((part) => {
+            if (!part || part === '.') {
+                return;
+            }
+            if (part === '..') {
+                stack.pop();
+                return;
+            }
+            stack.push(part);
+        });
+        return stack.join('/');
+    }
+
+    private findSwiftModuleFile(moduleName: string): SymbolNode | null {
+        if (!moduleName) {
+            return null;
+        }
+        const target = `${moduleName}.swift`;
+        for (const [path, node] of this.fileNodesByPath.entries()) {
+            if (path.endsWith(`/${target}`) || path === target) {
+                return node;
+            }
+        }
+        return null;
+    }
+
+    private findSymbolInFiles(symbolName: string, candidates: string[]): SymbolNode | null {
+        if (!symbolName || candidates.length === 0) {
+            return null;
+        }
+        const candidateSet = new Set(candidates.map((path) => this.normalizePath(path)));
+        return this.graphNodes.find((node) => {
+            if (!node.location?.path || node.kind === 'external' || node.kind === 'folder') {
+                return false;
+            }
+            if (node.name !== symbolName) {
+                return false;
+            }
+            return candidateSet.has(this.normalizePath(node.location.path));
+        }) ?? null;
+    }
+
+    private findFileByCandidates(candidates: string[]): SymbolNode | null {
+        for (const candidate of candidates) {
+            const normalized = this.normalizePath(candidate);
+            const node = this.fileNodesByPath.get(normalized);
+            if (node) {
+                return node;
+            }
+        }
+        return null;
+    }
+
+    private jumpToSymbol(symbol: SymbolNode): void {
+        if (this.graphInstance) {
+            const fileNode = this.getFileNodeForSymbol(symbol);
+            const fileElement = fileNode ? this.graphInstance.$id(fileNode.id) : null;
+            const symbolElement = this.graphInstance.$id(symbol.id);
+            if (fileElement && !fileElement.empty()) {
+                this.graphInstance.$('node:selected').unselect();
+                fileElement.select();
+                if (symbolElement && !symbolElement.empty() && symbolElement.id() !== fileElement.id()) {
+                    symbolElement.select();
+                }
+            } else if (symbolElement && !symbolElement.empty()) {
+                this.graphInstance.$('node:selected').unselect();
+                symbolElement.select();
+            }
+        }
+        this.loadSymbolSnippet(symbol).catch(() => {
+            this.renderCode(symbol);
+            void this.updateNarrator(symbol);
+        });
+    }
+
+    private ensureImportModal(): void {
+        if (this.importModal) {
+            return;
+        }
+        const modal = document.createElement('div');
+        modal.className = 'import-modal';
+        modal.setAttribute('aria-hidden', 'true');
+        modal.innerHTML = `
+            <div class="import-modal__backdrop" data-import-modal-close></div>
+            <div class="import-modal__dialog" role="dialog" aria-modal="true" aria-label="Import lookup">
+                <h3>Not in this project</h3>
+                <p class="import-modal__message"></p>
+                <div class="import-modal__actions">
+                    <button class="ghost-btn" type="button" data-import-modal-close>Close</button>
+                </div>
+            </div>
+        `;
+        modal.addEventListener('click', (event) => {
+            const target = event.target as HTMLElement;
+            if (target.closest('[data-import-modal-close]')) {
+                this.hideImportModal();
+            }
+        });
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                this.hideImportModal();
+            }
+        });
+        document.body.append(modal);
+        this.importModal = modal;
+        this.importModalMessage = modal.querySelector<HTMLElement>('.import-modal__message');
+    }
+
+    private showImportModal(message: string): void {
+        this.ensureImportModal();
+        if (this.importModalMessage) {
+            this.importModalMessage.textContent = message;
+        }
+        if (this.importModal) {
+            this.importModal.classList.add('is-visible');
+            this.importModal.setAttribute('aria-hidden', 'false');
+        }
+    }
+
+    private hideImportModal(): void {
+        if (!this.importModal) {
+            return;
+        }
+        this.importModal.classList.remove('is-visible');
+        this.importModal.setAttribute('aria-hidden', 'true');
     }
 
     private lineHasIdentifierUsage(lineEl: HTMLElement, importName: string): boolean {
@@ -2039,6 +2989,7 @@ class GitReaderApp {
             this.setCanvasOverlay('Graph library not loaded.', true);
             return;
         }
+        this.displayNodeById = new Map(nodes.map((node) => [node.id, node]));
         this.setCanvasOverlay('', false);
         this.ensureGraph();
         const selectedNodeId = this.getSelectedGraphNodeId();
@@ -2084,16 +3035,27 @@ class GitReaderApp {
         }
         this.graphInstance.on('tap', 'node', (event: { target: { id: () => string; select: () => void }; originalEvent?: MouseEvent }) => {
             const nodeId = event.target.id();
-            const node = this.nodeById.get(nodeId);
+            const node = this.displayNodeById.get(nodeId) ?? this.nodeById.get(nodeId);
             if (!node) {
                 return;
             }
+            const now = Date.now();
+            const isDoubleTap = this.lastTapNodeId === nodeId && (now - this.lastTapAt) < this.doubleTapDelay;
+            this.lastTapNodeId = nodeId;
+            this.lastTapAt = now;
             if (this.tourActive) {
                 if (!this.isGuidedNodeAllowed(nodeId)) {
                     this.flashGuidedMessage('Follow the guide to unlock this step.');
                     return;
                 }
                 void this.advanceTour('jump', nodeId);
+                return;
+            }
+            if (this.graphLayoutMode === 'cluster' && isDoubleTap && this.handleClusterNodeToggle(node, event.originalEvent)) {
+                return;
+            }
+            if (this.graphLayoutMode === 'cluster' && this.handleClusterFolderSingleClick(node)) {
+                event.target.select();
                 return;
             }
             if (this.handleFileFocusClick(node, event.originalEvent)) {
@@ -2177,6 +3139,9 @@ class GitReaderApp {
         if (node.kind === 'file') {
             return this.getBasename(path || fullLabel);
         }
+        if (node.kind === 'folder') {
+            return node.name || this.getBasename(path || fullLabel);
+        }
         return fullLabel || node.name;
     }
 
@@ -2212,6 +3177,8 @@ class GitReaderApp {
         switch (kind) {
             case 'file':
                 return 'F';
+            case 'folder':
+                return 'dir';
             case 'class':
                 return 'C';
             case 'function':
@@ -2231,6 +3198,8 @@ class GitReaderApp {
         switch (kind) {
             case 'file':
                 return 'File';
+            case 'folder':
+                return 'Folder';
             case 'class':
                 return 'Class';
             case 'function':
@@ -2276,6 +3245,10 @@ class GitReaderApp {
             {
                 selector: 'node[kind = "file"]',
                 style: { 'background-color': '#f0dcc1' },
+            },
+            {
+                selector: 'node[kind = "folder"]',
+                style: { 'background-color': '#f5e6d6', 'border-style': 'dashed' },
             },
             {
                 selector: 'node[kind = "class"]',
@@ -2478,6 +3451,10 @@ class GitReaderApp {
     }
 
     private async updateNarrator(symbol: SymbolNode): Promise<void> {
+        if (symbol.kind === 'folder') {
+            this.renderFileTreeNarrator();
+            return;
+        }
         const mode = this.currentMode;
         const section = this.getSnippetSection(symbol);
         const cacheKey = `${symbol.id}:${mode}:${section}`;
@@ -2632,6 +3609,30 @@ class GitReaderApp {
             <p class="eyebrow">File tree</p>
             <h3>Browse the repository layout</h3>
             <p>Expand folders in the tree to explore the structure. ${this.escapeHtml(countLabel)}</p>
+        `;
+    }
+
+    private renderReaderFileTree(focusPath: string): void {
+        const normalized = this.normalizePath(focusPath);
+        if (!this.fileTreeRoot) {
+            this.fileTreeRoot = this.buildFileTreeFromNodes(this.graphNodes);
+        }
+        this.readerTreeFocusPath = normalized || null;
+        this.currentSymbol = null;
+        this.currentSnippetText = '';
+        this.currentSnippetStartLine = 1;
+        const treeHtml = this.buildFileTreeMarkup(normalized);
+        this.codeSurface.innerHTML = `
+            <article class="code-card">
+                <div class="code-meta">
+                    <span>FOLDER</span>
+                    <span>${this.escapeHtml(normalized || 'Repository')}</span>
+                </div>
+                <div class="code-actions">
+                    <span class="code-status">Folder contents</span>
+                </div>
+                <div class="file-tree">${treeHtml}</div>
+            </article>
         `;
     }
 
@@ -2868,7 +3869,10 @@ class GitReaderApp {
         }
         const chapterId = this.getActiveChapterId();
         const nodes = this.filterNodesForChapter(chapterId ?? '');
-        const focus = this.getSelectedGraphNode() ?? this.currentSymbol ?? this.pickFocusNode(nodes);
+        const selected = this.getSelectedGraphNode();
+        const focus = selected && selected.kind !== 'folder'
+            ? selected
+            : (this.currentSymbol ?? this.pickFocusNode(nodes));
         void this.updateNarrator(focus);
     }
 
@@ -2904,7 +3908,7 @@ class GitReaderApp {
         if (!nodeId) {
             return null;
         }
-        return this.nodeById.get(nodeId) ?? null;
+        return this.displayNodeById.get(nodeId) ?? this.nodeById.get(nodeId) ?? null;
     }
 
     private escapeHtml(value: string): string {
@@ -3424,9 +4428,14 @@ class GitReaderApp {
         if (this.graphLayoutMode === mode) {
             return;
         }
+        const wasCluster = this.graphLayoutMode === 'cluster';
         this.graphLayoutMode = mode;
         window.localStorage.setItem('gitreader.graphLayoutMode', mode);
         this.updateGraphControls();
+        if (wasCluster || mode === 'cluster') {
+            this.refreshGraphView();
+            return;
+        }
         this.runGraphLayout();
     }
 

@@ -81,10 +81,12 @@
         this.guidedAllowedNodeIds = null;
         this.fileTreeRoot = null;
         this.fileTreeFocusPath = null;
+        this.readerTreeFocusPath = null;
         this.fileTreeCollapsed = new Set();
         this.graphNodes = [];
         this.graphEdges = [];
         this.nodeById = new Map();
+        this.displayNodeById = new Map();
         this.fileNodesByPath = new Map();
         this.snippetCache = new Map();
         this.graphCache = new Map();
@@ -105,6 +107,8 @@
         this.focusedNodeId = null;
         this.currentSymbol = null;
         this.currentSnippetText = '';
+        this.currentSnippetStartLine = 1;
+        this.clusterExpanded = new Set();
         this.tocDebounceTimer = null;
         this.tocDebounceDelay = 200;
         this.pendingChapterId = null;
@@ -112,6 +116,11 @@
         this.graphNodeCapStep = 200;
         this.labelZoomThreshold = 0.65;
         this.labelLineLength = 18;
+        this.lastTapNodeId = null;
+        this.lastTapAt = 0;
+        this.doubleTapDelay = 320;
+        this.importModal = null;
+        this.importModalMessage = null;
     }
 
     GitReaderApp.prototype.init = function () {
@@ -287,7 +296,11 @@
                 if (filter === 'external') {
                     _this.showExternalNodes = !_this.showExternalNodes;
                     _this.updateGraphControls();
-                    _this.applyGraphFilters();
+                    if (_this.graphLayoutMode === 'cluster') {
+                        _this.refreshGraphView();
+                    } else {
+                        _this.applyGraphFilters();
+                    }
                 }
             });
         });
@@ -384,6 +397,14 @@
 
         this.codeSurface.addEventListener('click', function (event) {
             var target = event.target;
+            var treeToggle = target.closest('[data-tree-toggle]');
+            if (treeToggle) {
+                var path = treeToggle.dataset.treeToggle;
+                if (path) {
+                    _this.toggleFileTreePath(path);
+                }
+                return;
+            }
             var actionTarget = target.closest('[data-reader-action]');
             if (actionTarget) {
                 var action = actionTarget.dataset.readerAction;
@@ -398,7 +419,11 @@
             if (importTarget) {
                 var importName = importTarget.dataset.importName;
                 if (importName) {
-                    _this.highlightImportUsage(importName);
+                    if (_this.isModifierClick(event)) {
+                        _this.handleImportJump(importName, importTarget.closest('.code-line'));
+                    } else {
+                        _this.highlightImportUsage(importName);
+                    }
                 }
                 return;
             }
@@ -406,7 +431,11 @@
             if (importLine) {
                 var imports = (importLine.dataset.imports || '').split(',').map(function (value) { return value.trim(); }).filter(Boolean);
                 if (imports.length > 0) {
-                    _this.highlightImportUsage(imports[0]);
+                    if (_this.isModifierClick(event)) {
+                        _this.handleImportJump(imports[0], importLine);
+                    } else {
+                        _this.highlightImportUsage(imports[0]);
+                    }
                 }
             }
         });
@@ -814,6 +843,9 @@
     };
 
     GitReaderApp.prototype.buildGraphView = function (nodes, edges, scope) {
+        if (this.graphLayoutMode === 'cluster') {
+            return this.buildClusterView(nodes, edges);
+        }
         var totalNodes = nodes.length;
         var cap = this.getNodeCapForScope(scope, totalNodes);
         if (cap >= totalNodes) {
@@ -899,6 +931,203 @@
         };
     };
 
+    GitReaderApp.prototype.buildClusterView = function (nodes, edges) {
+        var _this = this;
+        var totalNodes = nodes.length;
+        var fileNodes = nodes.filter(function (node) { return node.kind === 'file' && node.location && node.location.path; });
+        if (fileNodes.length === 0) {
+            return {
+                nodes: nodes,
+                edges: edges,
+                totalNodes: totalNodes,
+                visibleNodes: nodes.length,
+                isCapped: false
+            };
+        }
+        var fileTree = this.buildFileTreeFromNodes(fileNodes);
+        var pathToFileNode = new Map();
+        var filePathById = new Map();
+        fileNodes.forEach(function (node) {
+            var normalized = _this.normalizePath((node.location && node.location.path) || '');
+            if (!normalized) {
+                return;
+            }
+            pathToFileNode.set(normalized, node);
+            filePathById.set(node.id, normalized);
+        });
+        var symbolsByFile = new Map();
+        nodes.forEach(function (node) {
+            if (node.kind === 'file' || node.kind === 'external' || !(node.location && node.location.path)) {
+                return;
+            }
+            var normalized = _this.normalizePath(node.location.path);
+            var list = symbolsByFile.get(normalized) || [];
+            list.push(node);
+            symbolsByFile.set(normalized, list);
+        });
+        var visibleNodes = [];
+        var visibleNodeIds = new Set();
+        var visibleFileIds = new Set();
+        var folderEdges = [];
+        var addNode = function (node) {
+            if (visibleNodeIds.has(node.id)) {
+                return;
+            }
+            visibleNodes.push(node);
+            visibleNodeIds.add(node.id);
+        };
+        var addFolderEdge = function (source, target) {
+            folderEdges.push({
+                source: source,
+                target: target,
+                kind: 'contains',
+                confidence: 'low'
+            });
+        };
+        var visitTree = function (treeNode, parentFolderId) {
+            var entries = Array.from(treeNode.children.values());
+            entries.sort(function (a, b) {
+                if (a.isFile !== b.isFile) {
+                    return a.isFile ? 1 : -1;
+                }
+                return a.name.localeCompare(b.name);
+            });
+            entries.forEach(function (child) {
+                if (child.isFile) {
+                    var fileNode = pathToFileNode.get(child.path);
+                    if (!fileNode) {
+                        return;
+                    }
+                    addNode(fileNode);
+                    visibleFileIds.add(fileNode.id);
+                    if (parentFolderId) {
+                        addFolderEdge(parentFolderId, fileNode.id);
+                    }
+                    return;
+                }
+                var folderId = _this.getFolderClusterId(child.path);
+                var fileCount = _this.countFilesInTree(child);
+                var folderNode = {
+                    id: folderId,
+                    name: '(' + fileCount + ' files) ' + child.name,
+                    kind: 'folder',
+                    summary: '',
+                    location: {
+                        path: child.path,
+                        start_line: 0,
+                        end_line: 0,
+                        start_col: 0,
+                        end_col: 0
+                    }
+                };
+                addNode(folderNode);
+                if (parentFolderId) {
+                    addFolderEdge(parentFolderId, folderId);
+                }
+                if (_this.clusterExpanded.has(folderId)) {
+                    visitTree(child, folderId);
+                }
+            });
+        };
+        visitTree(fileTree, null);
+
+        if (this.showExternalNodes) {
+            nodes.forEach(function (node) {
+                if (node.kind === 'external') {
+                    addNode(node);
+                }
+            });
+        }
+
+        visibleFileIds.forEach(function (fileId) {
+            if (!_this.clusterExpanded.has(fileId)) {
+                return;
+            }
+            var path = filePathById.get(fileId);
+            if (!path) {
+                return;
+            }
+            var children = symbolsByFile.get(path);
+            if (!children) {
+                return;
+            }
+            children.forEach(function (child) { return addNode(child); });
+        });
+
+        var nodeMap = new Map(nodes.map(function (node) { return [node.id, node]; }));
+        var edgeMap = new Map();
+        var confidenceRank = { low: 0, medium: 1, high: 2 };
+        var addEdge = function (source, target, kind, confidence) {
+            var key = source + ':' + target + ':' + kind;
+            var existing = edgeMap.get(key);
+            if (!existing) {
+                edgeMap.set(key, { source: source, target: target, kind: kind, confidence: confidence });
+                return;
+            }
+            if (confidenceRank[confidence] > confidenceRank[existing.confidence]) {
+                existing.confidence = confidence;
+            }
+        };
+        var resolveRepresentative = function (node) {
+            var _a;
+            if (node.kind === 'external') {
+                return _this.showExternalNodes ? node.id : null;
+            }
+            var path = (_a = node.location) && _a.path;
+            if (!path) {
+                return visibleNodeIds.has(node.id) ? node.id : null;
+            }
+            var normalized = _this.normalizePath(path);
+            var fileNode = pathToFileNode.get(normalized);
+            var fileId = fileNode && fileNode.id;
+            var fileVisible = Boolean(fileId && visibleNodeIds.has(fileId));
+            if (node.kind === 'file') {
+                if (fileVisible && fileId) {
+                    return fileId;
+                }
+                var folderId = _this.findCollapsedFolderId(normalized);
+                if (folderId && visibleNodeIds.has(folderId)) {
+                    return folderId;
+                }
+                return fileId || null;
+            }
+            if (fileVisible && fileId) {
+                if (_this.clusterExpanded.has(fileId) && visibleNodeIds.has(node.id)) {
+                    return node.id;
+                }
+                return fileId;
+            }
+            var folderId = _this.findCollapsedFolderId(normalized);
+            if (folderId && visibleNodeIds.has(folderId)) {
+                return folderId;
+            }
+            return fileId || null;
+        };
+
+        edges.forEach(function (edge) {
+            var sourceNode = nodeMap.get(edge.source);
+            var targetNode = nodeMap.get(edge.target);
+            if (!sourceNode || !targetNode) {
+                return;
+            }
+            var sourceRep = resolveRepresentative(sourceNode);
+            var targetRep = resolveRepresentative(targetNode);
+            if (!sourceRep || !targetRep || sourceRep === targetRep) {
+                return;
+            }
+            addEdge(sourceRep, targetRep, edge.kind, edge.confidence);
+        });
+        folderEdges.forEach(function (edge) { return addEdge(edge.source, edge.target, edge.kind, edge.confidence); });
+
+        return {
+            nodes: visibleNodes,
+            edges: Array.from(edgeMap.values()),
+            totalNodes: totalNodes,
+            visibleNodes: visibleNodes.length,
+            isCapped: false
+        };
+    };
+
     GitReaderApp.prototype.updateGraphNodeStatus = function (graphView) {
         if (graphView.totalNodes === 0) {
             this.graphNodeStatus.textContent = '';
@@ -909,6 +1138,12 @@
             this.graphNodeStatus.textContent = 'Guided view: ' + graphView.visibleNodes + '/' + graphView.totalNodes;
             this.graphRevealButton.disabled = true;
             this.graphRevealButton.textContent = 'Guided';
+            return;
+        }
+        if (this.graphLayoutMode === 'cluster') {
+            this.graphNodeStatus.textContent = 'Cluster view: ' + graphView.visibleNodes + ' groups from ' + graphView.totalNodes;
+            this.graphRevealButton.disabled = true;
+            this.graphRevealButton.textContent = 'Show more';
             return;
         }
         if (!graphView.isCapped) {
@@ -1013,7 +1248,7 @@
         if (!symbol.id) {
             return false;
         }
-        if (symbol.kind === 'external') {
+        if (symbol.kind === 'external' || symbol.kind === 'folder') {
             return false;
         }
         return Boolean(symbol.location && symbol.location.path);
@@ -1049,7 +1284,7 @@
         if (nodes.length === 0) {
             return this.fallbackSymbol();
         }
-        var priority = ['function', 'method', 'class', 'file', 'blueprint', 'external'];
+        var priority = ['function', 'method', 'class', 'file', 'folder', 'blueprint', 'external'];
         for (var i = 0; i < priority.length; i++) {
             var kind = priority[i];
             var match = nodes.find(function (node) { return node.kind === kind; });
@@ -1071,6 +1306,41 @@
 
     GitReaderApp.prototype.normalizePath = function (path) {
         return path.replace(/\\/g, '/');
+    };
+
+    GitReaderApp.prototype.isReaderVisible = function () {
+        return this.workspace.dataset.layout !== 'canvas';
+    };
+
+    GitReaderApp.prototype.getFolderClusterId = function (path) {
+        return 'cluster:folder:' + path;
+    };
+
+    GitReaderApp.prototype.findCollapsedFolderId = function (path) {
+        var normalized = this.normalizePath(path);
+        var parts = normalized.split('/').filter(Boolean);
+        var current = '';
+        for (var i = 0; i < parts.length - 1; i += 1) {
+            var part = parts[i];
+            current = current ? current + '/' + part : part;
+            var folderId = this.getFolderClusterId(current);
+            if (!this.clusterExpanded.has(folderId)) {
+                return folderId;
+            }
+        }
+        return null;
+    };
+
+    GitReaderApp.prototype.countFilesInTree = function (node) {
+        var _this = this;
+        if (node.isFile) {
+            return 1;
+        }
+        var count = 0;
+        node.children.forEach(function (child) {
+            count += _this.countFilesInTree(child);
+        });
+        return count;
     };
 
     GitReaderApp.prototype.refreshFileTree = function () {
@@ -1126,17 +1396,8 @@
         }
         var normalizedFocus = focusPath ? this.normalizePath(focusPath) : '';
         this.fileTreeFocusPath = normalizedFocus || null;
-        if (normalizedFocus) {
-            this.expandFileTreePath(normalizedFocus);
-        }
-        if (!this.fileTreeRoot || this.fileTreeRoot.children.size === 0) {
-            this.narratorFileTree.innerHTML = '<p class="file-tree-empty">No files loaded yet.</p>';
-            return;
-        }
-        var focusParentPath = this.getParentPath(normalizedFocus);
-        var collapsedFocusParents = this.getCollapsedFocusParents(normalizedFocus);
-        var treeHtml = this.renderFileTreeNode(this.fileTreeRoot, normalizedFocus, focusParentPath, collapsedFocusParents);
-        this.narratorFileTree.innerHTML = treeHtml || '<p class="file-tree-empty">No files loaded yet.</p>';
+        var treeHtml = this.buildFileTreeMarkup(normalizedFocus);
+        this.narratorFileTree.innerHTML = treeHtml;
     };
 
     GitReaderApp.prototype.renderFileTreeNode = function (node, focusPath, focusParentPath, collapsedFocusParents) {
@@ -1152,11 +1413,13 @@
             return a.name.localeCompare(b.name);
         });
         var items = entries.map(function (child) {
-            var isFocus = child.isFile && focusPath && child.path === focusPath;
+            var isFocus = focusPath && child.path === focusPath;
+            var isFocusFile = child.isFile && isFocus;
+            var isFocusDir = !child.isFile && isFocus;
             var isFocusParent = !child.isFile && focusParentPath && child.path === focusParentPath;
             if (child.isFile) {
                 return '\
-                    <li class="file-tree-item' + (isFocus ? ' is-focus' : '') + '">\
+                    <li class="file-tree-item' + (isFocusFile ? ' is-focus' : '') + '">\
                         <span class="file-tree-name">' + escapeHtml(child.name) + '</span>\
                     </li>\
                 ';
@@ -1165,7 +1428,7 @@
             var isCollapsedFocusParent = isCollapsed && collapsedFocusParents.has(child.path);
             var childrenHtml = _this.renderFileTreeNode(child, focusPath, focusParentPath, collapsedFocusParents);
             return '\
-                <li class="file-tree-item is-dir' + (isCollapsed ? ' is-collapsed' : '') + (isCollapsedFocusParent ? ' is-focus' : '') + '">\
+                <li class="file-tree-item is-dir' + (isCollapsed ? ' is-collapsed' : '') + (isFocusDir || isCollapsedFocusParent ? ' is-focus' : '') + '">\
                     <button class="file-tree-toggle" type="button" data-tree-toggle="' + escapeHtml(child.path) + '">\
                         <span class="file-tree-caret"></span>\
                         <span class="file-tree-name">' + escapeHtml(child.name) + '/</span>\
@@ -1177,6 +1440,20 @@
         return '<ul class="file-tree-list">' + items.join('') + '</ul>';
     };
 
+    GitReaderApp.prototype.buildFileTreeMarkup = function (focusPath) {
+        var normalizedFocus = focusPath ? this.normalizePath(focusPath) : '';
+        if (normalizedFocus) {
+            this.expandFileTreeForFocus(normalizedFocus);
+        }
+        if (!this.fileTreeRoot || this.fileTreeRoot.children.size === 0) {
+            return '<p class="file-tree-empty">No files loaded yet.</p>';
+        }
+        var focusParentPath = this.getParentPath(normalizedFocus);
+        var collapsedFocusParents = this.getCollapsedFocusParents(normalizedFocus);
+        var treeHtml = this.renderFileTreeNode(this.fileTreeRoot, normalizedFocus, focusParentPath, collapsedFocusParents);
+        return treeHtml || '<p class="file-tree-empty">No files loaded yet.</p>';
+    };
+
     GitReaderApp.prototype.toggleFileTreePath = function (path) {
         if (this.fileTreeCollapsed.has(path)) {
             this.fileTreeCollapsed.delete(path);
@@ -1184,6 +1461,9 @@
             this.fileTreeCollapsed.add(path);
         }
         this.renderFileTree(this.fileTreeFocusPath);
+        if (this.readerTreeFocusPath) {
+            this.renderReaderFileTree(this.readerTreeFocusPath);
+        }
     };
 
     GitReaderApp.prototype.expandFileTreePath = function (path) {
@@ -1197,6 +1477,25 @@
             if (this.fileTreeCollapsed.has(current)) {
                 break;
             }
+            this.fileTreeCollapsed.delete(current);
+        }
+    };
+
+    GitReaderApp.prototype.expandFileTreeForFocus = function (path) {
+        if (this.fileNodesByPath.has(path)) {
+            this.expandFileTreePath(path);
+            return;
+        }
+        this.expandFileTreeFolder(path);
+    };
+
+    GitReaderApp.prototype.expandFileTreeFolder = function (path) {
+        var normalized = this.normalizePath(path);
+        var parts = normalized.split('/').filter(Boolean);
+        var current = '';
+        for (var i = 0; i < parts.length; i += 1) {
+            var part = parts[i];
+            current = current ? current + '/' + part : part;
             this.fileTreeCollapsed.delete(current);
         }
     };
@@ -1300,6 +1599,71 @@
         return true;
     };
 
+    GitReaderApp.prototype.handleClusterNodeToggle = function (symbol, event) {
+        var _a;
+        if (symbol.kind === 'folder') {
+            this.toggleClusterExpansion(symbol.id);
+            return true;
+        }
+        if (symbol.kind !== 'file') {
+            return false;
+        }
+        if (this.isModifierClick(event)) {
+            return false;
+        }
+        if (!((_a = symbol.location) && _a.path)) {
+            return false;
+        }
+        if (!this.fileHasClusterChildren(symbol)) {
+            return false;
+        }
+        this.toggleClusterExpansion(symbol.id);
+        return true;
+    };
+
+    GitReaderApp.prototype.handleClusterFolderSingleClick = function (symbol) {
+        var _a;
+        if (symbol.kind !== 'folder') {
+            return false;
+        }
+        if (this.isReaderVisible()) {
+            var folderPath = (_a = symbol.location) && _a.path;
+            if (folderPath) {
+                this.renderReaderFileTree(folderPath);
+                this.renderFileTree(folderPath);
+                this.renderFileTreeNarrator();
+            }
+        }
+        return true;
+    };
+
+    GitReaderApp.prototype.toggleClusterExpansion = function (nodeId) {
+        if (this.clusterExpanded.has(nodeId)) {
+            this.clusterExpanded.delete(nodeId);
+        } else {
+            this.clusterExpanded.add(nodeId);
+        }
+        this.refreshGraphView();
+    };
+
+    GitReaderApp.prototype.fileHasClusterChildren = function (fileNode) {
+        var _this = this;
+        var path = fileNode.location && fileNode.location.path;
+        if (!path) {
+            return false;
+        }
+        var normalized = this.normalizePath(path);
+        return this.graphNodes.some(function (node) {
+            if (node.kind === 'file' || node.kind === 'external') {
+                return false;
+            }
+            if (!(node.location && node.location.path)) {
+                return false;
+            }
+            return _this.normalizePath(node.location.path) === normalized;
+        });
+    };
+
     GitReaderApp.prototype.applyFocusHighlight = function (symbol) {
         var _a, _b;
         var start = ((_a = symbol.location) && _a.start_line) || 0;
@@ -1388,7 +1752,9 @@
         var revealLabel = snippet && snippet.section === 'body' ? 'Show body' : 'Show code';
         var codeClass = this.hasHighlightSupport() && language ? 'hljs language-' + language : '';
         this.currentSymbol = symbol;
+        this.readerTreeFocusPath = null;
         this.currentSnippetText = (snippet && snippet.snippet) || '';
+        this.currentSnippetStartLine = (snippet && snippet.start_line) || (symbol.location && symbol.location.start_line) || 1;
         this.codeSurface.innerHTML =
             '<article class="code-card">' +
             '<div class="code-meta">' +
@@ -1430,6 +1796,35 @@
         }
         var lines = raw.split('\n');
         var startLine = (snippet && snippet.start_line) || 1;
+        var isJsFamily = language === 'javascript' || language === 'typescript' || language === 'tsx';
+        if (isJsFamily) {
+            var blocks = this.findJSImportBlocks(lines);
+            if (blocks.length > 0) {
+                blocks.forEach(function (block) {
+                    var normalized = block.text.replace(/\s+/g, ' ').trim();
+                    var importNames = _this.extractImportNames(normalized, language);
+                    if (importNames.length === 0) {
+                        return;
+                    }
+                    for (var index = block.start; index <= block.end; index += 1) {
+                        var lineText = lines[index];
+                        var lineImports = _this.filterImportNamesForLine(lineText, importNames);
+                        if (lineImports.length === 0) {
+                            continue;
+                        }
+                        var lineNumber = startLine + index;
+                        var lineEl = _this.codeSurface.querySelector('[data-line="' + lineNumber + '"]');
+                        if (!lineEl) {
+                            continue;
+                        }
+                        lineEl.dataset.imports = lineImports.join(',');
+                        lineEl.dataset.importStatement = normalized;
+                        _this.decorateImportLine(lineEl, lineImports);
+                    }
+                });
+                return;
+            }
+        }
         lines.forEach(function (lineText, index) {
             var importNames = _this.extractImportNames(lineText, language);
             if (importNames.length === 0) {
@@ -1502,6 +1897,84 @@
         });
     };
 
+    GitReaderApp.prototype.findJSImportBlocks = function (lines) {
+        var _this = this;
+        var blocks = [];
+        var inBlock = false;
+        var blockStart = 0;
+        var blockText = '';
+        lines.forEach(function (line, index) {
+            var trimmed = line.trim();
+            if (!inBlock) {
+                if (!_this.isJSImportStart(trimmed)) {
+                    return;
+                }
+                inBlock = true;
+                blockStart = index;
+                blockText = trimmed;
+                if (_this.isJSImportComplete(blockText)) {
+                    blocks.push({ start: blockStart, end: index, text: blockText });
+                    inBlock = false;
+                    blockText = '';
+                }
+                return;
+            }
+            if (trimmed) {
+                blockText = blockText ? blockText + ' ' + trimmed : trimmed;
+            }
+            if (_this.isJSImportComplete(blockText)) {
+                blocks.push({ start: blockStart, end: index, text: blockText });
+                inBlock = false;
+                blockText = '';
+            }
+        });
+        if (inBlock) {
+            blocks.push({ start: blockStart, end: lines.length - 1, text: blockText });
+        }
+        return blocks;
+    };
+
+    GitReaderApp.prototype.isJSImportStart = function (trimmed) {
+        if (!trimmed) {
+            return false;
+        }
+        if (trimmed.startsWith('import(')) {
+            return false;
+        }
+        return /^import\b/.test(trimmed) || /^export\b/.test(trimmed);
+    };
+
+    GitReaderApp.prototype.isJSImportComplete = function (statement) {
+        var normalized = statement.replace(/\s+/g, ' ').trim();
+        if (!normalized) {
+            return false;
+        }
+        if (/^export\b/.test(normalized) && !/\bfrom\s+['"][^'"]+['"]/.test(normalized)) {
+            return true;
+        }
+        if (/\bfrom\s+['"][^'"]+['"]/.test(normalized)) {
+            return true;
+        }
+        if (/^import\s+['"][^'"]+['"]/.test(normalized)) {
+            return true;
+        }
+        if (/\brequire\s*\(\s*['"][^'"]+['"]\s*\)/.test(normalized)) {
+            return true;
+        }
+        return normalized.endsWith(';');
+    };
+
+    GitReaderApp.prototype.filterImportNamesForLine = function (lineText, importNames) {
+        var _this = this;
+        if (!lineText || importNames.length === 0) {
+            return [];
+        }
+        return importNames.filter(function (name) {
+            var matcher = new RegExp('\\b' + _this.escapeRegex(name) + '\\b');
+            return matcher.test(lineText);
+        });
+    };
+
     GitReaderApp.prototype.highlightImportUsage = function (importName) {
         if (!importName) {
             return;
@@ -1530,6 +2003,496 @@
         }
         this.setCodeStatus('Found ' + matchCount + ' usage' + (matchCount === 1 ? '' : 's') + ' of ' + importName + '.');
         firstMatch.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
+
+    GitReaderApp.prototype.handleImportJump = function (importName, lineEl) {
+        var lineText = this.getLineTextForElement(lineEl || undefined);
+        var language = this.getHighlightLanguage(this.currentSymbol && this.currentSymbol.location && this.currentSymbol.location.path);
+        var currentPath = this.currentSymbol && this.currentSymbol.location && this.currentSymbol.location.path;
+        var statement = (lineEl && lineEl.dataset && lineEl.dataset.importStatement) || lineText;
+        var target = this.resolveImportTarget(importName, statement, language, currentPath);
+        if (target) {
+            var fileNode = target.kind === 'file' ? target : this.getFileNodeForSymbol(target);
+            if (fileNode && target.kind !== 'file') {
+                if (this.graphInstance) {
+                    var fileElement = this.graphInstance.$id(fileNode.id);
+                    var symbolElement = this.graphInstance.$id(target.id);
+                    if (fileElement && !fileElement.empty()) {
+                        this.graphInstance.$('node:selected').unselect();
+                        fileElement.select();
+                        if (symbolElement && !symbolElement.empty() && symbolElement.id() !== fileElement.id()) {
+                            symbolElement.select();
+                        }
+                    }
+                    else if (symbolElement && !symbolElement.empty()) {
+                        this.graphInstance.$('node:selected').unselect();
+                        symbolElement.select();
+                    }
+                }
+                this.highlightSymbolInFile(fileNode, target);
+                return;
+            }
+            this.jumpToSymbol(target);
+            return;
+        }
+        var sourceLabel = statement ? ' from "' + statement.trim() + '"' : '';
+        this.showImportModal('"' + importName + '" is not defined in this project' + sourceLabel + '.');
+    };
+
+    GitReaderApp.prototype.getLineTextForElement = function (lineEl) {
+        if (!lineEl) {
+            return '';
+        }
+        var lineNumber = Number(lineEl.dataset.line);
+        if (Number.isFinite(lineNumber) && this.currentSnippetText) {
+            var lines = this.currentSnippetText.replace(/\n$/, '').split('\n');
+            var index = lineNumber - this.currentSnippetStartLine;
+            if (index >= 0 && index < lines.length) {
+                return lines[index];
+            }
+        }
+        var textEl = lineEl.querySelector('.line-text');
+        return (textEl && textEl.textContent) || '';
+    };
+
+    GitReaderApp.prototype.resolveImportTarget = function (importName, lineText, language, currentPath) {
+        var normalizedPath = currentPath ? this.normalizePath(currentPath) : '';
+        if (language === 'python') {
+            return this.resolvePythonImportTarget(importName, lineText, normalizedPath);
+        }
+        if (language === 'swift') {
+            return this.resolveSwiftImportTarget(importName, lineText);
+        }
+        if (language === 'javascript' || language === 'typescript' || language === 'tsx') {
+            return this.resolveJsImportTarget(importName, lineText, normalizedPath);
+        }
+        return null;
+    };
+
+    GitReaderApp.prototype.resolvePythonImportTarget = function (importName, lineText, currentPath) {
+        var entry = this.parsePythonImportEntry(lineText, importName);
+        if (!entry) {
+            return null;
+        }
+        var candidates = this.resolvePythonModuleCandidates(entry.module, currentPath);
+        if (!entry.importedName) {
+            return this.findFileByCandidates(candidates);
+        }
+        var symbolName = entry.importedName || importName;
+        var symbol = this.findSymbolInFiles(symbolName, candidates);
+        if (symbol) {
+            return symbol;
+        }
+        var fileNode = this.findFileByCandidates(candidates);
+        if (fileNode) {
+            return fileNode;
+        }
+        if (entry.importedName) {
+            var extended = this.resolvePythonModuleCandidates(entry.module + '.' + entry.importedName, currentPath);
+            var extendedFile = this.findFileByCandidates(extended);
+            if (extendedFile) {
+                return extendedFile;
+            }
+        }
+        return null;
+    };
+
+    GitReaderApp.prototype.resolveJsImportTarget = function (importName, lineText, currentPath) {
+        var info = this.parseJsImportEntry(lineText, importName);
+        if (!info || !info.source) {
+            return null;
+        }
+        if (!this.isRelativeImport(info.source)) {
+            return null;
+        }
+        var candidates = this.resolveJsModuleCandidates(info.source, currentPath);
+        if (candidates.length === 0) {
+            return null;
+        }
+        var importedName = info.importedName || importName;
+        var symbol = this.findSymbolInFiles(importedName, candidates);
+        if (symbol) {
+            return symbol;
+        }
+        return this.findFileByCandidates(candidates);
+    };
+
+    GitReaderApp.prototype.resolveSwiftImportTarget = function (importName, lineText) {
+        var moduleName = this.parseSwiftImportModule(lineText);
+        if (!moduleName) {
+            return null;
+        }
+        var moduleFile = this.findSwiftModuleFile(moduleName);
+        if (moduleFile) {
+            return moduleFile;
+        }
+        if (moduleName !== importName) {
+            return this.findSwiftModuleFile(importName);
+        }
+        return null;
+    };
+
+    GitReaderApp.prototype.parsePythonImportEntry = function (lineText, importName) {
+        var trimmed = lineText.trim();
+        if (!trimmed || trimmed.startsWith('#')) {
+            return null;
+        }
+        if (trimmed.startsWith('import ')) {
+            var rest = trimmed.slice('import '.length);
+            var parts = rest.split(',');
+            for (var i = 0; i < parts.length; i += 1) {
+                var piece = parts[i].trim();
+                if (!piece) {
+                    continue;
+                }
+                var segments = piece.split(/\s+as\s+/);
+                var modulePart = segments[0].trim();
+                var local = (segments[1] || modulePart).trim();
+                if (local === importName) {
+                    return { module: modulePart };
+                }
+            }
+            return null;
+        }
+        if (trimmed.startsWith('from ')) {
+            var match = trimmed.match(/^from\s+(\S+)\s+import\s+(.+)$/);
+            if (!match) {
+                return null;
+            }
+            var modulePart = match[1].trim();
+            var importPart = match[2].split('#')[0].trim();
+            var parts = importPart.split(',');
+            for (var i = 0; i < parts.length; i += 1) {
+                var piece = parts[i].trim();
+                if (!piece || piece === '*') {
+                    continue;
+                }
+                var segments = piece.split(/\s+as\s+/);
+                var imported = segments[0].trim();
+                var local = (segments[1] || imported).trim();
+                if (local === importName) {
+                    return { module: modulePart, importedName: imported };
+                }
+            }
+        }
+        return null;
+    };
+
+    GitReaderApp.prototype.parseJsImportEntry = function (lineText, importName) {
+        var importMatch = lineText.match(/^import\s+(?:type\s+)?(.+?)\s+from\s+['"]([^'"]+)['"]/);
+        var exportMatch = lineText.match(/^export\s+(?:type\s+)?(.+?)\s+from\s+['"]([^'"]+)['"]/);
+        var match = importMatch || exportMatch;
+        if (match) {
+            var binding = match[1];
+            var source = match[2];
+            var nameMap = this.parseJsImportBindingsMap(binding);
+            if (nameMap.has(importName)) {
+                return { source: source, importedName: nameMap.get(importName) };
+            }
+            return { source: source };
+        }
+        var importEqualsMatch = lineText.match(/^import\s+([A-Za-z_$][\w$]*)\s*=\s*require\s*\(\s*['"]([^'"]+)['"]\s*\)/);
+        if (importEqualsMatch) {
+            var local = importEqualsMatch[1];
+            var source = importEqualsMatch[2];
+            if (local === importName) {
+                return { source: source, importedName: local };
+            }
+            return { source: source };
+        }
+        var requireMatch = lineText.match(/^(?:const|let|var)\s+(.+?)\s*=\s*require\s*\(\s*['"]([^'"]+)['"]\s*\)/);
+        if (requireMatch) {
+            var binding = requireMatch[1];
+            var source = requireMatch[2];
+            var nameMap = this.parseJsRequireBindingMap(binding);
+            if (nameMap.has(importName)) {
+                return { source: source, importedName: nameMap.get(importName) };
+            }
+            return { source: source };
+        }
+        return null;
+    };
+
+    GitReaderApp.prototype.parseSwiftImportModule = function (lineText) {
+        var trimmed = lineText.trim();
+        if (!trimmed.startsWith('import ')) {
+            return null;
+        }
+        var rest = trimmed.slice('import '.length).trim();
+        var moduleName = rest.split(/\s+/)[0];
+        return moduleName || null;
+    };
+
+    GitReaderApp.prototype.parseJsImportBindingsMap = function (binding) {
+        var map = new Map();
+        var trimmed = binding.trim();
+        if (!trimmed) {
+            return map;
+        }
+        if (trimmed.startsWith('{')) {
+            this.fillBraceListMap(trimmed, map);
+            return map;
+        }
+        if (trimmed.startsWith('*')) {
+            var starMatch = trimmed.match(/\*\s+as\s+([A-Za-z_$][\w$]*)/);
+            if (starMatch) {
+                map.set(starMatch[1], starMatch[1]);
+            }
+            return map;
+        }
+        var parts = trimmed.split(',');
+        var defaultName = parts[0] && parts[0].trim();
+        if (defaultName) {
+            map.set(defaultName, defaultName);
+        }
+        if (parts.length > 1) {
+            var rest = parts.slice(1).join(',').trim();
+            if (rest.startsWith('{')) {
+                this.fillBraceListMap(rest, map);
+            } else if (rest.startsWith('*')) {
+                var starMatch = rest.match(/\*\s+as\s+([A-Za-z_$][\w$]*)/);
+                if (starMatch) {
+                    map.set(starMatch[1], starMatch[1]);
+                }
+            }
+        }
+        return map;
+    };
+
+    GitReaderApp.prototype.parseJsRequireBindingMap = function (binding) {
+        var map = new Map();
+        var trimmed = binding.trim();
+        if (!trimmed) {
+            return map;
+        }
+        if (trimmed.startsWith('{')) {
+            this.fillBraceListMap(trimmed, map);
+            return map;
+        }
+        if (trimmed.startsWith('[')) {
+            return map;
+        }
+        var local = trimmed.split(/\s+/)[0];
+        if (local) {
+            map.set(local, local);
+        }
+        return map;
+    };
+
+    GitReaderApp.prototype.fillBraceListMap = function (segment, map) {
+        var content = segment.replace(/^{/, '').replace(/}.*$/, '');
+        content.split(',')
+            .map(function (part) { return part.trim(); })
+            .forEach(function (part) {
+                if (!part) {
+                    return;
+                }
+                if (part.includes(' as ')) {
+                    var parts = part.split(/\s+as\s+/);
+                    var imported = parts[0];
+                    var local = parts[1];
+                    if (local && imported) {
+                        map.set(local.trim(), imported.trim());
+                    }
+                    return;
+                }
+                if (part.includes(':')) {
+                    var parts = part.split(':');
+                    var imported = parts[0];
+                    var local = parts[1];
+                    if (local && imported) {
+                        map.set(local.trim(), imported.trim());
+                    }
+                    return;
+                }
+                map.set(part, part);
+            });
+    };
+
+    GitReaderApp.prototype.resolvePythonModuleCandidates = function (modulePath, currentPath) {
+        if (!modulePath) {
+            return [];
+        }
+        var normalizedCurrent = currentPath ? this.normalizePath(currentPath) : '';
+        var baseDir = normalizedCurrent.split('/').slice(0, -1).join('/');
+        var relativeMatch = modulePath.match(/^(\.+)(.*)$/);
+        var baseParts = baseDir ? baseDir.split('/').filter(Boolean) : [];
+        var remainder = modulePath;
+        if (relativeMatch) {
+            var dots = relativeMatch[1].length;
+            remainder = relativeMatch[2] || '';
+            for (var i = 1; i < dots; i += 1) {
+                baseParts = baseParts.slice(0, -1);
+            }
+        }
+        var moduleSuffix = remainder.replace(/^\./, '');
+        var modulePathParts = moduleSuffix ? moduleSuffix.split('.').filter(Boolean) : [];
+        var joined = baseParts.concat(modulePathParts).join('/');
+        if (!joined) {
+            return [];
+        }
+        return [joined + '.py', joined + '/__init__.py'];
+    };
+
+    GitReaderApp.prototype.resolveJsModuleCandidates = function (modulePath, currentPath) {
+        var extensions = ['.js', '.jsx', '.ts', '.tsx', '.mjs', '.cjs'];
+        var normalizedCurrent = currentPath ? this.normalizePath(currentPath) : '';
+        var baseDir = normalizedCurrent.split('/').slice(0, -1).join('/');
+        var resolved = this.resolvePath(baseDir, modulePath);
+        if (!resolved) {
+            return [];
+        }
+        var hasExtension = extensions.some(function (ext) { return resolved.endsWith(ext); });
+        if (hasExtension) {
+            return [resolved];
+        }
+        var candidates = extensions.map(function (ext) { return '' + resolved + ext; });
+        extensions.forEach(function (ext) { return candidates.push(resolved + '/index' + ext); });
+        return candidates;
+    };
+
+    GitReaderApp.prototype.isRelativeImport = function (modulePath) {
+        return modulePath.startsWith('.') || modulePath.startsWith('/');
+    };
+
+    GitReaderApp.prototype.resolvePath = function (baseDir, relative) {
+        var cleaned = relative.startsWith('/') ? relative.slice(1) : relative;
+        var parts = (baseDir ? baseDir.split('/').filter(Boolean) : []).concat(cleaned.split('/'));
+        var stack = [];
+        parts.forEach(function (part) {
+            if (!part || part === '.') {
+                return;
+            }
+            if (part === '..') {
+                stack.pop();
+                return;
+            }
+            stack.push(part);
+        });
+        return stack.join('/');
+    };
+
+    GitReaderApp.prototype.findSwiftModuleFile = function (moduleName) {
+        if (!moduleName) {
+            return null;
+        }
+        var target = moduleName + '.swift';
+        for (var _i = 0, _a = Array.from(this.fileNodesByPath.entries()); _i < _a.length; _i++) {
+            var entry = _a[_i];
+            var path = entry[0];
+            var node = entry[1];
+            if (path.endsWith('/' + target) || path === target) {
+                return node;
+            }
+        }
+        return null;
+    };
+
+    GitReaderApp.prototype.findSymbolInFiles = function (symbolName, candidates) {
+        if (!symbolName || candidates.length === 0) {
+            return null;
+        }
+        var candidateSet = new Set(candidates.map(this.normalizePath, this));
+        for (var i = 0; i < this.graphNodes.length; i += 1) {
+            var node = this.graphNodes[i];
+            if (!(node.location && node.location.path) || node.kind === 'external' || node.kind === 'folder') {
+                continue;
+            }
+            if (node.name !== symbolName) {
+                continue;
+            }
+            if (candidateSet.has(this.normalizePath(node.location.path))) {
+                return node;
+            }
+        }
+        return null;
+    };
+
+    GitReaderApp.prototype.findFileByCandidates = function (candidates) {
+        for (var i = 0; i < candidates.length; i += 1) {
+            var normalized = this.normalizePath(candidates[i]);
+            var node = this.fileNodesByPath.get(normalized);
+            if (node) {
+                return node;
+            }
+        }
+        return null;
+    };
+
+    GitReaderApp.prototype.jumpToSymbol = function (symbol) {
+        var _this = this;
+        if (this.graphInstance) {
+            var fileNode = this.getFileNodeForSymbol(symbol);
+            var fileElement = fileNode ? this.graphInstance.$id(fileNode.id) : null;
+            var symbolElement = this.graphInstance.$id(symbol.id);
+            if (fileElement && !fileElement.empty()) {
+                this.graphInstance.$('node:selected').unselect();
+                fileElement.select();
+                if (symbolElement && !symbolElement.empty() && symbolElement.id() !== fileElement.id()) {
+                    symbolElement.select();
+                }
+            }
+            else if (symbolElement && !symbolElement.empty()) {
+                this.graphInstance.$('node:selected').unselect();
+                symbolElement.select();
+            }
+        }
+        this.loadSymbolSnippet(symbol).catch(function () {
+            _this.renderCode(symbol);
+            _this.updateNarrator(symbol);
+        });
+    };
+
+    GitReaderApp.prototype.ensureImportModal = function () {
+        var _this = this;
+        if (this.importModal) {
+            return;
+        }
+        var modal = document.createElement('div');
+        modal.className = 'import-modal';
+        modal.setAttribute('aria-hidden', 'true');
+        modal.innerHTML =
+            '<div class="import-modal__backdrop" data-import-modal-close></div>' +
+                '<div class="import-modal__dialog" role="dialog" aria-modal="true" aria-label="Import lookup">' +
+                    '<h3>Not in this project</h3>' +
+                    '<p class="import-modal__message"></p>' +
+                    '<div class="import-modal__actions">' +
+                        '<button class="ghost-btn" type="button" data-import-modal-close>Close</button>' +
+                    '</div>' +
+                '</div>';
+        modal.addEventListener('click', function (event) {
+            var target = event.target;
+            if (target.closest('[data-import-modal-close]')) {
+                _this.hideImportModal();
+            }
+        });
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape') {
+                _this.hideImportModal();
+            }
+        });
+        document.body.append(modal);
+        this.importModal = modal;
+        this.importModalMessage = modal.querySelector('.import-modal__message');
+    };
+
+    GitReaderApp.prototype.showImportModal = function (message) {
+        this.ensureImportModal();
+        if (this.importModalMessage) {
+            this.importModalMessage.textContent = message;
+        }
+        if (this.importModal) {
+            this.importModal.classList.add('is-visible');
+            this.importModal.setAttribute('aria-hidden', 'false');
+        }
+    };
+
+    GitReaderApp.prototype.hideImportModal = function () {
+        if (!this.importModal) {
+            return;
+        }
+        this.importModal.classList.remove('is-visible');
+        this.importModal.setAttribute('aria-hidden', 'true');
     };
 
     GitReaderApp.prototype.lineHasIdentifierUsage = function (lineEl, importName) {
@@ -1770,6 +2733,7 @@
             this.setCanvasOverlay('Graph library not loaded.', true);
             return;
         }
+        this.displayNodeById = new Map(nodes.map(function (node) { return [node.id, node]; }));
         this.setCanvasOverlay('', false);
         this.ensureGraph();
         var selectedNodeId = this.getSelectedGraphNodeId();
@@ -1816,16 +2780,27 @@
         }
         this.graphInstance.on('tap', 'node', function (event) {
             var nodeId = event.target.id();
-            var node = _this.nodeById.get(nodeId);
+            var node = _this.displayNodeById.get(nodeId) || _this.nodeById.get(nodeId);
             if (!node) {
                 return;
             }
+            var now = Date.now();
+            var isDoubleTap = _this.lastTapNodeId === nodeId && (now - _this.lastTapAt) < _this.doubleTapDelay;
+            _this.lastTapNodeId = nodeId;
+            _this.lastTapAt = now;
             if (_this.tourActive) {
                 if (!_this.isGuidedNodeAllowed(nodeId)) {
                     _this.flashGuidedMessage('Follow the guide to unlock this step.');
                     return;
                 }
                 _this.advanceTour('jump', nodeId);
+                return;
+            }
+            if (_this.graphLayoutMode === 'cluster' && isDoubleTap && _this.handleClusterNodeToggle(node, event.originalEvent)) {
+                return;
+            }
+            if (_this.graphLayoutMode === 'cluster' && _this.handleClusterFolderSingleClick(node)) {
+                event.target.select();
                 return;
             }
             if (_this.handleFileFocusClick(node, event.originalEvent)) {
@@ -1912,6 +2887,9 @@
         if (node.kind === 'file') {
             return this.getBasename(path || fullLabel);
         }
+        if (node.kind === 'folder') {
+            return node.name || this.getBasename(path || fullLabel);
+        }
         return fullLabel || node.name;
     };
 
@@ -1947,6 +2925,8 @@
         switch (kind) {
             case 'file':
                 return 'F';
+            case 'folder':
+                return 'dir';
             case 'class':
                 return 'C';
             case 'function':
@@ -1966,6 +2946,8 @@
         switch (kind) {
             case 'file':
                 return 'File';
+            case 'folder':
+                return 'Folder';
             case 'class':
                 return 'Class';
             case 'function':
@@ -2011,6 +2993,10 @@
             {
                 selector: 'node[kind = "file"]',
                 style: { 'background-color': '#f0dcc1' }
+            },
+            {
+                selector: 'node[kind = "folder"]',
+                style: { 'background-color': '#f5e6d6', 'border-style': 'dashed' }
             },
             {
                 selector: 'node[kind = "class"]',
@@ -2332,9 +3318,14 @@
         if (this.graphLayoutMode === mode) {
             return;
         }
+        var wasCluster = this.graphLayoutMode === 'cluster';
         this.graphLayoutMode = mode;
         window.localStorage.setItem('gitreader.graphLayoutMode', mode);
         this.updateGraphControls();
+        if (wasCluster || mode === 'cluster') {
+            this.refreshGraphView();
+            return;
+        }
         this.runGraphLayout();
     };
 
@@ -2485,6 +3476,10 @@
     };
 
     GitReaderApp.prototype.updateNarrator = function (symbol) {
+        if (symbol.kind === 'folder') {
+            this.renderFileTreeNarrator();
+            return Promise.resolve();
+        }
         var _this = this;
         var mode = this.currentMode;
         var section = this.getSnippetSection(symbol);
@@ -2629,6 +3624,29 @@
             '<p class="eyebrow">File tree</p>' +
             '<h3>Browse the repository layout</h3>' +
             '<p>Expand folders in the tree to explore the structure. ' + escapeHtml(countLabel) + '</p>';
+    };
+
+    GitReaderApp.prototype.renderReaderFileTree = function (focusPath) {
+        var normalized = this.normalizePath(focusPath);
+        if (!this.fileTreeRoot) {
+            this.fileTreeRoot = this.buildFileTreeFromNodes(this.graphNodes);
+        }
+        this.readerTreeFocusPath = normalized || null;
+        this.currentSymbol = null;
+        this.currentSnippetText = '';
+        this.currentSnippetStartLine = 1;
+        var treeHtml = this.buildFileTreeMarkup(normalized);
+        this.codeSurface.innerHTML =
+            '<article class="code-card">' +
+                '<div class="code-meta">' +
+                    '<span>FOLDER</span>' +
+                    '<span>' + escapeHtml(normalized || 'Repository') + '</span>' +
+                '</div>' +
+                '<div class="code-actions">' +
+                    '<span class="code-status">Folder contents</span>' +
+                '</div>' +
+                '<div class="file-tree">' + treeHtml + '</div>' +
+            '</article>';
     };
 
     GitReaderApp.prototype.formatStoryArc = function (arc, mode) {
@@ -2860,7 +3878,10 @@
         }
         var chapterId = this.getActiveChapterId();
         var nodes = this.filterNodesForChapter(chapterId || '');
-        var focus = this.getSelectedGraphNode() || this.currentSymbol || this.pickFocusNode(nodes);
+        var selected = this.getSelectedGraphNode();
+        var focus = selected && selected.kind !== 'folder'
+            ? selected
+            : (this.currentSymbol || this.pickFocusNode(nodes));
         this.updateNarrator(focus);
     };
 
@@ -2896,7 +3917,7 @@
         if (!nodeId) {
             return null;
         }
-        return this.nodeById.get(nodeId) || null;
+        return this.displayNodeById.get(nodeId) || this.nodeById.get(nodeId) || null;
     };
 
     GitReaderApp.prototype.updateNarratorToggle = function () {
