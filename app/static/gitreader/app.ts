@@ -342,6 +342,7 @@ class GitReaderApp {
     private doubleTapDelay = 320;
     private importModal: HTMLElement | null = null;
     private importModalMessage: HTMLElement | null = null;
+    private importBreadcrumbs: string[] = [];
 
     constructor() {
         this.tocList = this.getElement('toc-list');
@@ -672,6 +673,14 @@ class GitReaderApp {
 
         this.codeSurface.addEventListener('click', (event) => {
             const target = event.target as HTMLElement;
+            const breadcrumbTarget = target.closest<HTMLElement>('[data-breadcrumb-path]');
+            if (breadcrumbTarget) {
+                const path = breadcrumbTarget.dataset.breadcrumbPath;
+                if (path) {
+                    this.navigateBreadcrumb(path);
+                }
+                return;
+            }
             const treeToggle = target.closest<HTMLElement>('[data-tree-toggle]');
             if (treeToggle) {
                 const path = treeToggle.dataset.treeToggle;
@@ -2011,6 +2020,7 @@ class GitReaderApp {
         const snippetHtml = this.renderSnippetLines(snippet, language);
         const revealLabel = snippet?.section === 'body' ? 'Show body' : 'Show code';
         const codeClass = this.hasHighlightSupport() && language ? `hljs language-${language}` : '';
+        const breadcrumbHtml = this.renderImportBreadcrumbs(symbol.location?.path);
         this.currentSymbol = symbol;
         this.readerTreeFocusPath = null;
         this.currentSnippetText = snippet?.snippet ?? '';
@@ -2021,6 +2031,7 @@ class GitReaderApp {
                     <span>${this.escapeHtml(symbol.kind.toUpperCase())}</span>
                     <span>${this.escapeHtml(locationLabel)}${this.escapeHtml(truncationLabel)}</span>
                 </div>
+                ${breadcrumbHtml}
                 <div class="code-actions">
                     <button class="ghost-btn" data-reader-action="copy">Copy snippet</button>
                     <div class="jump-control">
@@ -2155,6 +2166,72 @@ class GitReaderApp {
         });
     }
 
+    private updateImportBreadcrumbs(fromPath: string, toPath: string): void {
+        const from = this.normalizePath(fromPath);
+        const to = this.normalizePath(toPath);
+        if (!from || !to) {
+            return;
+        }
+        const last = this.importBreadcrumbs[this.importBreadcrumbs.length - 1];
+        if (!last || last !== from) {
+            this.importBreadcrumbs = [from];
+        }
+        if (from === to) {
+            return;
+        }
+        if (this.importBreadcrumbs[this.importBreadcrumbs.length - 1] !== to) {
+            this.importBreadcrumbs.push(to);
+        }
+    }
+
+    private renderImportBreadcrumbs(path?: string): string {
+        if (!path || this.importBreadcrumbs.length < 2) {
+            return '';
+        }
+        const normalized = this.normalizePath(path);
+        const currentIndex = this.importBreadcrumbs.lastIndexOf(normalized);
+        if (currentIndex < 0) {
+            return '';
+        }
+        const crumbs = [...this.importBreadcrumbs];
+        const items = crumbs.map((crumbPath, index) => {
+            const label = this.escapeHtml(this.getBreadcrumbLabel(crumbPath));
+            const escapedPath = this.escapeHtml(crumbPath);
+            const isCurrent = index === currentIndex;
+            const currentAttr = isCurrent ? ' aria-current="page"' : '';
+            const currentClass = isCurrent ? ' is-current' : '';
+            return `<button class="breadcrumb${currentClass}" data-breadcrumb-path="${escapedPath}"${currentAttr}>${label}</button>`;
+        });
+        return `
+            <nav class="code-breadcrumbs" aria-label="Import trail">
+                ${items.join('<span class="breadcrumb-sep">&gt;</span>')}
+            </nav>
+        `;
+    }
+
+    private getBreadcrumbLabel(path: string): string {
+        const normalized = this.normalizePath(path);
+        const parts = normalized.split('/').filter(Boolean);
+        if (parts.length <= 2) {
+            return normalized;
+        }
+        return `.../${parts.slice(-2).join('/')}`;
+    }
+
+    private navigateBreadcrumb(path: string): void {
+        const normalized = this.normalizePath(path);
+        const index = this.importBreadcrumbs.lastIndexOf(normalized);
+        if (index < 0) {
+            this.importBreadcrumbs = [normalized];
+        }
+        const fileNode = this.fileNodesByPath.get(normalized);
+        if (!fileNode) {
+            this.setCodeStatus(`"${normalized}" is not indexed in this project.`);
+            return;
+        }
+        this.jumpToSymbol(fileNode);
+    }
+
     private findJSImportBlocks(lines: string[]): Array<{ start: number; end: number; text: string }> {
         const blocks: Array<{ start: number; end: number; text: string }> = [];
         let inBlock = false;
@@ -2268,6 +2345,11 @@ class GitReaderApp {
         const target = this.resolveImportTarget(importName, statement, language, currentPath);
         if (target) {
             const fileNode = target.kind === 'file' ? target : this.getFileNodeForSymbol(target);
+            const fromPath = this.currentSymbol?.location?.path;
+            const toPath = fileNode?.location?.path ?? target.location?.path;
+            if (fromPath && toPath) {
+                this.updateImportBreadcrumbs(fromPath, toPath);
+            }
             if (fileNode && target.kind !== 'file') {
                 if (this.graphInstance) {
                     const fileElement = this.graphInstance.$id(fileNode.id);

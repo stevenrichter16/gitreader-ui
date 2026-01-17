@@ -121,6 +121,7 @@
         this.doubleTapDelay = 320;
         this.importModal = null;
         this.importModalMessage = null;
+        this.importBreadcrumbs = [];
     }
 
     GitReaderApp.prototype.init = function () {
@@ -397,6 +398,14 @@
 
         this.codeSurface.addEventListener('click', function (event) {
             var target = event.target;
+            var breadcrumbTarget = target.closest('[data-breadcrumb-path]');
+            if (breadcrumbTarget) {
+                var path = breadcrumbTarget.dataset.breadcrumbPath;
+                if (path) {
+                    _this.navigateBreadcrumb(path);
+                }
+                return;
+            }
             var treeToggle = target.closest('[data-tree-toggle]');
             if (treeToggle) {
                 var path = treeToggle.dataset.treeToggle;
@@ -1751,6 +1760,7 @@
         var snippetHtml = this.renderSnippetLines(snippet, language);
         var revealLabel = snippet && snippet.section === 'body' ? 'Show body' : 'Show code';
         var codeClass = this.hasHighlightSupport() && language ? 'hljs language-' + language : '';
+        var breadcrumbHtml = this.renderImportBreadcrumbs(symbol.location && symbol.location.path);
         this.currentSymbol = symbol;
         this.readerTreeFocusPath = null;
         this.currentSnippetText = (snippet && snippet.snippet) || '';
@@ -1761,6 +1771,7 @@
             '<span>' + escapeHtml(symbol.kind.toUpperCase()) + '</span>' +
             '<span>' + escapeHtml(locationLabel) + escapeHtml(truncationLabel) + '</span>' +
             '</div>' +
+            breadcrumbHtml +
             '<div class="code-actions">' +
             '<button class="ghost-btn" data-reader-action="copy">Copy snippet</button>' +
             '<div class="jump-control">' +
@@ -1897,6 +1908,70 @@
         });
     };
 
+    GitReaderApp.prototype.updateImportBreadcrumbs = function (fromPath, toPath) {
+        var from = this.normalizePath(fromPath);
+        var to = this.normalizePath(toPath);
+        if (!from || !to) {
+            return;
+        }
+        var last = this.importBreadcrumbs[this.importBreadcrumbs.length - 1];
+        if (!last || last !== from) {
+            this.importBreadcrumbs = [from];
+        }
+        if (from === to) {
+            return;
+        }
+        if (this.importBreadcrumbs[this.importBreadcrumbs.length - 1] !== to) {
+            this.importBreadcrumbs.push(to);
+        }
+    };
+
+    GitReaderApp.prototype.renderImportBreadcrumbs = function (path) {
+        if (!path || this.importBreadcrumbs.length < 2) {
+            return '';
+        }
+        var normalized = this.normalizePath(path);
+        var currentIndex = this.importBreadcrumbs.lastIndexOf(normalized);
+        if (currentIndex < 0) {
+            return '';
+        }
+        var crumbs = this.importBreadcrumbs.slice();
+        var items = crumbs.map(function (crumbPath, index) {
+            var label = escapeHtml(this.getBreadcrumbLabel(crumbPath));
+            var escapedPath = escapeHtml(crumbPath);
+            var isCurrent = index === currentIndex;
+            var currentAttr = isCurrent ? ' aria-current="page"' : '';
+            var currentClass = isCurrent ? ' is-current' : '';
+            return '<button class="breadcrumb' + currentClass + '" data-breadcrumb-path="' + escapedPath + '"' + currentAttr + '>' + label + '</button>';
+        }, this);
+        return '<nav class="code-breadcrumbs" aria-label="Import trail">' +
+            items.join('<span class="breadcrumb-sep">&gt;</span>') +
+            '</nav>';
+    };
+
+    GitReaderApp.prototype.getBreadcrumbLabel = function (path) {
+        var normalized = this.normalizePath(path);
+        var parts = normalized.split('/').filter(Boolean);
+        if (parts.length <= 2) {
+            return normalized;
+        }
+        return '.../' + parts.slice(-2).join('/');
+    };
+
+    GitReaderApp.prototype.navigateBreadcrumb = function (path) {
+        var normalized = this.normalizePath(path);
+        var index = this.importBreadcrumbs.lastIndexOf(normalized);
+        if (index < 0) {
+            this.importBreadcrumbs = [normalized];
+        }
+        var fileNode = this.fileNodesByPath.get(normalized);
+        if (!fileNode) {
+            this.setCodeStatus('"' + normalized + '" is not indexed in this project.');
+            return;
+        }
+        this.jumpToSymbol(fileNode);
+    };
+
     GitReaderApp.prototype.findJSImportBlocks = function (lines) {
         var _this = this;
         var blocks = [];
@@ -2013,6 +2088,11 @@
         var target = this.resolveImportTarget(importName, statement, language, currentPath);
         if (target) {
             var fileNode = target.kind === 'file' ? target : this.getFileNodeForSymbol(target);
+            var fromPath = this.currentSymbol && this.currentSymbol.location && this.currentSymbol.location.path;
+            var toPath = (fileNode && fileNode.location && fileNode.location.path) || (target.location && target.location.path);
+            if (fromPath && toPath) {
+                this.updateImportBreadcrumbs(fromPath, toPath);
+            }
             if (fileNode && target.kind !== 'file') {
                 if (this.graphInstance) {
                     var fileElement = this.graphInstance.$id(fileNode.id);
