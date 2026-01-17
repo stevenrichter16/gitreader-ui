@@ -42,6 +42,7 @@
         this.graphRevealButton = getElement('graph-reveal');
         this.graphTooltip = getElement('graph-tooltip');
         this.narratorPane = getElement('narrator');
+        this.readerFileTreeButton = getElement('reader-file-tree');
         this.routePicker = getElement('route-picker');
         this.routeSelect = getElement('route-select');
         this.routeJump = getElement('route-jump');
@@ -125,6 +126,8 @@
         this.foldedSymbolIds = new Set();
         this.currentFoldRanges = new Map();
         this.currentFoldPath = null;
+        this.pendingSymbol = null;
+        this.pendingSnippet = null;
     }
 
     GitReaderApp.prototype.init = function () {
@@ -274,6 +277,10 @@
                     _this.setSnippetMode(mode);
                 }
             });
+        });
+
+        this.readerFileTreeButton.addEventListener('click', function () {
+            _this.showReaderFileTreeForCurrent();
         });
 
         this.graphLayoutButtons.forEach(function (button) {
@@ -1251,6 +1258,8 @@
         return this.fetchJson(this.buildApiUrl('/gitreader/api/symbol', { id: symbol.id, section: section }))
             .then(function (response) {
                 _this.snippetCache.set(cacheKey, response);
+                _this.pendingSymbol = symbol;
+                _this.pendingSnippet = response;
                 _this.renderCode(symbol, response);
                 if (shouldNarrate) {
                     _this.updateNarrator(symbol);
@@ -1777,6 +1786,8 @@
         var codeClass = this.hasHighlightSupport() && language ? 'hljs language-' + language : '';
         var breadcrumbHtml = this.renderImportBreadcrumbs(symbol.location && symbol.location.path);
         this.currentSymbol = symbol;
+        this.pendingSymbol = symbol;
+        this.pendingSnippet = snippet || null;
         this.readerTreeFocusPath = null;
         this.currentSnippetText = (snippet && snippet.snippet) || '';
         this.currentSnippetStartLine = (snippet && snippet.start_line) || (symbol.location && symbol.location.start_line) || 1;
@@ -1809,6 +1820,7 @@
         this.applyGuidedCodeFocus();
         this.decorateImportLines(snippet, language);
         this.applyFoldControls(symbol);
+        this.updateReaderControls();
     };
 
     GitReaderApp.prototype.decorateImportLines = function (snippet, language) {
@@ -3583,12 +3595,19 @@
 
     GitReaderApp.prototype.setSnippetMode = function (mode) {
         var _this = this;
-        if (this.snippetMode === mode) {
+        if (this.snippetMode === mode && !this.readerTreeFocusPath) {
             return Promise.resolve();
         }
         this.snippetMode = mode;
         this.snippetCache.clear();
         this.updateSnippetModeUi();
+        if (this.readerTreeFocusPath) {
+            this.readerTreeFocusPath = null;
+            if (this.pendingSymbol) {
+                this.renderCode(this.pendingSymbol, this.pendingSnippet || undefined);
+                return Promise.resolve();
+            }
+        }
         if (this.currentSymbol) {
             var narrate = !this.activeStoryArc && !_this.tourActive;
             return this.loadSymbolSnippet(this.currentSymbol, narrate).then(function () {
@@ -3607,6 +3626,20 @@
         this.snippetModeButtons.forEach(function (button) {
             button.classList.toggle('is-active', button.dataset.snippetMode === _this.snippetMode);
         });
+    };
+
+    GitReaderApp.prototype.updateReaderControls = function () {
+        if (!this.readerFileTreeButton) {
+            return;
+        }
+        var isFileTree = Boolean(this.readerTreeFocusPath);
+        this.readerFileTreeButton.classList.toggle('is-active', isFileTree);
+        if (isFileTree) {
+            this.snippetModeButtons.forEach(function (button) { return button.classList.remove('is-active'); });
+        }
+        else {
+            this.updateSnippetModeUi();
+        }
     };
 
     GitReaderApp.prototype.copySnippet = function () {
@@ -3976,6 +4009,17 @@
             '<p>Expand folders in the tree to explore the structure. ' + escapeHtml(countLabel) + '</p>';
     };
 
+    GitReaderApp.prototype.showReaderFileTreeForCurrent = function () {
+        var _a;
+        var path = ((_a = this.currentSymbol) && _a.location && _a.location.path) || this.readerTreeFocusPath;
+        if (!path) {
+            return;
+        }
+        this.renderReaderFileTree(path);
+        this.renderFileTree(path);
+        this.updateReaderControls();
+    };
+
     GitReaderApp.prototype.renderReaderFileTree = function (focusPath) {
         var normalized = this.normalizePath(focusPath);
         if (!this.fileTreeRoot) {
@@ -3997,6 +4041,7 @@
                 '</div>' +
                 '<div class="file-tree">' + treeHtml + '</div>' +
             '</article>';
+        this.updateReaderControls();
     };
 
     GitReaderApp.prototype.formatStoryArc = function (arc, mode) {

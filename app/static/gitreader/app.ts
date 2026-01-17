@@ -279,6 +279,7 @@ class GitReaderApp {
     private graphRevealButton: HTMLButtonElement;
     private graphTooltip: HTMLElement;
     private narratorPane: HTMLElement;
+    private readerFileTreeButton: HTMLButtonElement;
     private routePicker: HTMLElement;
     private routeSelect: HTMLSelectElement;
     private routeJump: HTMLButtonElement;
@@ -354,6 +355,8 @@ class GitReaderApp {
     private foldedSymbolIds: Set<string> = new Set();
     private currentFoldRanges: Map<string, FoldRange> = new Map();
     private currentFoldPath: string | null = null;
+    private pendingSymbol: SymbolNode | null = null;
+    private pendingSnippet: SymbolSnippetResponse | null = null;
 
     constructor() {
         this.tocList = this.getElement('toc-list');
@@ -379,6 +382,7 @@ class GitReaderApp {
         this.graphRevealButton = this.getElement('graph-reveal') as HTMLButtonElement;
         this.graphTooltip = this.getElement('graph-tooltip');
         this.narratorPane = this.getElement('narrator');
+        this.readerFileTreeButton = this.getElement('reader-file-tree') as HTMLButtonElement;
         this.routePicker = this.getElement('route-picker');
         this.routeSelect = this.getElement('route-select') as HTMLSelectElement;
         this.routeJump = this.getElement('route-jump') as HTMLButtonElement;
@@ -557,6 +561,10 @@ class GitReaderApp {
                     void this.setSnippetMode(mode);
                 }
             });
+        });
+
+        this.readerFileTreeButton.addEventListener('click', () => {
+            this.showReaderFileTreeForCurrent();
         });
 
         this.graphLayoutButtons.forEach((button) => {
@@ -1521,6 +1529,8 @@ class GitReaderApp {
             this.buildApiUrl('/gitreader/api/symbol', { id: symbol.id, section }),
         );
         this.snippetCache.set(cacheKey, response);
+        this.pendingSymbol = symbol;
+        this.pendingSnippet = response;
         this.renderCode(symbol, response);
         if (shouldNarrate) {
             void this.updateNarrator(symbol);
@@ -2045,6 +2055,8 @@ class GitReaderApp {
         const codeClass = this.hasHighlightSupport() && language ? `hljs language-${language}` : '';
         const breadcrumbHtml = this.renderImportBreadcrumbs(symbol.location?.path);
         this.currentSymbol = symbol;
+        this.pendingSymbol = symbol;
+        this.pendingSnippet = snippet ?? null;
         this.readerTreeFocusPath = null;
         this.currentSnippetText = snippet?.snippet ?? '';
         this.currentSnippetStartLine = snippet?.start_line ?? symbol.location?.start_line ?? 1;
@@ -2078,6 +2090,7 @@ class GitReaderApp {
         this.applyGuidedCodeFocus();
         this.decorateImportLines(snippet, language);
         this.applyFoldControls(symbol);
+        this.updateReaderControls();
     }
 
     private decorateImportLines(snippet?: SymbolSnippetResponse, language?: string): void {
@@ -3972,6 +3985,16 @@ class GitReaderApp {
         `;
     }
 
+    private showReaderFileTreeForCurrent(): void {
+        const path = this.currentSymbol?.location?.path ?? this.readerTreeFocusPath;
+        if (!path) {
+            return;
+        }
+        this.renderReaderFileTree(path);
+        this.renderFileTree(path);
+        this.updateReaderControls();
+    }
+
     private renderReaderFileTree(focusPath: string): void {
         const normalized = this.normalizePath(focusPath);
         if (!this.fileTreeRoot) {
@@ -3994,6 +4017,7 @@ class GitReaderApp {
                 <div class="file-tree">${treeHtml}</div>
             </article>
         `;
+        this.updateReaderControls();
     }
 
     private formatStoryArc(arc: StoryArc, mode: NarrationMode): { eyebrow: string; title: string; body: string } {
@@ -4707,12 +4731,19 @@ class GitReaderApp {
     }
 
     private async setSnippetMode(mode: SnippetMode): Promise<void> {
-        if (this.snippetMode === mode) {
+        if (this.snippetMode === mode && !this.readerTreeFocusPath) {
             return;
         }
         this.snippetMode = mode;
         this.snippetCache.clear();
         this.updateSnippetModeUi();
+        if (this.readerTreeFocusPath) {
+            this.readerTreeFocusPath = null;
+            if (this.pendingSymbol) {
+                this.renderCode(this.pendingSymbol, this.pendingSnippet ?? undefined);
+                return;
+            }
+        }
         if (this.currentSymbol) {
             const narrate = !this.activeStoryArc && !this.tourActive;
             await this.loadSymbolSnippet(this.currentSymbol, narrate);
@@ -4728,6 +4759,19 @@ class GitReaderApp {
         this.snippetModeButtons.forEach((button) => {
             button.classList.toggle('is-active', button.dataset.snippetMode === this.snippetMode);
         });
+    }
+
+    private updateReaderControls(): void {
+        if (!this.readerFileTreeButton) {
+            return;
+        }
+        const isFileTree = Boolean(this.readerTreeFocusPath);
+        this.readerFileTreeButton.classList.toggle('is-active', isFileTree);
+        if (isFileTree) {
+            this.snippetModeButtons.forEach((button) => button.classList.remove('is-active'));
+        } else {
+            this.updateSnippetModeUi();
+        }
     }
 
     private copySnippet(): void {
