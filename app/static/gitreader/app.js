@@ -454,6 +454,416 @@ ${secondPart}`;
     `;
   }
 
+  // app/static/gitreader/modules/ui/graphView.ts
+  var GraphViewController = class {
+    // Holds dependency references so GraphViewController can orchestrate graph rendering later.
+    constructor(deps) {
+      this.deps = deps;
+      __publicField(this, "graph", null);
+      __publicField(this, "layoutMode", "cluster");
+      __publicField(this, "edgeFilters", /* @__PURE__ */ new Set(["calls", "imports", "inherits", "contains", "blueprint"]));
+      __publicField(this, "showExternalNodes", true);
+      __publicField(this, "focusedNodeId", null);
+    }
+    // Renders the provided nodes/edges and rebuilds Cytoscape when needed.
+    render(input) {
+      this.layoutMode = input.layoutMode;
+      if (input.nodes.length === 0) {
+        this.deps.clearGraph();
+        this.deps.setCanvasOverlay("No nodes yet. Graph data has not loaded.", true);
+        return;
+      }
+      if (!this.graph && typeof cytoscape !== "function") {
+        this.deps.setCanvasOverlay("Graph library not loaded.", true);
+        return;
+      }
+      this.deps.setDisplayNodes(input.nodes);
+      this.deps.setCanvasOverlay("", false);
+      this.ensureGraph();
+      if (!this.graph) {
+        return;
+      }
+      const selectedNodeId = this.deps.getSelectedNodeId();
+      const elements = this.buildGraphElements(input.nodes, input.edges);
+      this.graph.elements().remove();
+      this.graph.add(elements);
+      if (selectedNodeId) {
+        const selected = this.graph.$id(selectedNodeId);
+        if (selected) {
+          selected.select();
+        }
+      }
+      this.runLayout();
+      this.applyFilters();
+    }
+    // Updates the layout mode and reruns layout when graph data is already present.
+    setLayout(mode) {
+      this.layoutMode = mode;
+      this.runLayout();
+    }
+    // Updates edge/node filters wholesale when app state restores or resets.
+    setFilters(filters) {
+      this.edgeFilters = new Set(filters.edgeFilters);
+      this.showExternalNodes = filters.showExternalNodes;
+      this.applyFilters();
+    }
+    // Syncs focused node state from the orchestrator, then reapplies filters.
+    setSelection(state) {
+      this.focusedNodeId = state.focusedNodeId;
+      this.applyFilters();
+    }
+    // Returns the current edge/node filter state so UI controls can reflect it.
+    getFilterState() {
+      return {
+        edgeFilters: this.edgeFilters,
+        showExternalNodes: this.showExternalNodes
+      };
+    }
+    // Exposes the focused node id so app-level capping can keep it visible.
+    getFocusedNodeId() {
+      return this.focusedNodeId;
+    }
+    // Updates the focused node id without applying filters immediately.
+    setFocusedNodeId(nodeId) {
+      this.focusedNodeId = nodeId;
+    }
+    // Toggles an edge filter and reapplies visibility rules on the canvas.
+    toggleEdgeFilter(filter) {
+      if (this.edgeFilters.has(filter)) {
+        this.edgeFilters.delete(filter);
+      } else {
+        this.edgeFilters.add(filter);
+      }
+      this.applyFilters();
+    }
+    // Toggles external-node visibility and returns the new state.
+    toggleExternalNodes() {
+      this.showExternalNodes = !this.showExternalNodes;
+      return this.showExternalNodes;
+    }
+    // Applies edge/node filters, guided filters, and focus trimming in one pass.
+    applyFilters() {
+      if (!this.graph) {
+        return;
+      }
+      const cy = this.graph;
+      cy.elements().show();
+      if (!this.showExternalNodes) {
+        cy.nodes().filter('[kind = "external"]').hide();
+      }
+      cy.edges().forEach((edge) => {
+        if (!this.edgeFilters.has(edge.data("kind"))) {
+          edge.hide();
+        }
+      });
+      cy.edges().forEach((edge) => {
+        if (edge.source().hidden() || edge.target().hidden()) {
+          edge.hide();
+        }
+      });
+      this.deps.applyGuidedFilter();
+      this.applyFocus();
+      this.deps.refreshEdgeHighlights();
+      this.deps.updateLabelVisibility();
+    }
+    // Focuses the graph around the currently selected node, if any.
+    focusOnSelected() {
+      if (!this.graph) {
+        return;
+      }
+      const selected = this.graph.$("node:selected");
+      if (!selected || selected.length === 0) {
+        this.flashCanvasMessage("Select a node to focus.");
+        return;
+      }
+      this.focusedNodeId = selected[0].id();
+      this.applyFilters();
+    }
+    // Clears the focused node and restores the default visibility rules.
+    resetFocus() {
+      this.focusedNodeId = null;
+      this.applyFilters();
+    }
+    // Creates the Cytoscape instance once and informs the app for event binding.
+    ensureGraph() {
+      if (this.graph) {
+        return;
+      }
+      if (typeof cytoscape !== "function") {
+        return;
+      }
+      this.graph = cytoscape({
+        container: this.deps.container,
+        elements: [],
+        style: this.getGraphStyles(),
+        layout: { name: "cose", animate: false, fit: true, padding: 24 },
+        minZoom: 0.2,
+        maxZoom: 2.5,
+        wheelSensitivity: 0.2
+      });
+      this.deps.onGraphReady(this.graph);
+    }
+    // Applies focus trimming to the current graph to isolate a focused node.
+    applyFocus() {
+      if (!this.graph || !this.focusedNodeId || this.deps.isTourActive()) {
+        return;
+      }
+      const node = this.graph.getElementById(this.focusedNodeId);
+      if (!node || node.empty() || node.hidden()) {
+        this.focusedNodeId = null;
+        return;
+      }
+      const visible = this.graph.elements(":visible");
+      const focusElements = node.closedNeighborhood().intersection(visible);
+      visible.not(focusElements).hide();
+      this.graph.fit(focusElements, 40);
+    }
+    // Flashes a short overlay message to guide focus interactions.
+    flashCanvasMessage(message) {
+      this.deps.setCanvasOverlay(message, true);
+      window.setTimeout(() => this.deps.setCanvasOverlay("", false), 1200);
+    }
+    // Re-runs the current layout mode on the active graph instance.
+    runLayout() {
+      if (!this.graph) {
+        return;
+      }
+      const layout = this.graph.layout(this.getLayoutOptions());
+      layout.run();
+      this.deps.updateLabelVisibility();
+    }
+    // Zooms the canvas around its center so focus stays predictable.
+    zoom(factor) {
+      if (!this.graph) {
+        return;
+      }
+      const current = this.graph.zoom();
+      const next = Math.min(2.5, Math.max(0.2, current * factor));
+      const rect = this.deps.container.getBoundingClientRect();
+      this.graph.zoom({
+        level: next,
+        renderedPosition: {
+          x: rect.width / 2,
+          y: rect.height / 2
+        }
+      });
+      this.deps.updateLabelVisibility();
+    }
+    // Fits all visible graph elements within the viewport.
+    fit() {
+      if (!this.graph) {
+        return;
+      }
+      this.graph.fit(void 0, 40);
+      this.deps.updateLabelVisibility();
+    }
+    // Chooses layout options based on the current layout mode.
+    getLayoutOptions() {
+      if (this.layoutMode === "layer") {
+        return {
+          name: "breadthfirst",
+          animate: false,
+          fit: true,
+          padding: 36,
+          directed: true,
+          spacingFactor: 1.35,
+          avoidOverlap: true,
+          avoidOverlapPadding: 24,
+          nodeDimensionsIncludeLabels: true
+        };
+      }
+      if (this.layoutMode === "free") {
+        return {
+          name: "preset",
+          animate: false,
+          fit: true,
+          padding: 24
+        };
+      }
+      return {
+        name: "cose",
+        animate: false,
+        fit: true,
+        padding: 24
+      };
+    }
+    // Builds Cytoscape element data for nodes and edges using shared label formatting.
+    buildGraphElements(nodes, edges) {
+      const nodeElements = nodes.map((node) => {
+        const labelData = this.deps.formatLabel(node);
+        return {
+          data: {
+            id: node.id,
+            label: labelData.label,
+            fullLabel: labelData.fullLabel,
+            kindLabel: labelData.kindLabel,
+            kind: node.kind,
+            summary: node.summary || "",
+            path: labelData.path,
+            labelVisible: "true"
+          }
+        };
+      });
+      const edgeElements = edges.map((edge, index) => ({
+        data: {
+          id: `edge:${edge.source}:${edge.target}:${edge.kind}:${index}`,
+          source: edge.source,
+          target: edge.target,
+          kind: edge.kind,
+          confidence: edge.confidence
+        }
+      }));
+      return [...nodeElements, ...edgeElements];
+    }
+    // Supplies the Cytoscape stylesheet that defines node/edge appearance and state styling.
+    getGraphStyles() {
+      return [
+        {
+          selector: "node",
+          style: {
+            "background-color": "#e9dfcf",
+            "label": "data(label)",
+            "font-size": "12px",
+            "font-family": "Space Grotesk, sans-serif",
+            "text-wrap": "wrap",
+            "text-max-width": "120px",
+            "text-valign": "center",
+            "text-halign": "center",
+            "color": "#1e1914",
+            "border-width": 1,
+            "border-color": "#d2c2ad",
+            "padding": "10px",
+            "shape": "round-rectangle"
+          }
+        },
+        {
+          selector: 'node[labelVisible = "false"]',
+          style: {
+            "text-opacity": 0,
+            "text-background-opacity": 0
+          }
+        },
+        {
+          selector: 'node[kind = "file"]',
+          style: { "background-color": "#f0dcc1" }
+        },
+        {
+          selector: 'node[kind = "folder"]',
+          style: { "background-color": "#f5e6d6", "border-style": "dashed" }
+        },
+        {
+          selector: 'node[kind = "class"]',
+          style: { "background-color": "#d9e8f0" }
+        },
+        {
+          selector: 'node[kind = "function"]',
+          style: { "background-color": "#e3f0d9" }
+        },
+        {
+          selector: 'node[kind = "method"]',
+          style: { "background-color": "#f0e3d9" }
+        },
+        {
+          selector: 'node[kind = "blueprint"]',
+          style: { "background-color": "#d9efe7" }
+        },
+        {
+          selector: 'node[kind = "external"]',
+          style: { "background-color": "#efe0f0", "border-style": "dashed" }
+        },
+        {
+          selector: "node:selected",
+          style: {
+            "border-width": 2,
+            "border-color": "#237a78",
+            "shadow-blur": 18,
+            "shadow-color": "#237a78",
+            "shadow-opacity": 0.5,
+            "shadow-offset-x": 0,
+            "shadow-offset-y": 0
+          }
+        },
+        {
+          selector: "node.is-hovered",
+          style: {
+            "text-opacity": 1,
+            "text-background-opacity": 1,
+            "shadow-blur": 16,
+            "shadow-color": "#237a78",
+            "shadow-opacity": 0.45,
+            "z-index": 10
+          }
+        },
+        {
+          selector: "node.is-guided-focus",
+          style: {
+            "border-width": 3,
+            "border-color": "#c75c2a",
+            "shadow-blur": 22,
+            "shadow-color": "#c75c2a",
+            "shadow-opacity": 0.6,
+            "z-index": 12
+          }
+        },
+        {
+          selector: "node.is-guided-hidden",
+          style: {
+            "opacity": 0,
+            "text-opacity": 0
+          }
+        },
+        {
+          selector: "edge",
+          style: {
+            "line-color": "#bcae9c",
+            "width": 1,
+            "curve-style": "unbundled-bezier",
+            "control-point-distances": 40,
+            "control-point-weights": 0.5,
+            "target-arrow-shape": "triangle",
+            "target-arrow-color": "#bcae9c",
+            "opacity": 0.2
+          }
+        },
+        {
+          selector: "edge.is-active",
+          style: {
+            "opacity": 0.75,
+            "width": 2
+          }
+        },
+        {
+          selector: 'edge[kind = "calls"]',
+          style: { "line-color": "#237a78", "target-arrow-color": "#237a78" }
+        },
+        {
+          selector: 'edge[kind = "imports"]',
+          style: { "line-color": "#d07838", "target-arrow-color": "#d07838" }
+        },
+        {
+          selector: 'edge[kind = "inherits"]',
+          style: { "line-color": "#7d6ba6", "target-arrow-color": "#7d6ba6" }
+        },
+        {
+          selector: 'edge[kind = "contains"]',
+          style: { "line-color": "#5c4d3c", "target-arrow-color": "#5c4d3c" }
+        },
+        {
+          selector: 'edge[kind = "blueprint"]',
+          style: { "line-color": "#2a9d8f", "target-arrow-color": "#2a9d8f" }
+        },
+        {
+          selector: 'edge[confidence = "low"]',
+          style: { "line-style": "dashed", "opacity": 0.15 }
+        },
+        {
+          selector: "edge.is-guided-hidden",
+          style: { "opacity": 0 }
+        }
+      ];
+    }
+  };
+
   // app/static/gitreader/modules/ui/fileTreeInteractions.ts
   function expandFileTreePath(collapsed, path) {
     const normalized = normalizePath(path);
@@ -2467,6 +2877,7 @@ ${secondPart}`;
       __publicField(this, "tocMode", "story");
       __publicField(this, "fileTreeView");
       __publicField(this, "fileTreeController");
+      __publicField(this, "graphView");
       __publicField(this, "readerView");
       __publicField(this, "readerInteractions");
       __publicField(this, "readerController");
@@ -2497,12 +2908,9 @@ ${secondPart}`;
       __publicField(this, "narratorVisible", true);
       __publicField(this, "graphInstance", null);
       __publicField(this, "graphEventsBound", false);
-      __publicField(this, "edgeFilters", /* @__PURE__ */ new Set(["calls", "imports", "inherits", "contains", "blueprint"]));
-      __publicField(this, "showExternalNodes", true);
       __publicField(this, "hoveredNodeId", null);
       __publicField(this, "currentScope", "full");
       __publicField(this, "currentChapterId", null);
-      __publicField(this, "focusedNodeId", null);
       __publicField(this, "currentSymbol", null);
       __publicField(this, "currentSnippetText", "");
       __publicField(this, "currentSnippetStartLine", 1);
@@ -2577,6 +2985,24 @@ ${secondPart}`;
       this.fileTreeController = new FileTreeController({
         fileTreeView: this.fileTreeView,
         narratorContainer: this.narratorFileTree
+      });
+      this.graphView = new GraphViewController({
+        container: this.canvasGraph,
+        setCanvasOverlay: (message, visible) => this.setCanvasOverlay(message, visible),
+        clearGraph: () => this.clearGraph(),
+        getSelectedNodeId: () => this.getSelectedGraphNodeId(),
+        isTourActive: () => this.tourActive,
+        applyGuidedFilter: () => this.applyGuidedGraphFilter(),
+        refreshEdgeHighlights: () => this.refreshEdgeHighlights(),
+        updateLabelVisibility: () => this.updateLabelVisibility(),
+        setDisplayNodes: (nodes) => {
+          this.displayNodeById = new Map(nodes.map((node) => [node.id, node]));
+        },
+        formatLabel: (node) => this.formatNodeLabel(node),
+        onGraphReady: (graph) => {
+          this.graphInstance = graph;
+          this.bindGraphEvents();
+        }
       });
       const setReaderState = (update) => {
         var _a, _b, _c, _d, _e, _f;
@@ -2810,7 +3236,8 @@ ${secondPart}`;
         button.addEventListener("click", () => {
           const filter = button.dataset.edgeFilter;
           if (filter) {
-            this.toggleEdgeFilter(filter);
+            this.graphView.toggleEdgeFilter(filter);
+            this.updateGraphControls();
           }
         });
       });
@@ -2818,12 +3245,12 @@ ${secondPart}`;
         button.addEventListener("click", () => {
           const filter = button.dataset.nodeFilter;
           if (filter === "external") {
-            this.showExternalNodes = !this.showExternalNodes;
+            this.graphView.toggleExternalNodes();
             this.updateGraphControls();
             if (this.graphLayoutMode === "cluster") {
               this.refreshGraphView();
             } else {
-              this.applyGraphFilters();
+              this.graphView.applyFilters();
             }
           }
         });
@@ -2832,17 +3259,18 @@ ${secondPart}`;
         button.addEventListener("click", () => {
           const action = button.dataset.graphAction;
           if (action === "focus") {
-            this.focusOnSelected();
+            this.graphView.focusOnSelected();
           } else if (action === "reset") {
-            this.resetGraphFocus();
+            this.graphView.resetFocus();
+            this.refreshGraphViewport();
           } else if (action === "reveal") {
             this.revealMoreNodes();
           } else if (action === "zoom-in") {
-            this.zoomGraph(1.2);
+            this.graphView.zoom(1.2);
           } else if (action === "zoom-out") {
-            this.zoomGraph(0.8);
+            this.graphView.zoom(0.8);
           } else if (action === "fit") {
-            this.fitGraph();
+            this.graphView.fit();
           }
         });
       });
@@ -3154,7 +3582,7 @@ ${secondPart}`;
       this.activeStoryArc = null;
       const chapter = this.chapters.find((entry) => entry.id === chapterId);
       const scope = (_a = chapter == null ? void 0 : chapter.scope) != null ? _a : this.getScopeForChapter(chapterId);
-      this.focusedNodeId = null;
+      this.graphView.setFocusedNodeId(null);
       await this.loadGraphForScope(scope);
       if (requestToken !== this.chapterRequestToken) {
         return;
@@ -3163,7 +3591,11 @@ ${secondPart}`;
       const edges = this.filterEdgesForNodes(nodes);
       const graphView = this.buildGraphView(nodes, edges, scope);
       const focus = this.pickFocusNode(graphView.nodes);
-      this.renderGraph(graphView.nodes, graphView.edges);
+      this.graphView.render({
+        nodes: graphView.nodes,
+        edges: graphView.edges,
+        layoutMode: this.graphLayoutMode
+      });
       this.updateGraphNodeStatus(graphView);
       this.loadSymbolSnippet(focus).catch(() => {
         this.readerController.render(focus);
@@ -3200,7 +3632,7 @@ ${secondPart}`;
       }
       this.activeStoryArc = arc;
       this.syncRoutePickerSelection(arcId);
-      this.focusedNodeId = arc.entry_id;
+      this.graphView.setFocusedNodeId(arc.entry_id);
       await this.loadGraphForScope("full");
       if (requestToken !== this.chapterRequestToken) {
         return;
@@ -3208,7 +3640,11 @@ ${secondPart}`;
       const nodes = this.graphNodes;
       const edges = this.filterEdgesForNodes(nodes);
       const graphView = this.buildGraphView(nodes, edges, "full");
-      this.renderGraph(graphView.nodes, graphView.edges);
+      this.graphView.render({
+        nodes: graphView.nodes,
+        edges: graphView.edges,
+        layoutMode: this.graphLayoutMode
+      });
       this.updateGraphNodeStatus(graphView);
       const entryNode = (_a = this.nodeById.get(arc.entry_id)) != null ? _a : this.pickFocusNode(graphView.nodes);
       if (entryNode) {
@@ -3309,8 +3745,9 @@ ${secondPart}`;
           keepIds.add(fileNode.id);
         }
       }
-      if (this.focusedNodeId && nodeMap.has(this.focusedNodeId)) {
-        keepIds.add(this.focusedNodeId);
+      const focusedNodeId = this.graphView.getFocusedNodeId();
+      if (focusedNodeId && nodeMap.has(focusedNodeId)) {
+        keepIds.add(focusedNodeId);
       }
       const kindWeight = {
         function: 0,
@@ -3476,7 +3913,8 @@ ${secondPart}`;
         });
       };
       visitTree(fileTree, null);
-      if (this.showExternalNodes) {
+      const { showExternalNodes } = this.graphView.getFilterState();
+      if (showExternalNodes) {
         nodes.forEach((node) => {
           if (node.kind === "external") {
             addNode(node);
@@ -3514,7 +3952,7 @@ ${secondPart}`;
       const resolveRepresentative = (node) => {
         var _a;
         if (node.kind === "external") {
-          return this.showExternalNodes ? node.id : null;
+          return showExternalNodes ? node.id : null;
         }
         const path = (_a = node.location) == null ? void 0 : _a.path;
         if (!path) {
@@ -3627,7 +4065,11 @@ ${secondPart}`;
       const nodes = this.filterNodesForChapter(this.currentChapterId);
       const edges = this.filterEdgesForNodes(nodes);
       const graphView = this.buildGraphView(nodes, edges, this.currentScope);
-      this.renderGraph(graphView.nodes, graphView.edges);
+      this.graphView.render({
+        nodes: graphView.nodes,
+        edges: graphView.edges,
+        layoutMode: this.graphLayoutMode
+      });
       this.updateGraphNodeStatus(graphView);
     }
     setGraphData(graphData) {
@@ -4074,47 +4516,6 @@ ${secondPart}`;
         void this.updateNarrator(symbol);
       });
     }
-    renderGraph(nodes, edges) {
-      if (nodes.length === 0) {
-        this.clearGraph();
-        this.setCanvasOverlay("No nodes yet. Graph data has not loaded.", true);
-        return;
-      }
-      if (!this.graphInstance && typeof cytoscape !== "function") {
-        this.setCanvasOverlay("Graph library not loaded.", true);
-        return;
-      }
-      this.displayNodeById = new Map(nodes.map((node) => [node.id, node]));
-      this.setCanvasOverlay("", false);
-      this.ensureGraph();
-      const selectedNodeId = this.getSelectedGraphNodeId();
-      const elements = this.buildGraphElements(nodes, edges);
-      this.graphInstance.elements().remove();
-      this.graphInstance.add(elements);
-      if (selectedNodeId) {
-        const selected = this.graphInstance.$id(selectedNodeId);
-        if (selected) {
-          selected.select();
-        }
-      }
-      this.runGraphLayout();
-      this.applyGraphFilters();
-    }
-    ensureGraph() {
-      if (this.graphInstance) {
-        return;
-      }
-      this.graphInstance = cytoscape({
-        container: this.canvasGraph,
-        elements: [],
-        style: this.getGraphStyles(),
-        layout: { name: "cose", animate: false, fit: true, padding: 24 },
-        minZoom: 0.2,
-        maxZoom: 2.5,
-        wheelSensitivity: 0.2
-      });
-      this.bindGraphEvents();
-    }
     clearGraph() {
       if (this.graphInstance) {
         this.graphInstance.elements().remove();
@@ -4167,33 +4568,6 @@ ${secondPart}`;
         this.graphEventsBound = true;
       }
     }
-    buildGraphElements(nodes, edges) {
-      const nodeElements = nodes.map((node) => {
-        const labelData = this.formatNodeLabel(node);
-        return {
-          data: {
-            id: node.id,
-            label: labelData.label,
-            fullLabel: labelData.fullLabel,
-            kindLabel: labelData.kindLabel,
-            kind: node.kind,
-            summary: node.summary || "",
-            path: labelData.path,
-            labelVisible: "true"
-          }
-        };
-      });
-      const edgeElements = edges.map((edge, index) => ({
-        data: {
-          id: `edge:${edge.source}:${edge.target}:${edge.kind}:${index}`,
-          source: edge.source,
-          target: edge.target,
-          kind: edge.kind,
-          confidence: edge.confidence
-        }
-      }));
-      return [...nodeElements, ...edgeElements];
-    }
     formatNodeLabel(node) {
       return formatGraphNodeLabel(node, this.labelLineLength);
     }
@@ -4211,152 +4585,6 @@ ${secondPart}`;
     }
     getKindLabel(kind) {
       return getKindLabel(kind);
-    }
-    getGraphStyles() {
-      return [
-        {
-          selector: "node",
-          style: {
-            "background-color": "#e9dfcf",
-            "label": "data(label)",
-            "font-size": "12px",
-            "font-family": "Space Grotesk, sans-serif",
-            "text-wrap": "wrap",
-            "text-max-width": "120px",
-            "text-valign": "center",
-            "text-halign": "center",
-            "color": "#1e1914",
-            "border-width": 1,
-            "border-color": "#d2c2ad",
-            "padding": "10px",
-            "shape": "round-rectangle"
-          }
-        },
-        {
-          selector: 'node[labelVisible = "false"]',
-          style: {
-            "text-opacity": 0,
-            "text-background-opacity": 0
-          }
-        },
-        {
-          selector: 'node[kind = "file"]',
-          style: { "background-color": "#f0dcc1" }
-        },
-        {
-          selector: 'node[kind = "folder"]',
-          style: { "background-color": "#f5e6d6", "border-style": "dashed" }
-        },
-        {
-          selector: 'node[kind = "class"]',
-          style: { "background-color": "#d9e8f0" }
-        },
-        {
-          selector: 'node[kind = "function"]',
-          style: { "background-color": "#e3f0d9" }
-        },
-        {
-          selector: 'node[kind = "method"]',
-          style: { "background-color": "#f0e3d9" }
-        },
-        {
-          selector: 'node[kind = "blueprint"]',
-          style: { "background-color": "#d9efe7" }
-        },
-        {
-          selector: 'node[kind = "external"]',
-          style: { "background-color": "#efe0f0", "border-style": "dashed" }
-        },
-        {
-          selector: "node:selected",
-          style: {
-            "border-width": 2,
-            "border-color": "#237a78",
-            "shadow-blur": 18,
-            "shadow-color": "#237a78",
-            "shadow-opacity": 0.5,
-            "shadow-offset-x": 0,
-            "shadow-offset-y": 0
-          }
-        },
-        {
-          selector: "node.is-hovered",
-          style: {
-            "text-opacity": 1,
-            "text-background-opacity": 1,
-            "shadow-blur": 16,
-            "shadow-color": "#237a78",
-            "shadow-opacity": 0.45,
-            "z-index": 10
-          }
-        },
-        {
-          selector: "node.is-guided-focus",
-          style: {
-            "border-width": 3,
-            "border-color": "#c75c2a",
-            "shadow-blur": 22,
-            "shadow-color": "#c75c2a",
-            "shadow-opacity": 0.6,
-            "z-index": 12
-          }
-        },
-        {
-          selector: "node.is-guided-hidden",
-          style: {
-            "opacity": 0,
-            "text-opacity": 0
-          }
-        },
-        {
-          selector: "edge",
-          style: {
-            "line-color": "#bcae9c",
-            "width": 1,
-            "curve-style": "unbundled-bezier",
-            "control-point-distances": 40,
-            "control-point-weights": 0.5,
-            "target-arrow-shape": "triangle",
-            "target-arrow-color": "#bcae9c",
-            "opacity": 0.2
-          }
-        },
-        {
-          selector: "edge.is-active",
-          style: {
-            "opacity": 0.75,
-            "width": 2
-          }
-        },
-        {
-          selector: 'edge[kind = "calls"]',
-          style: { "line-color": "#237a78", "target-arrow-color": "#237a78" }
-        },
-        {
-          selector: 'edge[kind = "imports"]',
-          style: { "line-color": "#d07838", "target-arrow-color": "#d07838" }
-        },
-        {
-          selector: 'edge[kind = "inherits"]',
-          style: { "line-color": "#7d6ba6", "target-arrow-color": "#7d6ba6" }
-        },
-        {
-          selector: 'edge[kind = "contains"]',
-          style: { "line-color": "#5c4d3c", "target-arrow-color": "#5c4d3c" }
-        },
-        {
-          selector: 'edge[kind = "blueprint"]',
-          style: { "line-color": "#2a9d8f", "target-arrow-color": "#2a9d8f" }
-        },
-        {
-          selector: 'edge[confidence = "low"]',
-          style: { "line-style": "dashed", "opacity": 0.15 }
-        },
-        {
-          selector: "edge.is-guided-hidden",
-          style: { "opacity": 0 }
-        }
-      ];
     }
     refreshEdgeHighlights() {
       if (!this.graphInstance) {
@@ -4427,14 +4655,6 @@ ${secondPart}`;
       const x = Math.min(surfaceRect.width - 20, Math.max(0, rendered.x + offset));
       const y = Math.min(surfaceRect.height - 20, Math.max(0, rendered.y + offset));
       this.graphTooltip.style.transform = `translate(${x}px, ${y}px)`;
-    }
-    runGraphLayout() {
-      if (!this.graphInstance) {
-        return;
-      }
-      const layout = this.graphInstance.layout(this.getLayoutOptions());
-      layout.run();
-      this.updateLabelVisibility();
     }
     async updateNarrator(symbol) {
       if (symbol.kind === "folder") {
@@ -4722,7 +4942,11 @@ ${secondPart}`;
           visibleNodes: nodes.length,
           isCapped: false
         };
-        this.renderGraph(graphView.nodes, graphView.edges);
+        this.graphView.render({
+          nodes: graphView.nodes,
+          edges: graphView.edges,
+          layoutMode: this.graphLayoutMode
+        });
         this.updateGraphNodeStatus(graphView);
       }
       if (this.graphInstance) {
@@ -4858,7 +5082,7 @@ ${secondPart}`;
         this.guidedAllowedNodeIds = null;
         this.applyGuidedToc();
         this.applyGuidedCodeFocus();
-        this.applyGraphFilters();
+        this.graphView.applyFilters();
         this.fileTreeController.render(null);
         return;
       }
@@ -4873,7 +5097,7 @@ ${secondPart}`;
       }
       this.guidedAllowedNodeIds = allowed.size > 0 ? allowed : null;
       this.applyGuidedToc();
-      this.applyGraphFilters();
+      this.graphView.applyFilters();
       this.applyGuidedCodeFocus();
       this.fileTreeController.render((_d = (_c = this.tourStep.focus) == null ? void 0 : _c.file_path) != null ? _d : null);
     }
@@ -5041,98 +5265,10 @@ ${secondPart}`;
         this.refreshGraphView();
         return;
       }
-      this.runGraphLayout();
-    }
-    toggleEdgeFilter(filter) {
-      if (this.edgeFilters.has(filter)) {
-        this.edgeFilters.delete(filter);
-      } else {
-        this.edgeFilters.add(filter);
-      }
-      this.updateGraphControls();
-      this.applyGraphFilters();
-    }
-    applyGraphFilters() {
-      if (!this.graphInstance) {
-        return;
-      }
-      const cy = this.graphInstance;
-      cy.elements().show();
-      if (!this.showExternalNodes) {
-        cy.nodes().filter('[kind = "external"]').hide();
-      }
-      cy.edges().forEach((edge) => {
-        if (!this.edgeFilters.has(edge.data("kind"))) {
-          edge.hide();
-        }
-      });
-      cy.edges().forEach((edge) => {
-        if (edge.source().hidden() || edge.target().hidden()) {
-          edge.hide();
-        }
-      });
-      this.applyGuidedGraphFilter();
-      this.applyFocus();
-      this.refreshEdgeHighlights();
-      this.updateLabelVisibility();
-    }
-    focusOnSelected() {
-      if (!this.graphInstance) {
-        return;
-      }
-      const selected = this.graphInstance.$("node:selected");
-      if (!selected || selected.length === 0) {
-        this.setCanvasOverlay("Select a node to focus.", true);
-        window.setTimeout(() => this.setCanvasOverlay("", false), 1200);
-        return;
-      }
-      this.focusedNodeId = selected[0].id();
-      this.applyGraphFilters();
-    }
-    resetGraphFocus() {
-      this.focusedNodeId = null;
-      this.applyGraphFilters();
-      this.refreshGraphViewport();
-    }
-    applyFocus() {
-      if (!this.graphInstance || !this.focusedNodeId || this.tourActive) {
-        return;
-      }
-      const cy = this.graphInstance;
-      const node = cy.getElementById(this.focusedNodeId);
-      if (!node || node.empty() || node.hidden()) {
-        this.focusedNodeId = null;
-        return;
-      }
-      const visible = cy.elements(":visible");
-      const focusElements = node.closedNeighborhood().intersection(visible);
-      visible.not(focusElements).hide();
-      cy.fit(focusElements, 40);
-    }
-    zoomGraph(factor) {
-      if (!this.graphInstance) {
-        return;
-      }
-      const current = this.graphInstance.zoom();
-      const next = Math.min(2.5, Math.max(0.2, current * factor));
-      const rect = this.canvasGraph.getBoundingClientRect();
-      this.graphInstance.zoom({
-        level: next,
-        renderedPosition: {
-          x: rect.width / 2,
-          y: rect.height / 2
-        }
-      });
-      this.updateLabelVisibility();
-    }
-    fitGraph() {
-      if (!this.graphInstance) {
-        return;
-      }
-      this.graphInstance.fit(void 0, 40);
-      this.updateLabelVisibility();
+      this.graphView.setLayout(mode);
     }
     updateGraphControls() {
+      const { edgeFilters, showExternalNodes } = this.graphView.getFilterState();
       this.graphLayoutButtons.forEach((button) => {
         button.classList.toggle("is-active", button.dataset.layoutAction === this.graphLayoutMode);
       });
@@ -5141,42 +5277,13 @@ ${secondPart}`;
         if (!filter) {
           return;
         }
-        button.classList.toggle("is-active", this.edgeFilters.has(filter));
+        button.classList.toggle("is-active", edgeFilters.has(filter));
       });
       this.nodeFilterButtons.forEach((button) => {
         if (button.dataset.nodeFilter === "external") {
-          button.classList.toggle("is-active", this.showExternalNodes);
+          button.classList.toggle("is-active", showExternalNodes);
         }
       });
-    }
-    getLayoutOptions() {
-      if (this.graphLayoutMode === "layer") {
-        return {
-          name: "breadthfirst",
-          animate: false,
-          fit: true,
-          padding: 36,
-          directed: true,
-          spacingFactor: 1.35,
-          avoidOverlap: true,
-          avoidOverlapPadding: 24,
-          nodeDimensionsIncludeLabels: true
-        };
-      }
-      if (this.graphLayoutMode === "free") {
-        return {
-          name: "preset",
-          animate: false,
-          fit: true,
-          padding: 24
-        };
-      }
-      return {
-        name: "cose",
-        animate: false,
-        fit: true,
-        padding: 24
-      };
     }
   };
   document.addEventListener("DOMContentLoaded", () => {

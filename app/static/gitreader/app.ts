@@ -4,6 +4,7 @@ import { FileTreeController } from './modules/ui/fileTreeController';
 import { bindFileTreeEvents } from './modules/ui/fileTreeEvents';
 import { bindGraphEvents } from './modules/ui/graphEvents';
 import { buildGraphTooltipHtml, formatGraphNodeLabel } from './modules/ui/graphLabels';
+import { GraphViewController } from './modules/ui/graphView';
 import { FileTreeView, fileTreeViewDefaults } from './modules/ui/fileTreeView';
 import { ReaderController } from './modules/ui/readerController';
 import { ReaderView, type ReaderStateUpdate } from './modules/ui/reader';
@@ -54,7 +55,6 @@ import type {
     TourState,
 } from './modules/types';
 
-declare const cytoscape: any;
 declare const hljs: any;
 
 class GitReaderApp {
@@ -103,6 +103,7 @@ class GitReaderApp {
     private tocMode: TocMode = 'story';
     private fileTreeView: FileTreeView;
     private fileTreeController: FileTreeController;
+    private graphView: GraphViewController;
     private readerView: ReaderView;
     private readerInteractions: ReaderInteractions;
     private readerController: ReaderController;
@@ -133,12 +134,9 @@ class GitReaderApp {
     private narratorVisible = true;
     private graphInstance: any | null = null;
     private graphEventsBound = false;
-    private edgeFilters: Set<EdgeKind> = new Set(['calls', 'imports', 'inherits', 'contains', 'blueprint']);
-    private showExternalNodes = true;
     private hoveredNodeId: string | null = null;
     private currentScope = 'full';
     private currentChapterId: string | null = null;
-    private focusedNodeId: string | null = null;
     private currentSymbol: SymbolNode | null = null;
     private currentSnippetText = '';
     private currentSnippetStartLine = 1;
@@ -215,6 +213,24 @@ class GitReaderApp {
         this.fileTreeController = new FileTreeController({
             fileTreeView: this.fileTreeView,
             narratorContainer: this.narratorFileTree,
+        });
+        this.graphView = new GraphViewController({
+            container: this.canvasGraph,
+            setCanvasOverlay: (message, visible) => this.setCanvasOverlay(message, visible),
+            clearGraph: () => this.clearGraph(),
+            getSelectedNodeId: () => this.getSelectedGraphNodeId(),
+            isTourActive: () => this.tourActive,
+            applyGuidedFilter: () => this.applyGuidedGraphFilter(),
+            refreshEdgeHighlights: () => this.refreshEdgeHighlights(),
+            updateLabelVisibility: () => this.updateLabelVisibility(),
+            setDisplayNodes: (nodes) => {
+                this.displayNodeById = new Map(nodes.map((node) => [node.id, node]));
+            },
+            formatLabel: (node) => this.formatNodeLabel(node),
+            onGraphReady: (graph) => {
+                this.graphInstance = graph;
+                this.bindGraphEvents();
+            },
         });
         const setReaderState = (update: ReaderStateUpdate): void => {
             if (Object.prototype.hasOwnProperty.call(update, 'currentSymbol')) {
@@ -459,7 +475,8 @@ class GitReaderApp {
             button.addEventListener('click', () => {
                 const filter = button.dataset.edgeFilter as EdgeKind | undefined;
                 if (filter) {
-                    this.toggleEdgeFilter(filter);
+                    this.graphView.toggleEdgeFilter(filter);
+                    this.updateGraphControls();
                 }
             });
         });
@@ -468,12 +485,12 @@ class GitReaderApp {
             button.addEventListener('click', () => {
                 const filter = button.dataset.nodeFilter;
                 if (filter === 'external') {
-                    this.showExternalNodes = !this.showExternalNodes;
+                    this.graphView.toggleExternalNodes();
                     this.updateGraphControls();
                     if (this.graphLayoutMode === 'cluster') {
                         this.refreshGraphView();
                     } else {
-                        this.applyGraphFilters();
+                        this.graphView.applyFilters();
                     }
                 }
             });
@@ -483,17 +500,18 @@ class GitReaderApp {
             button.addEventListener('click', () => {
                 const action = button.dataset.graphAction;
                 if (action === 'focus') {
-                    this.focusOnSelected();
+                    this.graphView.focusOnSelected();
                 } else if (action === 'reset') {
-                    this.resetGraphFocus();
+                    this.graphView.resetFocus();
+                    this.refreshGraphViewport();
                 } else if (action === 'reveal') {
                     this.revealMoreNodes();
                 } else if (action === 'zoom-in') {
-                    this.zoomGraph(1.2);
+                    this.graphView.zoom(1.2);
                 } else if (action === 'zoom-out') {
-                    this.zoomGraph(0.8);
+                    this.graphView.zoom(0.8);
                 } else if (action === 'fit') {
-                    this.fitGraph();
+                    this.graphView.fit();
                 }
             });
         });
@@ -834,7 +852,7 @@ class GitReaderApp {
         this.activeStoryArc = null;
         const chapter = this.chapters.find((entry) => entry.id === chapterId);
         const scope = chapter?.scope ?? this.getScopeForChapter(chapterId);
-        this.focusedNodeId = null;
+        this.graphView.setFocusedNodeId(null);
         await this.loadGraphForScope(scope);
         if (requestToken !== this.chapterRequestToken) {
             return;
@@ -843,7 +861,11 @@ class GitReaderApp {
         const edges = this.filterEdgesForNodes(nodes);
         const graphView = this.buildGraphView(nodes, edges, scope);
         const focus = this.pickFocusNode(graphView.nodes);
-        this.renderGraph(graphView.nodes, graphView.edges);
+        this.graphView.render({
+            nodes: graphView.nodes,
+            edges: graphView.edges,
+            layoutMode: this.graphLayoutMode,
+        });
         this.updateGraphNodeStatus(graphView);
         this.loadSymbolSnippet(focus).catch(() => {
                 this.readerController.render(focus);
@@ -880,7 +902,7 @@ class GitReaderApp {
         }
         this.activeStoryArc = arc;
         this.syncRoutePickerSelection(arcId);
-        this.focusedNodeId = arc.entry_id;
+        this.graphView.setFocusedNodeId(arc.entry_id);
         await this.loadGraphForScope('full');
         if (requestToken !== this.chapterRequestToken) {
             return;
@@ -888,7 +910,11 @@ class GitReaderApp {
         const nodes = this.graphNodes;
         const edges = this.filterEdgesForNodes(nodes);
         const graphView = this.buildGraphView(nodes, edges, 'full');
-        this.renderGraph(graphView.nodes, graphView.edges);
+        this.graphView.render({
+            nodes: graphView.nodes,
+            edges: graphView.edges,
+            layoutMode: this.graphLayoutMode,
+        });
         this.updateGraphNodeStatus(graphView);
         const entryNode = this.nodeById.get(arc.entry_id) ?? this.pickFocusNode(graphView.nodes);
         if (entryNode) {
@@ -992,8 +1018,9 @@ class GitReaderApp {
                 keepIds.add(fileNode.id);
             }
         }
-        if (this.focusedNodeId && nodeMap.has(this.focusedNodeId)) {
-            keepIds.add(this.focusedNodeId);
+        const focusedNodeId = this.graphView.getFocusedNodeId();
+        if (focusedNodeId && nodeMap.has(focusedNodeId)) {
+            keepIds.add(focusedNodeId);
         }
         const kindWeight: Partial<Record<SymbolKind, number>> = {
             function: 0,
@@ -1155,7 +1182,8 @@ class GitReaderApp {
         };
         visitTree(fileTree, null);
 
-        if (this.showExternalNodes) {
+        const { showExternalNodes } = this.graphView.getFilterState();
+        if (showExternalNodes) {
             nodes.forEach((node) => {
                 if (node.kind === 'external') {
                     addNode(node);
@@ -1194,7 +1222,7 @@ class GitReaderApp {
         };
         const resolveRepresentative = (node: SymbolNode): string | null => {
             if (node.kind === 'external') {
-                return this.showExternalNodes ? node.id : null;
+                return showExternalNodes ? node.id : null;
             }
             const path = node.location?.path;
             if (!path) {
@@ -1312,7 +1340,11 @@ class GitReaderApp {
         const nodes = this.filterNodesForChapter(this.currentChapterId);
         const edges = this.filterEdgesForNodes(nodes);
         const graphView = this.buildGraphView(nodes, edges, this.currentScope);
-        this.renderGraph(graphView.nodes, graphView.edges);
+        this.graphView.render({
+            nodes: graphView.nodes,
+            edges: graphView.edges,
+            layoutMode: this.graphLayoutMode,
+        });
         this.updateGraphNodeStatus(graphView);
     }
 
@@ -1787,49 +1819,6 @@ class GitReaderApp {
         });
     }
 
-    private renderGraph(nodes: SymbolNode[], edges: GraphEdge[]): void {
-        if (nodes.length === 0) {
-            this.clearGraph();
-            this.setCanvasOverlay('No nodes yet. Graph data has not loaded.', true);
-            return;
-        }
-        if (!this.graphInstance && typeof cytoscape !== 'function') {
-            this.setCanvasOverlay('Graph library not loaded.', true);
-            return;
-        }
-        this.displayNodeById = new Map(nodes.map((node) => [node.id, node]));
-        this.setCanvasOverlay('', false);
-        this.ensureGraph();
-        const selectedNodeId = this.getSelectedGraphNodeId();
-        const elements = this.buildGraphElements(nodes, edges);
-        this.graphInstance.elements().remove();
-        this.graphInstance.add(elements);
-        if (selectedNodeId) {
-            const selected = this.graphInstance.$id(selectedNodeId);
-            if (selected) {
-                selected.select();
-            }
-        }
-        this.runGraphLayout();
-        this.applyGraphFilters();
-    }
-
-    private ensureGraph(): void {
-        if (this.graphInstance) {
-            return;
-        }
-        this.graphInstance = cytoscape({
-            container: this.canvasGraph,
-            elements: [],
-            style: this.getGraphStyles(),
-            layout: { name: 'cose', animate: false, fit: true, padding: 24 },
-            minZoom: 0.2,
-            maxZoom: 2.5,
-            wheelSensitivity: 0.2,
-        });
-        this.bindGraphEvents();
-    }
-
     private clearGraph(): void {
         if (this.graphInstance) {
             this.graphInstance.elements().remove();
@@ -1881,34 +1870,6 @@ class GitReaderApp {
         }
     }
 
-    private buildGraphElements(nodes: SymbolNode[], edges: GraphEdge[]): Array<{ data: Record<string, unknown> }> {
-        const nodeElements = nodes.map((node) => {
-            const labelData = this.formatNodeLabel(node);
-            return {
-                data: {
-                    id: node.id,
-                    label: labelData.label,
-                    fullLabel: labelData.fullLabel,
-                    kindLabel: labelData.kindLabel,
-                    kind: node.kind,
-                    summary: node.summary || '',
-                    path: labelData.path,
-                    labelVisible: 'true',
-                },
-            };
-        });
-        const edgeElements = edges.map((edge, index) => ({
-            data: {
-                id: `edge:${edge.source}:${edge.target}:${edge.kind}:${index}`,
-                source: edge.source,
-                target: edge.target,
-                kind: edge.kind,
-                confidence: edge.confidence,
-            },
-        }));
-        return [...nodeElements, ...edgeElements];
-    }
-
     private formatNodeLabel(node: SymbolNode): { label: string; fullLabel: string; path: string; kindLabel: string } {
         return formatGraphNodeLabel(node, this.labelLineLength);
     }
@@ -1931,153 +1892,6 @@ class GitReaderApp {
 
     private getKindLabel(kind: SymbolKind | string): string {
         return getKindLabelUtil(kind);
-    }
-
-    private getGraphStyles(): Array<Record<string, object>> {
-        return [
-            {
-                selector: 'node',
-                style: {
-                    'background-color': '#e9dfcf',
-                    'label': 'data(label)',
-                    'font-size': '12px',
-                    'font-family': 'Space Grotesk, sans-serif',
-                    'text-wrap': 'wrap',
-                    'text-max-width': '120px',
-                    'text-valign': 'center',
-                    'text-halign': 'center',
-                    'color': '#1e1914',
-                    'border-width': 1,
-                    'border-color': '#d2c2ad',
-                    'padding': '10px',
-                    'shape': 'round-rectangle',
-                },
-            },
-            {
-                selector: 'node[labelVisible = "false"]',
-                style: {
-                    'text-opacity': 0,
-                    'text-background-opacity': 0,
-                },
-            },
-            {
-                selector: 'node[kind = "file"]',
-                style: { 'background-color': '#f0dcc1' },
-            },
-            {
-                selector: 'node[kind = "folder"]',
-                style: { 'background-color': '#f5e6d6', 'border-style': 'dashed' },
-            },
-            {
-                selector: 'node[kind = "class"]',
-                style: { 'background-color': '#d9e8f0' },
-            },
-            {
-                selector: 'node[kind = "function"]',
-                style: { 'background-color': '#e3f0d9' },
-            },
-            {
-                selector: 'node[kind = "method"]',
-                style: { 'background-color': '#f0e3d9' },
-            },
-            {
-                selector: 'node[kind = "blueprint"]',
-                style: { 'background-color': '#d9efe7' },
-            },
-            {
-                selector: 'node[kind = "external"]',
-                style: { 'background-color': '#efe0f0', 'border-style': 'dashed' },
-            },
-            {
-                selector: 'node:selected',
-                style: {
-                    'border-width': 2,
-                    'border-color': '#237a78',
-                    'shadow-blur': 18,
-                    'shadow-color': '#237a78',
-                    'shadow-opacity': 0.5,
-                    'shadow-offset-x': 0,
-                    'shadow-offset-y': 0,
-                },
-            },
-            {
-                selector: 'node.is-hovered',
-                style: {
-                    'text-opacity': 1,
-                    'text-background-opacity': 1,
-                    'shadow-blur': 16,
-                    'shadow-color': '#237a78',
-                    'shadow-opacity': 0.45,
-                    'z-index': 10,
-                },
-            },
-            {
-                selector: 'node.is-guided-focus',
-                style: {
-                    'border-width': 3,
-                    'border-color': '#c75c2a',
-                    'shadow-blur': 22,
-                    'shadow-color': '#c75c2a',
-                    'shadow-opacity': 0.6,
-                    'z-index': 12,
-                },
-            },
-            {
-                selector: 'node.is-guided-hidden',
-                style: {
-                    'opacity': 0,
-                    'text-opacity': 0,
-                },
-            },
-            {
-                selector: 'edge',
-                style: {
-                    'line-color': '#bcae9c',
-                    'width': 1,
-                    'curve-style': 'unbundled-bezier',
-                    'control-point-distances': 40,
-                    'control-point-weights': 0.5,
-                    'target-arrow-shape': 'triangle',
-                    'target-arrow-color': '#bcae9c',
-                    'opacity': 0.2,
-                },
-            },
-            {
-                selector: 'edge.is-active',
-                style: {
-                    'opacity': 0.75,
-                    'width': 2,
-                },
-            },
-            {
-                selector: 'edge[kind = "calls"]',
-                style: { 'line-color': '#237a78', 'target-arrow-color': '#237a78' },
-            },
-            {
-                selector: 'edge[kind = "imports"]',
-                style: { 'line-color': '#d07838', 'target-arrow-color': '#d07838' },
-            },
-            {
-                selector: 'edge[kind = "inherits"]',
-                style: { 'line-color': '#7d6ba6', 'target-arrow-color': '#7d6ba6' },
-            },
-            {
-                selector: 'edge[kind = "contains"]',
-                style: { 'line-color': '#5c4d3c', 'target-arrow-color': '#5c4d3c' },
-            },
-            {
-                selector: 'edge[kind = "blueprint"]',
-                style: { 'line-color': '#2a9d8f', 'target-arrow-color': '#2a9d8f' },
-            },
-            {
-                selector: 'edge[confidence = "low"]',
-                style: { 'line-style': 'dashed', 'opacity': 0.15 },
-            },
-            {
-                selector: 'edge.is-guided-hidden',
-                style: { 'opacity': 0 },
-            },
-        ];
     }
 
     private refreshEdgeHighlights(): void {
@@ -2157,15 +1971,6 @@ class GitReaderApp {
         const x = Math.min(surfaceRect.width - 20, Math.max(0, rendered.x + offset));
         const y = Math.min(surfaceRect.height - 20, Math.max(0, rendered.y + offset));
         this.graphTooltip.style.transform = `translate(${x}px, ${y}px)`;
-    }
-
-    private runGraphLayout(): void {
-        if (!this.graphInstance) {
-            return;
-        }
-        const layout = this.graphInstance.layout(this.getLayoutOptions());
-        layout.run();
-        this.updateLabelVisibility();
     }
 
     private async updateNarrator(symbol: SymbolNode): Promise<void> {
@@ -2474,8 +2279,12 @@ class GitReaderApp {
                 visibleNodes: nodes.length,
                 isCapped: false,
             };
-            this.renderGraph(graphView.nodes, graphView.edges);
-            this.updateGraphNodeStatus(graphView);
+        this.graphView.render({
+            nodes: graphView.nodes,
+            edges: graphView.edges,
+            layoutMode: this.graphLayoutMode,
+        });
+        this.updateGraphNodeStatus(graphView);
         }
         if (this.graphInstance) {
             this.graphInstance.$('node:selected').unselect();
@@ -2619,7 +2428,7 @@ class GitReaderApp {
             this.guidedAllowedNodeIds = null;
             this.applyGuidedToc();
             this.applyGuidedCodeFocus();
-            this.applyGraphFilters();
+            this.graphView.applyFilters();
             this.fileTreeController.render(null);
             return;
         }
@@ -2634,7 +2443,7 @@ class GitReaderApp {
         }
         this.guidedAllowedNodeIds = allowed.size > 0 ? allowed : null;
         this.applyGuidedToc();
-        this.applyGraphFilters();
+        this.graphView.applyFilters();
         this.applyGuidedCodeFocus();
         this.fileTreeController.render(this.tourStep.focus?.file_path ?? null);
     }
@@ -2815,106 +2624,11 @@ class GitReaderApp {
             this.refreshGraphView();
             return;
         }
-        this.runGraphLayout();
-    }
-
-    private toggleEdgeFilter(filter: EdgeKind): void {
-        if (this.edgeFilters.has(filter)) {
-            this.edgeFilters.delete(filter);
-        } else {
-            this.edgeFilters.add(filter);
-        }
-        this.updateGraphControls();
-        this.applyGraphFilters();
-    }
-
-    private applyGraphFilters(): void {
-        if (!this.graphInstance) {
-            return;
-        }
-        const cy = this.graphInstance;
-        cy.elements().show();
-        if (!this.showExternalNodes) {
-            cy.nodes().filter('[kind = "external"]').hide();
-        }
-        cy.edges().forEach((edge: { data: (key: string) => EdgeKind; hide: () => void }) => {
-            if (!this.edgeFilters.has(edge.data('kind'))) {
-                edge.hide();
-            }
-        });
-        cy.edges().forEach((edge: any) => {
-            if (edge.source().hidden() || edge.target().hidden()) {
-                edge.hide();
-            }
-        });
-        this.applyGuidedGraphFilter();
-        this.applyFocus();
-        this.refreshEdgeHighlights();
-        this.updateLabelVisibility();
-    }
-
-    private focusOnSelected(): void {
-        if (!this.graphInstance) {
-            return;
-        }
-        const selected = this.graphInstance.$('node:selected');
-        if (!selected || selected.length === 0) {
-            this.setCanvasOverlay('Select a node to focus.', true);
-            window.setTimeout(() => this.setCanvasOverlay('', false), 1200);
-            return;
-        }
-        this.focusedNodeId = selected[0].id();
-        this.applyGraphFilters();
-    }
-
-    private resetGraphFocus(): void {
-        this.focusedNodeId = null;
-        this.applyGraphFilters();
-        this.refreshGraphViewport();
-    }
-
-    private applyFocus(): void {
-        if (!this.graphInstance || !this.focusedNodeId || this.tourActive) {
-            return;
-        }
-        const cy = this.graphInstance;
-        const node = cy.getElementById(this.focusedNodeId);
-        if (!node || node.empty() || node.hidden()) {
-            this.focusedNodeId = null;
-            return;
-        }
-        const visible = cy.elements(':visible');
-        const focusElements = node.closedNeighborhood().intersection(visible);
-        visible.not(focusElements).hide();
-        cy.fit(focusElements, 40);
-    }
-
-    private zoomGraph(factor: number): void {
-        if (!this.graphInstance) {
-            return;
-        }
-        const current = this.graphInstance.zoom();
-        const next = Math.min(2.5, Math.max(0.2, current * factor));
-        const rect = this.canvasGraph.getBoundingClientRect();
-        this.graphInstance.zoom({
-            level: next,
-            renderedPosition: {
-                x: rect.width / 2,
-                y: rect.height / 2,
-            },
-        });
-        this.updateLabelVisibility();
-    }
-
-    private fitGraph(): void {
-        if (!this.graphInstance) {
-            return;
-        }
-        this.graphInstance.fit(undefined, 40);
-        this.updateLabelVisibility();
+        this.graphView.setLayout(mode);
     }
 
     private updateGraphControls(): void {
+        const { edgeFilters, showExternalNodes } = this.graphView.getFilterState();
         this.graphLayoutButtons.forEach((button) => {
             button.classList.toggle('is-active', button.dataset.layoutAction === this.graphLayoutMode);
         });
@@ -2923,54 +2637,15 @@ class GitReaderApp {
             if (!filter) {
                 return;
             }
-            button.classList.toggle('is-active', this.edgeFilters.has(filter));
+            button.classList.toggle('is-active', edgeFilters.has(filter));
         });
         this.nodeFilterButtons.forEach((button) => {
             if (button.dataset.nodeFilter === 'external') {
-                button.classList.toggle('is-active', this.showExternalNodes);
+                button.classList.toggle('is-active', showExternalNodes);
             }
         });
     }
 
-    private getLayoutOptions(): {
-        name: string;
-        animate: boolean;
-        fit: boolean;
-        padding: number;
-        directed?: boolean;
-        spacingFactor?: number;
-        avoidOverlap?: boolean;
-        avoidOverlapPadding?: number;
-        nodeDimensionsIncludeLabels?: boolean;
-    } {
-        if (this.graphLayoutMode === 'layer') {
-            return {
-                name: 'breadthfirst',
-                animate: false,
-                fit: true,
-                padding: 36,
-                directed: true,
-                spacingFactor: 1.35,
-                avoidOverlap: true,
-                avoidOverlapPadding: 24,
-                nodeDimensionsIncludeLabels: true,
-            };
-        }
-        if (this.graphLayoutMode === 'free') {
-            return {
-                name: 'preset',
-                animate: false,
-                fit: true,
-                padding: 24,
-            };
-        }
-        return {
-            name: 'cose',
-            animate: false,
-            fit: true,
-            padding: 24,
-        };
-    }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
