@@ -393,13 +393,55 @@ body {
 
 .code-line {
     display: grid;
-    grid-template-columns: 4ch 1fr;
+    grid-template-columns: 6ch 1fr;
     gap: 12px;
     padding: 2px 6px;
 }
 
 .line-text {
     min-width: 0;
+}
+
+.line-no {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+}
+
+.line-num {
+    min-width: 0;
+}
+
+.fold-toggle {
+    border: 1px solid rgba(35, 122, 120, 0.3);
+    background: rgba(35, 122, 120, 0.1);
+    color: #0e4b4a;
+    border-radius: 6px;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1;
+}
+
+.fold-toggle:hover {
+    background: rgba(35, 122, 120, 0.2);
+}
+
+.fold-toggle:focus-visible {
+    outline: 2px solid rgba(35, 122, 120, 0.5);
+    outline-offset: 2px;
+}
+
+.code-line.is-folded {
+    display: none;
+}
+
+.code-line.is-fold-collapsed .line-text::after {
+    content: " ...";
+    color: rgba(247, 242, 233, 0.6);
 }
 
 .code-line.is-highlight {

@@ -29,6 +29,14 @@ interface SymbolNode {
     module?: string;
 }
 
+interface FoldRange {
+    id: string;
+    name: string;
+    kind: SymbolKind;
+    start: number;
+    end: number;
+}
+
 interface GraphEdge {
     source: string;
     target: string;
@@ -343,6 +351,9 @@ class GitReaderApp {
     private importModal: HTMLElement | null = null;
     private importModalMessage: HTMLElement | null = null;
     private importBreadcrumbs: string[] = [];
+    private foldedSymbolIds: Set<string> = new Set();
+    private currentFoldRanges: Map<string, FoldRange> = new Map();
+    private currentFoldPath: string | null = null;
 
     constructor() {
         this.tocList = this.getElement('toc-list');
@@ -673,6 +684,14 @@ class GitReaderApp {
 
         this.codeSurface.addEventListener('click', (event) => {
             const target = event.target as HTMLElement;
+            const foldToggle = target.closest<HTMLElement>('[data-fold-toggle]');
+            if (foldToggle) {
+                const foldId = foldToggle.dataset.foldToggle;
+                if (foldId) {
+                    this.toggleFold(foldId);
+                }
+                return;
+            }
             const breadcrumbTarget = target.closest<HTMLElement>('[data-breadcrumb-path]');
             if (breadcrumbTarget) {
                 const path = breadcrumbTarget.dataset.breadcrumbPath;
@@ -721,6 +740,10 @@ class GitReaderApp {
                         this.highlightImportUsage(imports[0]);
                     }
                 }
+                return;
+            }
+            if (this.handleDefinitionJump(event as MouseEvent, target)) {
+                return;
             }
         });
 
@@ -2054,6 +2077,7 @@ class GitReaderApp {
         `;
         this.applyGuidedCodeFocus();
         this.decorateImportLines(snippet, language);
+        this.applyFoldControls(symbol);
     }
 
     private decorateImportLines(snippet?: SymbolSnippetResponse, language?: string): void {
@@ -2344,31 +2368,8 @@ class GitReaderApp {
         const statement = lineEl?.dataset.importStatement ?? lineText;
         const target = this.resolveImportTarget(importName, statement, language, currentPath);
         if (target) {
-            const fileNode = target.kind === 'file' ? target : this.getFileNodeForSymbol(target);
-            const fromPath = this.currentSymbol?.location?.path;
-            const toPath = fileNode?.location?.path ?? target.location?.path;
-            if (fromPath && toPath) {
-                this.updateImportBreadcrumbs(fromPath, toPath);
-            }
-            if (fileNode && target.kind !== 'file') {
-                if (this.graphInstance) {
-                    const fileElement = this.graphInstance.$id(fileNode.id);
-                    const symbolElement = this.graphInstance.$id(target.id);
-                    if (fileElement && !fileElement.empty()) {
-                        this.graphInstance.$('node:selected').unselect();
-                        fileElement.select();
-                        if (symbolElement && !symbolElement.empty() && symbolElement.id() !== fileElement.id()) {
-                            symbolElement.select();
-                        }
-                    } else if (symbolElement && !symbolElement.empty()) {
-                        this.graphInstance.$('node:selected').unselect();
-                        symbolElement.select();
-                    }
-                }
-                void this.highlightSymbolInFile(fileNode, target);
-                return;
-            }
-            this.jumpToSymbol(target);
+            const definitionName = this.getImportDefinitionName(importName, statement, language);
+            this.navigateToSymbolDefinition(target, currentPath, definitionName);
             return;
         }
         const sourceLabel = statement ? ` from "${statement.trim()}"` : '';
@@ -2518,6 +2519,24 @@ class GitReaderApp {
                     return { module: modulePart, importedName: imported };
                 }
             }
+        }
+        return null;
+    }
+
+    private getImportDefinitionName(importName: string, statement: string, language?: string): string | null {
+        if (!statement) {
+            return null;
+        }
+        if (language === 'python') {
+            const entry = this.parsePythonImportEntry(statement, importName);
+            return entry?.importedName ?? null;
+        }
+        if (language === 'javascript' || language === 'typescript' || language === 'tsx') {
+            const entry = this.parseJsImportEntry(statement, importName);
+            if (!entry) {
+                return null;
+            }
+            return entry.importedName ?? importName;
         }
         return null;
     }
@@ -2855,6 +2874,265 @@ class GitReaderApp {
         return false;
     }
 
+    private applyFoldControls(symbol: SymbolNode): void {
+        if (symbol.kind !== 'file' || !symbol.location?.path) {
+            this.currentFoldRanges = new Map();
+            this.currentFoldPath = null;
+            return;
+        }
+        const path = this.normalizePath(symbol.location.path);
+        const ranges = this.getFoldableRangesForPath(path);
+        this.currentFoldRanges = new Map(ranges.map((range) => [range.id, range]));
+        this.currentFoldPath = path;
+        ranges.forEach((range) => {
+            const lineEl = this.codeSurface.querySelector<HTMLElement>(`[data-line="${range.start}"]`);
+            if (!lineEl) {
+                return;
+            }
+            if (lineEl.dataset.foldId === range.id) {
+                return;
+            }
+            lineEl.dataset.foldId = range.id;
+            lineEl.dataset.foldEnd = String(range.end);
+            lineEl.classList.add('is-fold-start');
+            const lineNo = lineEl.querySelector<HTMLElement>('.line-no');
+            if (!lineNo) {
+                return;
+            }
+            const lineNumber = (lineEl.dataset.line ?? lineNo.textContent ?? '').trim();
+            lineNo.textContent = '';
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'fold-toggle';
+            button.dataset.foldToggle = range.id;
+            button.setAttribute('aria-label', `Toggle ${range.kind} ${range.name}`);
+            button.textContent = this.foldedSymbolIds.has(range.id) ? '+' : '-';
+            const numberSpan = document.createElement('span');
+            numberSpan.className = 'line-num';
+            numberSpan.textContent = lineNumber;
+            lineNo.append(button, numberSpan);
+        });
+        this.refreshFoldVisibility();
+    }
+
+    private getFoldableRangesForPath(path: string): FoldRange[] {
+        const ranges: FoldRange[] = [];
+        this.graphNodes.forEach((node) => {
+            if (!node.location?.path || !node.location.start_line || !node.location.end_line) {
+                return;
+            }
+            if (node.kind !== 'function' && node.kind !== 'method' && node.kind !== 'class') {
+                return;
+            }
+            if (this.normalizePath(node.location.path) !== path) {
+                return;
+            }
+            const start = node.location.start_line;
+            const end = node.location.end_line;
+            if (end <= start) {
+                return;
+            }
+            ranges.push({
+                id: node.id,
+                name: node.name,
+                kind: node.kind,
+                start,
+                end,
+            });
+        });
+        ranges.sort((a, b) => a.start - b.start || b.end - a.end);
+        return ranges;
+    }
+
+    private refreshFoldVisibility(): void {
+        this.codeSurface.querySelectorAll<HTMLElement>('.code-line.is-folded')
+            .forEach((line) => line.classList.remove('is-folded'));
+        this.codeSurface.querySelectorAll<HTMLElement>('.code-line.is-fold-collapsed')
+            .forEach((line) => line.classList.remove('is-fold-collapsed'));
+        this.currentFoldRanges.forEach((range) => {
+            const isCollapsed = this.foldedSymbolIds.has(range.id);
+            const startLine = this.codeSurface.querySelector<HTMLElement>(`[data-line="${range.start}"]`);
+            if (startLine) {
+                startLine.classList.toggle('is-fold-collapsed', isCollapsed);
+                const toggle = startLine.querySelector<HTMLButtonElement>('[data-fold-toggle]');
+                if (toggle) {
+                    toggle.textContent = isCollapsed ? '+' : '-';
+                }
+            }
+            if (!isCollapsed) {
+                return;
+            }
+            for (let line = range.start + 1; line <= range.end; line += 1) {
+                const lineEl = this.codeSurface.querySelector<HTMLElement>(`[data-line="${line}"]`);
+                if (lineEl) {
+                    lineEl.classList.add('is-folded');
+                }
+            }
+        });
+    }
+
+    private toggleFold(foldId: string): void {
+        if (!this.currentFoldRanges.has(foldId)) {
+            return;
+        }
+        if (this.foldedSymbolIds.has(foldId)) {
+            this.foldedSymbolIds.delete(foldId);
+        } else {
+            this.foldedSymbolIds.add(foldId);
+        }
+        this.refreshFoldVisibility();
+    }
+
+    private handleDefinitionJump(event: MouseEvent, target: HTMLElement): boolean {
+        if (!this.isModifierClick(event)) {
+            return false;
+        }
+        if (!this.currentSymbol?.location?.path) {
+            return false;
+        }
+        const lineEl = target.closest<HTMLElement>('.code-line');
+        if (!lineEl) {
+            return false;
+        }
+        if (target.closest('.code-import')) {
+            return false;
+        }
+        const identifier = this.getIdentifierAtClick(event);
+        if (!identifier) {
+            return false;
+        }
+        const symbol = this.resolveDefinitionSymbol(identifier, this.currentSymbol.location.path);
+        if (!symbol) {
+            this.setCodeStatus(`No definition found for ${identifier}.`);
+            return true;
+        }
+        this.navigateToSymbolDefinition(symbol, this.currentSymbol.location.path);
+        return true;
+    }
+
+    private getIdentifierAtClick(event: MouseEvent): string | null {
+        const range = this.getCaretRangeFromPoint(event.clientX, event.clientY);
+        if (!range) {
+            return null;
+        }
+        const node = range.startContainer;
+        if (!node || node.nodeType !== Node.TEXT_NODE) {
+            return null;
+        }
+        const textNode = node as Text;
+        const parent = textNode.parentElement;
+        if (!parent || parent.closest('.line-no') || parent.closest('.hljs-string') || parent.closest('.hljs-comment')) {
+            return null;
+        }
+        const text = textNode.textContent ?? '';
+        if (!text) {
+            return null;
+        }
+        let offset = Math.min(range.startOffset, text.length);
+        const isWordChar = (char: string) => /[A-Za-z0-9_$]/.test(char);
+        if (offset > 0 && (!text[offset] || !isWordChar(text[offset])) && isWordChar(text[offset - 1])) {
+            offset -= 1;
+        }
+        if (!isWordChar(text[offset] ?? '')) {
+            return null;
+        }
+        let start = offset;
+        while (start > 0 && isWordChar(text[start - 1])) {
+            start -= 1;
+        }
+        let end = offset;
+        while (end < text.length && isWordChar(text[end])) {
+            end += 1;
+        }
+        const word = text.slice(start, end);
+        if (!word || !/^[A-Za-z_$][\w$]*$/.test(word)) {
+            return null;
+        }
+        return word;
+    }
+
+    private getCaretRangeFromPoint(x: number, y: number): Range | null {
+        const doc = document as Document & {
+            caretRangeFromPoint?: (x: number, y: number) => Range | null;
+            caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null;
+        };
+        if (doc.caretRangeFromPoint) {
+            return doc.caretRangeFromPoint(x, y);
+        }
+        if (doc.caretPositionFromPoint) {
+            const position = doc.caretPositionFromPoint(x, y);
+            if (position) {
+                const range = document.createRange();
+                range.setStart(position.offsetNode, position.offset);
+                range.collapse(true);
+                return range;
+            }
+        }
+        return null;
+    }
+
+    private resolveDefinitionSymbol(identifier: string, currentPath: string): SymbolNode | null {
+        const normalizedCurrent = this.normalizePath(currentPath);
+        const kinds = new Set<SymbolKind>(['function', 'method', 'class']);
+        const matches = this.graphNodes.filter((node) => {
+            if (!node.location?.path) {
+                return false;
+            }
+            if (!kinds.has(node.kind)) {
+                return false;
+            }
+            return node.name === identifier;
+        });
+        if (matches.length === 0) {
+            return null;
+        }
+        const sameFile = matches.find((node) => this.normalizePath(node.location?.path ?? '') === normalizedCurrent);
+        if (sameFile) {
+            return sameFile;
+        }
+        return matches[0];
+    }
+
+    private navigateToSymbolDefinition(symbol: SymbolNode, fromPath?: string, preferredSymbolName?: string | null): void {
+        const fileNode = symbol.kind === 'file' ? symbol : this.getFileNodeForSymbol(symbol);
+        const sourcePath = fromPath ?? this.currentSymbol?.location?.path;
+        const targetPath = fileNode?.location?.path ?? symbol.location?.path;
+        if (sourcePath && targetPath) {
+            const normalizedSource = this.normalizePath(sourcePath);
+            const normalizedTarget = this.normalizePath(targetPath);
+            if (normalizedSource !== normalizedTarget) {
+                this.updateImportBreadcrumbs(normalizedSource, normalizedTarget);
+            }
+        }
+        if (fileNode && preferredSymbolName) {
+            const filePath = fileNode.location?.path ?? '';
+            const candidate = this.findSymbolInFiles(preferredSymbolName, [filePath]);
+            if (candidate) {
+                void this.highlightSymbolInFile(fileNode, candidate);
+                return;
+            }
+        }
+        if (fileNode && symbol.kind !== 'file') {
+            if (this.graphInstance) {
+                const fileElement = this.graphInstance.$id(fileNode.id);
+                const symbolElement = this.graphInstance.$id(symbol.id);
+                if (fileElement && !fileElement.empty()) {
+                    this.graphInstance.$('node:selected').unselect();
+                    fileElement.select();
+                    if (symbolElement && !symbolElement.empty() && symbolElement.id() !== fileElement.id()) {
+                        symbolElement.select();
+                    }
+                } else if (symbolElement && !symbolElement.empty()) {
+                    this.graphInstance.$('node:selected').unselect();
+                    symbolElement.select();
+                }
+            }
+            void this.highlightSymbolInFile(fileNode, symbol);
+            return;
+        }
+        this.jumpToSymbol(symbol);
+    }
+
     private clearImportUsageHighlights(): void {
         this.codeSurface.querySelectorAll<HTMLElement>('.code-line.is-import-usage')
             .forEach((line) => line.classList.remove('is-import-usage'));
@@ -3046,7 +3324,7 @@ class GitReaderApp {
                 const classes = isHighlighted ? 'code-line is-highlight' : 'code-line';
                 return `<span class="${classes}" data-line="${lineNumber}"><span class="line-no">${lineNumber}</span><span class="line-text">${line}</span></span>`;
             })
-            .join('\n');
+            .join('');
     }
 
     private buildHighlightSet(highlights: HighlightRange[]): Set<number> {
