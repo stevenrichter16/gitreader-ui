@@ -3,7 +3,7 @@ import { buildFileTreeFromNodes, countFilesInTree, type FileTreeNode } from './m
 import { FileTreeController } from './modules/ui/fileTreeController';
 import { bindFileTreeEvents } from './modules/ui/fileTreeEvents';
 import { bindGraphEvents } from './modules/ui/graphEvents';
-import { buildGraphTooltipHtml, formatGraphNodeLabel } from './modules/ui/graphLabels';
+import { formatGraphNodeLabel } from './modules/ui/graphLabels';
 import { GraphViewController } from './modules/ui/graphView';
 import { FileTreeView, fileTreeViewDefaults } from './modules/ui/fileTreeView';
 import { ReaderController } from './modules/ui/readerController';
@@ -127,14 +127,12 @@ class GitReaderApp {
     private graphCache: Map<string, ApiGraphResponse> = new Map();
     private graphLoadPromises: Map<string, Promise<ApiGraphResponse>> = new Map();
     private narratorCache: Map<string, NarrationResponse> = new Map();
-    private graphNodeCapByScope: Map<string, number> = new Map();
     private narratorRequestToken = 0;
     private chapterRequestToken = 0;
     private graphRequestToken = 0;
     private narratorVisible = true;
     private graphInstance: any | null = null;
     private graphEventsBound = false;
-    private hoveredNodeId: string | null = null;
     private currentScope = 'full';
     private currentChapterId: string | null = null;
     private currentSymbol: SymbolNode | null = null;
@@ -146,8 +144,6 @@ class GitReaderApp {
     private tocDebounceTimer: number | null = null;
     private tocDebounceDelay = 200;
     private pendingChapterId: string | null = null;
-    private graphNodeCap = 300;
-    private graphNodeCapStep = 200;
     private labelZoomThreshold = 0.65;
     private labelLineLength = 18;
     private lastTapNodeId: string | null = null;
@@ -216,12 +212,15 @@ class GitReaderApp {
         });
         this.graphView = new GraphViewController({
             container: this.canvasGraph,
+            tooltipElement: this.graphTooltip,
+            tooltipContainer: this.canvasSurface,
+            nodeStatusElement: this.graphNodeStatus,
+            revealButton: this.graphRevealButton,
             setCanvasOverlay: (message, visible) => this.setCanvasOverlay(message, visible),
             clearGraph: () => this.clearGraph(),
             getSelectedNodeId: () => this.getSelectedGraphNodeId(),
             isTourActive: () => this.tourActive,
             applyGuidedFilter: () => this.applyGuidedGraphFilter(),
-            refreshEdgeHighlights: () => this.refreshEdgeHighlights(),
             updateLabelVisibility: () => this.updateLabelVisibility(),
             setDisplayNodes: (nodes) => {
                 this.displayNodeById = new Map(nodes.map((node) => [node.id, node]));
@@ -505,7 +504,13 @@ class GitReaderApp {
                     this.graphView.resetFocus();
                     this.refreshGraphViewport();
                 } else if (action === 'reveal') {
-                    this.revealMoreNodes();
+                    if (!this.currentChapterId) {
+                        return;
+                    }
+                    const nodes = this.filterNodesForChapter(this.currentChapterId);
+                    if (this.graphView.revealMoreNodes(this.currentScope, nodes.length)) {
+                        this.refreshGraphView();
+                    }
                 } else if (action === 'zoom-in') {
                     this.graphView.zoom(1.2);
                 } else if (action === 'zoom-out') {
@@ -866,7 +871,7 @@ class GitReaderApp {
             edges: graphView.edges,
             layoutMode: this.graphLayoutMode,
         });
-        this.updateGraphNodeStatus(graphView);
+        this.graphView.updateNodeStatus(graphView);
         this.loadSymbolSnippet(focus).catch(() => {
                 this.readerController.render(focus);
             void this.updateNarrator(focus);
@@ -915,7 +920,7 @@ class GitReaderApp {
             edges: graphView.edges,
             layoutMode: this.graphLayoutMode,
         });
-        this.updateGraphNodeStatus(graphView);
+        this.graphView.updateNodeStatus(graphView);
         const entryNode = this.nodeById.get(arc.entry_id) ?? this.pickFocusNode(graphView.nodes);
         if (entryNode) {
             if (this.graphInstance) {
@@ -969,24 +974,12 @@ class GitReaderApp {
         this.setGraphData(graphData);
     }
 
-    private getNodeCapForScope(scope: string, totalNodes: number): number {
-        let cap = this.graphNodeCapByScope.get(scope);
-        if (cap === undefined) {
-            cap = Math.min(this.graphNodeCap, totalNodes);
-            this.graphNodeCapByScope.set(scope, cap);
-        } else if (cap > totalNodes) {
-            cap = totalNodes;
-            this.graphNodeCapByScope.set(scope, cap);
-        }
-        return cap;
-    }
-
     private buildGraphView(nodes: SymbolNode[], edges: GraphEdge[], scope: string): GraphView {
         if (this.graphLayoutMode === 'cluster') {
             return this.buildClusterView(nodes, edges);
         }
         const totalNodes = nodes.length;
-        const cap = this.getNodeCapForScope(scope, totalNodes);
+        const cap = this.graphView.getNodeCapForScope(scope, totalNodes);
         if (cap >= totalNodes) {
             return {
                 nodes,
@@ -1288,51 +1281,6 @@ class GitReaderApp {
         };
     }
 
-    private updateGraphNodeStatus(graphView: GraphView): void {
-        if (graphView.totalNodes === 0) {
-            this.graphNodeStatus.textContent = '';
-            this.graphRevealButton.disabled = true;
-            return;
-        }
-        if (this.tourActive) {
-            this.graphNodeStatus.textContent = `Guided view: ${graphView.visibleNodes}/${graphView.totalNodes}`;
-            this.graphRevealButton.disabled = true;
-            this.graphRevealButton.textContent = 'Guided';
-            return;
-        }
-        if (this.graphLayoutMode === 'cluster') {
-            this.graphNodeStatus.textContent = `Cluster view: ${graphView.visibleNodes} groups from ${graphView.totalNodes}`;
-            this.graphRevealButton.disabled = true;
-            this.graphRevealButton.textContent = 'Show more';
-            return;
-        }
-        if (!graphView.isCapped) {
-            this.graphNodeStatus.textContent = `Showing ${graphView.visibleNodes} nodes`;
-            this.graphRevealButton.disabled = true;
-            this.graphRevealButton.textContent = 'Show more';
-            return;
-        }
-        this.graphNodeStatus.textContent = `Showing ${graphView.visibleNodes} of ${graphView.totalNodes}`;
-        const nextCap = Math.min(graphView.totalNodes, graphView.visibleNodes + this.graphNodeCapStep);
-        this.graphRevealButton.textContent = nextCap >= graphView.totalNodes ? 'Show all' : 'Show more';
-        this.graphRevealButton.disabled = false;
-    }
-
-    private revealMoreNodes(): void {
-        if (!this.currentChapterId) {
-            return;
-        }
-        const nodes = this.filterNodesForChapter(this.currentChapterId);
-        const total = nodes.length;
-        const cap = this.getNodeCapForScope(this.currentScope, total);
-        if (cap >= total) {
-            return;
-        }
-        const nextCap = Math.min(total, cap + this.graphNodeCapStep);
-        this.graphNodeCapByScope.set(this.currentScope, nextCap);
-        this.refreshGraphView();
-    }
-
     private refreshGraphView(): void {
         if (!this.currentChapterId) {
             return;
@@ -1345,7 +1293,7 @@ class GitReaderApp {
             edges: graphView.edges,
             layoutMode: this.graphLayoutMode,
         });
-        this.updateGraphNodeStatus(graphView);
+        this.graphView.updateNodeStatus(graphView);
     }
 
     private setGraphData(graphData: ApiGraphResponse): void {
@@ -1823,7 +1771,7 @@ class GitReaderApp {
         if (this.graphInstance) {
             this.graphInstance.elements().remove();
         }
-        this.hideGraphTooltip();
+        this.graphView.hideTooltip();
     }
 
     private bindGraphEvents(): void {
@@ -1857,12 +1805,12 @@ class GitReaderApp {
                 loadSymbolSnippet: (node) => this.loadSymbolSnippet(node),
                 renderCode: (node) => this.readerController.render(node),
                 updateNarrator: (node) => this.updateNarrator(node),
-                refreshEdgeHighlights: () => this.refreshEdgeHighlights(),
+                refreshEdgeHighlights: () => this.graphView.refreshEdgeHighlights(),
                 updateLabelVisibility: () => this.updateLabelVisibility(),
-                setHoveredNode: (nodeId) => this.setHoveredNode(nodeId),
-                showGraphTooltip: (node, event) => this.showGraphTooltip(node, event),
-                hideGraphTooltip: () => this.hideGraphTooltip(),
-                updateTooltipPosition: (event) => this.updateTooltipPosition(event),
+                setHoveredNode: (nodeId) => this.graphView.setHoveredNode(nodeId),
+                showGraphTooltip: (node, event) => this.graphView.showTooltip(node, event),
+                hideGraphTooltip: () => this.graphView.hideTooltip(),
+                updateTooltipPosition: (event) => this.graphView.updateTooltipPosition(event),
             },
         });
         if (didBind) {
@@ -1894,24 +1842,6 @@ class GitReaderApp {
         return getKindLabelUtil(kind);
     }
 
-    private refreshEdgeHighlights(): void {
-        if (!this.graphInstance) {
-            return;
-        }
-        const cy = this.graphInstance;
-        cy.edges().removeClass('is-active');
-        const selectedNodes = cy.$('node:selected');
-        selectedNodes.forEach((node: any) => {
-            node.connectedEdges().addClass('is-active');
-        });
-        if (this.hoveredNodeId) {
-            const hovered = cy.getElementById(this.hoveredNodeId);
-            if (hovered && !hovered.empty()) {
-                hovered.connectedEdges().addClass('is-active');
-            }
-        }
-    }
-
     private updateLabelVisibility(): void {
         if (!this.graphInstance) {
             return;
@@ -1926,51 +1856,6 @@ class GitReaderApp {
                 || (guidedAllowed ? guidedAllowed.has(node.id()) : false);
             node.data('labelVisible', shouldShow ? 'true' : 'false');
         });
-    }
-
-    private setHoveredNode(nodeId: string | null): void {
-        this.hoveredNodeId = nodeId;
-        this.refreshEdgeHighlights();
-    }
-
-    private showGraphTooltip(node: any, event: any): void {
-        if (!this.graphTooltip) {
-            return;
-        }
-        const fullLabel = node.data('fullLabel') || node.data('label');
-        const kindLabel = node.data('kindLabel') || node.data('kind') || 'Symbol';
-        const path = node.data('path');
-        this.graphTooltip.innerHTML = buildGraphTooltipHtml({
-            fullLabel: String(fullLabel),
-            kindLabel: String(kindLabel),
-            path: path ? String(path) : undefined,
-        });
-        this.graphTooltip.setAttribute('aria-hidden', 'false');
-        this.graphTooltip.classList.add('is-visible');
-        this.updateTooltipPosition(event);
-    }
-
-    private hideGraphTooltip(): void {
-        if (!this.graphTooltip) {
-            return;
-        }
-        this.graphTooltip.classList.remove('is-visible');
-        this.graphTooltip.setAttribute('aria-hidden', 'true');
-    }
-
-    private updateTooltipPosition(event: any): void {
-        if (!this.graphTooltip || !this.canvasSurface) {
-            return;
-        }
-        const rendered = event.renderedPosition || event.position;
-        if (!rendered) {
-            return;
-        }
-        const offset = 12;
-        const surfaceRect = this.canvasSurface.getBoundingClientRect();
-        const x = Math.min(surfaceRect.width - 20, Math.max(0, rendered.x + offset));
-        const y = Math.min(surfaceRect.height - 20, Math.max(0, rendered.y + offset));
-        this.graphTooltip.style.transform = `translate(${x}px, ${y}px)`;
     }
 
     private async updateNarrator(symbol: SymbolNode): Promise<void> {
@@ -2284,7 +2169,7 @@ class GitReaderApp {
             edges: graphView.edges,
             layoutMode: this.graphLayoutMode,
         });
-        this.updateGraphNodeStatus(graphView);
+        this.graphView.updateNodeStatus(graphView);
         }
         if (this.graphInstance) {
             this.graphInstance.$('node:selected').unselect();

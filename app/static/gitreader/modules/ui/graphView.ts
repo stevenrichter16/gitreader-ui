@@ -1,4 +1,5 @@
-import type { EdgeKind, GraphEdge, GraphLayoutMode, SymbolNode } from '../types';
+import { buildGraphTooltipHtml } from './graphLabels';
+import type { EdgeKind, GraphEdge, GraphLayoutMode, GraphView, SymbolNode } from '../types';
 
 declare const cytoscape: any;
 
@@ -6,6 +7,14 @@ declare const cytoscape: any;
 export interface GraphViewDependencies {
     // Canvas container where the Cytoscape instance will be mounted.
     container: HTMLElement;
+    // Tooltip element used to show node metadata on hover.
+    tooltipElement: HTMLElement;
+    // Surface element used to calculate tooltip positioning bounds.
+    tooltipContainer: HTMLElement;
+    // Node-status element that reports current visibility/cap status.
+    nodeStatusElement: HTMLElement;
+    // Reveal button that unlocks more nodes when the graph is capped.
+    revealButton: HTMLButtonElement;
     // Updates the canvas overlay copy for empty/error states.
     setCanvasOverlay: (message: string, visible: boolean) => void;
     // Clears any existing graph elements when no data is available.
@@ -16,8 +25,6 @@ export interface GraphViewDependencies {
     isTourActive: () => boolean;
     // Applies guided-mode visibility rules after base filters are set.
     applyGuidedFilter: () => void;
-    // Refreshes edge emphasis based on current selection and hover states.
-    refreshEdgeHighlights: () => void;
     // Recomputes label visibility after layout/zoom changes.
     updateLabelVisibility: () => void;
     // Updates the display-node map used by event resolution callbacks.
@@ -61,6 +68,10 @@ export class GraphViewController {
     private edgeFilters: Set<EdgeKind> = new Set(['calls', 'imports', 'inherits', 'contains', 'blueprint']);
     private showExternalNodes = true;
     private focusedNodeId: string | null = null;
+    private hoveredNodeId: string | null = null;
+    private nodeCapByScope: Map<string, number> = new Map();
+    private nodeCap = 300;
+    private nodeCapStep = 200;
 
     // Holds dependency references so GraphViewController can orchestrate graph rendering later.
     constructor(private deps: GraphViewDependencies) {}
@@ -134,6 +145,61 @@ export class GraphViewController {
         this.focusedNodeId = nodeId;
     }
 
+    // Returns a stable cap for a scope so repeated renders keep consistent node limits.
+    getNodeCapForScope(scope: string, totalNodes: number): number {
+        let cap = this.nodeCapByScope.get(scope);
+        if (cap === undefined) {
+            cap = Math.min(this.nodeCap, totalNodes);
+            this.nodeCapByScope.set(scope, cap);
+        } else if (cap > totalNodes) {
+            cap = totalNodes;
+            this.nodeCapByScope.set(scope, cap);
+        }
+        return cap;
+    }
+
+    // Increases the cap for a scope and returns whether a refresh is needed.
+    revealMoreNodes(scope: string, totalNodes: number): boolean {
+        const cap = this.getNodeCapForScope(scope, totalNodes);
+        if (cap >= totalNodes) {
+            return false;
+        }
+        const nextCap = Math.min(totalNodes, cap + this.nodeCapStep);
+        this.nodeCapByScope.set(scope, nextCap);
+        return true;
+    }
+
+    // Updates the node status label and reveal button to match current cap state.
+    updateNodeStatus(graphView: GraphView): void {
+        if (graphView.totalNodes === 0) {
+            this.deps.nodeStatusElement.textContent = '';
+            this.deps.revealButton.disabled = true;
+            return;
+        }
+        if (this.deps.isTourActive()) {
+            this.deps.nodeStatusElement.textContent = `Guided view: ${graphView.visibleNodes}/${graphView.totalNodes}`;
+            this.deps.revealButton.disabled = true;
+            this.deps.revealButton.textContent = 'Guided';
+            return;
+        }
+        if (this.layoutMode === 'cluster') {
+            this.deps.nodeStatusElement.textContent = `Cluster view: ${graphView.visibleNodes} groups from ${graphView.totalNodes}`;
+            this.deps.revealButton.disabled = true;
+            this.deps.revealButton.textContent = 'Show more';
+            return;
+        }
+        if (!graphView.isCapped) {
+            this.deps.nodeStatusElement.textContent = `Showing ${graphView.visibleNodes} nodes`;
+            this.deps.revealButton.disabled = true;
+            this.deps.revealButton.textContent = 'Show more';
+            return;
+        }
+        this.deps.nodeStatusElement.textContent = `Showing ${graphView.visibleNodes} of ${graphView.totalNodes}`;
+        const nextCap = Math.min(graphView.totalNodes, graphView.visibleNodes + this.nodeCapStep);
+        this.deps.revealButton.textContent = nextCap >= graphView.totalNodes ? 'Show all' : 'Show more';
+        this.deps.revealButton.disabled = false;
+    }
+
     // Toggles an edge filter and reapplies visibility rules on the canvas.
     toggleEdgeFilter(filter: EdgeKind): void {
         if (this.edgeFilters.has(filter)) {
@@ -172,8 +238,67 @@ export class GraphViewController {
         });
         this.deps.applyGuidedFilter();
         this.applyFocus();
-        this.deps.refreshEdgeHighlights();
+        this.refreshEdgeHighlights();
         this.deps.updateLabelVisibility();
+    }
+
+    // Updates the hovered node state so edge highlights track cursor focus.
+    setHoveredNode(nodeId: string | null): void {
+        this.hoveredNodeId = nodeId;
+        this.refreshEdgeHighlights();
+    }
+
+    // Refreshes edge emphasis based on selected and hovered nodes.
+    refreshEdgeHighlights(): void {
+        if (!this.graph) {
+            return;
+        }
+        const cy = this.graph;
+        cy.edges().removeClass('is-active');
+        const selectedNodes = cy.$('node:selected');
+        selectedNodes.forEach((node: any) => {
+            node.connectedEdges().addClass('is-active');
+        });
+        if (this.hoveredNodeId) {
+            const hovered = cy.getElementById(this.hoveredNodeId);
+            if (hovered && !hovered.empty()) {
+                hovered.connectedEdges().addClass('is-active');
+            }
+        }
+    }
+
+    // Shows the hover tooltip with label metadata for the active node.
+    showTooltip(node: any, event: any): void {
+        const fullLabel = node.data('fullLabel') || node.data('label');
+        const kindLabel = node.data('kindLabel') || node.data('kind') || 'Symbol';
+        const path = node.data('path');
+        this.deps.tooltipElement.innerHTML = buildGraphTooltipHtml({
+            fullLabel: String(fullLabel),
+            kindLabel: String(kindLabel),
+            path: path ? String(path) : undefined,
+        });
+        this.deps.tooltipElement.setAttribute('aria-hidden', 'false');
+        this.deps.tooltipElement.classList.add('is-visible');
+        this.updateTooltipPosition(event);
+    }
+
+    // Hides the hover tooltip when the pointer leaves the node.
+    hideTooltip(): void {
+        this.deps.tooltipElement.classList.remove('is-visible');
+        this.deps.tooltipElement.setAttribute('aria-hidden', 'true');
+    }
+
+    // Repositions the tooltip to follow the cursor within the canvas bounds.
+    updateTooltipPosition(event: any): void {
+        const rendered = event.renderedPosition || event.position;
+        if (!rendered) {
+            return;
+        }
+        const offset = 12;
+        const surfaceRect = this.deps.tooltipContainer.getBoundingClientRect();
+        const x = Math.min(surfaceRect.width - 20, Math.max(0, rendered.x + offset));
+        const y = Math.min(surfaceRect.height - 20, Math.max(0, rendered.y + offset));
+        this.deps.tooltipElement.style.transform = `translate(${x}px, ${y}px)`;
     }
 
     // Focuses the graph around the currently selected node, if any.

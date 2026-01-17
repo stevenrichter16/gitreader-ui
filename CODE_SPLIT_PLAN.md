@@ -151,23 +151,40 @@ Split file tree responsibilities across dedicated modules:
 - File tree renders, expands, highlights focus
 - Narrator + reader in sync
 
-## Phase 4 — Graph Module
-Create `modules/graphView.ts`.
+## Phase 4 — Graph Module (Complete)
+Create `modules/graphView.ts`. ✅ Done.
 
-**Move**
-- graph render, layout selection
+**Moved**
+- graph render + layout handling
 - edge/node filters
 - tooltips + hover
-- selection and focus logic
+- selection + focus logic
+- node cap/reveal + node status updates
 
-**Module API**
-- `render(nodes, edges)`
+**Final GraphViewController API (used by app.ts)**
+- `render({ nodes, edges, layoutMode })`
 - `setLayout(mode)`
-- `setFilters(filters)`
-- `selectNode(id)`
+- `toggleEdgeFilter(filter)`
+- `toggleExternalNodes()`
+- `applyFilters()`
+- `focusOnSelected()`
+- `resetFocus()`
+- `zoom(factor)`
+- `fit()`
+- `getFilterState()`
+- `getFocusedNodeId()`
+- `setFocusedNodeId(nodeId)`
+- `getNodeCapForScope(scope, totalNodes)`
+- `revealMoreNodes(scope, totalNodes)`
+- `updateNodeStatus(graphView)`
+- `setHoveredNode(nodeId)`
+- `refreshEdgeHighlights()`
+- `showTooltip(node, event)`
+- `hideTooltip()`
+- `updateTooltipPosition(event)`
 
 **Validation**
-- Graph renders; filters toggle; selection sync works
+- Graph renders; filters toggle; hover tooltip + selection sync works; cap/reveal updates node status.
 
 ## Phase 5 — Narrator Module
 Create `modules/narrator.ts`.

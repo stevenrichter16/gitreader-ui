@@ -464,6 +464,10 @@ ${secondPart}`;
       __publicField(this, "edgeFilters", /* @__PURE__ */ new Set(["calls", "imports", "inherits", "contains", "blueprint"]));
       __publicField(this, "showExternalNodes", true);
       __publicField(this, "focusedNodeId", null);
+      __publicField(this, "hoveredNodeId", null);
+      __publicField(this, "nodeCapByScope", /* @__PURE__ */ new Map());
+      __publicField(this, "nodeCap", 300);
+      __publicField(this, "nodeCapStep", 200);
     }
     // Renders the provided nodes/edges and rebuilds Cytoscape when needed.
     render(input) {
@@ -527,6 +531,58 @@ ${secondPart}`;
     setFocusedNodeId(nodeId) {
       this.focusedNodeId = nodeId;
     }
+    // Returns a stable cap for a scope so repeated renders keep consistent node limits.
+    getNodeCapForScope(scope, totalNodes) {
+      let cap = this.nodeCapByScope.get(scope);
+      if (cap === void 0) {
+        cap = Math.min(this.nodeCap, totalNodes);
+        this.nodeCapByScope.set(scope, cap);
+      } else if (cap > totalNodes) {
+        cap = totalNodes;
+        this.nodeCapByScope.set(scope, cap);
+      }
+      return cap;
+    }
+    // Increases the cap for a scope and returns whether a refresh is needed.
+    revealMoreNodes(scope, totalNodes) {
+      const cap = this.getNodeCapForScope(scope, totalNodes);
+      if (cap >= totalNodes) {
+        return false;
+      }
+      const nextCap = Math.min(totalNodes, cap + this.nodeCapStep);
+      this.nodeCapByScope.set(scope, nextCap);
+      return true;
+    }
+    // Updates the node status label and reveal button to match current cap state.
+    updateNodeStatus(graphView) {
+      if (graphView.totalNodes === 0) {
+        this.deps.nodeStatusElement.textContent = "";
+        this.deps.revealButton.disabled = true;
+        return;
+      }
+      if (this.deps.isTourActive()) {
+        this.deps.nodeStatusElement.textContent = `Guided view: ${graphView.visibleNodes}/${graphView.totalNodes}`;
+        this.deps.revealButton.disabled = true;
+        this.deps.revealButton.textContent = "Guided";
+        return;
+      }
+      if (this.layoutMode === "cluster") {
+        this.deps.nodeStatusElement.textContent = `Cluster view: ${graphView.visibleNodes} groups from ${graphView.totalNodes}`;
+        this.deps.revealButton.disabled = true;
+        this.deps.revealButton.textContent = "Show more";
+        return;
+      }
+      if (!graphView.isCapped) {
+        this.deps.nodeStatusElement.textContent = `Showing ${graphView.visibleNodes} nodes`;
+        this.deps.revealButton.disabled = true;
+        this.deps.revealButton.textContent = "Show more";
+        return;
+      }
+      this.deps.nodeStatusElement.textContent = `Showing ${graphView.visibleNodes} of ${graphView.totalNodes}`;
+      const nextCap = Math.min(graphView.totalNodes, graphView.visibleNodes + this.nodeCapStep);
+      this.deps.revealButton.textContent = nextCap >= graphView.totalNodes ? "Show all" : "Show more";
+      this.deps.revealButton.disabled = false;
+    }
     // Toggles an edge filter and reapplies visibility rules on the canvas.
     toggleEdgeFilter(filter) {
       if (this.edgeFilters.has(filter)) {
@@ -563,8 +619,62 @@ ${secondPart}`;
       });
       this.deps.applyGuidedFilter();
       this.applyFocus();
-      this.deps.refreshEdgeHighlights();
+      this.refreshEdgeHighlights();
       this.deps.updateLabelVisibility();
+    }
+    // Updates the hovered node state so edge highlights track cursor focus.
+    setHoveredNode(nodeId) {
+      this.hoveredNodeId = nodeId;
+      this.refreshEdgeHighlights();
+    }
+    // Refreshes edge emphasis based on selected and hovered nodes.
+    refreshEdgeHighlights() {
+      if (!this.graph) {
+        return;
+      }
+      const cy = this.graph;
+      cy.edges().removeClass("is-active");
+      const selectedNodes = cy.$("node:selected");
+      selectedNodes.forEach((node) => {
+        node.connectedEdges().addClass("is-active");
+      });
+      if (this.hoveredNodeId) {
+        const hovered = cy.getElementById(this.hoveredNodeId);
+        if (hovered && !hovered.empty()) {
+          hovered.connectedEdges().addClass("is-active");
+        }
+      }
+    }
+    // Shows the hover tooltip with label metadata for the active node.
+    showTooltip(node, event) {
+      const fullLabel = node.data("fullLabel") || node.data("label");
+      const kindLabel = node.data("kindLabel") || node.data("kind") || "Symbol";
+      const path = node.data("path");
+      this.deps.tooltipElement.innerHTML = buildGraphTooltipHtml({
+        fullLabel: String(fullLabel),
+        kindLabel: String(kindLabel),
+        path: path ? String(path) : void 0
+      });
+      this.deps.tooltipElement.setAttribute("aria-hidden", "false");
+      this.deps.tooltipElement.classList.add("is-visible");
+      this.updateTooltipPosition(event);
+    }
+    // Hides the hover tooltip when the pointer leaves the node.
+    hideTooltip() {
+      this.deps.tooltipElement.classList.remove("is-visible");
+      this.deps.tooltipElement.setAttribute("aria-hidden", "true");
+    }
+    // Repositions the tooltip to follow the cursor within the canvas bounds.
+    updateTooltipPosition(event) {
+      const rendered = event.renderedPosition || event.position;
+      if (!rendered) {
+        return;
+      }
+      const offset = 12;
+      const surfaceRect = this.deps.tooltipContainer.getBoundingClientRect();
+      const x = Math.min(surfaceRect.width - 20, Math.max(0, rendered.x + offset));
+      const y = Math.min(surfaceRect.height - 20, Math.max(0, rendered.y + offset));
+      this.deps.tooltipElement.style.transform = `translate(${x}px, ${y}px)`;
     }
     // Focuses the graph around the currently selected node, if any.
     focusOnSelected() {
@@ -2901,14 +3011,12 @@ ${secondPart}`;
       __publicField(this, "graphCache", /* @__PURE__ */ new Map());
       __publicField(this, "graphLoadPromises", /* @__PURE__ */ new Map());
       __publicField(this, "narratorCache", /* @__PURE__ */ new Map());
-      __publicField(this, "graphNodeCapByScope", /* @__PURE__ */ new Map());
       __publicField(this, "narratorRequestToken", 0);
       __publicField(this, "chapterRequestToken", 0);
       __publicField(this, "graphRequestToken", 0);
       __publicField(this, "narratorVisible", true);
       __publicField(this, "graphInstance", null);
       __publicField(this, "graphEventsBound", false);
-      __publicField(this, "hoveredNodeId", null);
       __publicField(this, "currentScope", "full");
       __publicField(this, "currentChapterId", null);
       __publicField(this, "currentSymbol", null);
@@ -2920,8 +3028,6 @@ ${secondPart}`;
       __publicField(this, "tocDebounceTimer", null);
       __publicField(this, "tocDebounceDelay", 200);
       __publicField(this, "pendingChapterId", null);
-      __publicField(this, "graphNodeCap", 300);
-      __publicField(this, "graphNodeCapStep", 200);
       __publicField(this, "labelZoomThreshold", 0.65);
       __publicField(this, "labelLineLength", 18);
       __publicField(this, "lastTapNodeId", null);
@@ -2988,12 +3094,15 @@ ${secondPart}`;
       });
       this.graphView = new GraphViewController({
         container: this.canvasGraph,
+        tooltipElement: this.graphTooltip,
+        tooltipContainer: this.canvasSurface,
+        nodeStatusElement: this.graphNodeStatus,
+        revealButton: this.graphRevealButton,
         setCanvasOverlay: (message, visible) => this.setCanvasOverlay(message, visible),
         clearGraph: () => this.clearGraph(),
         getSelectedNodeId: () => this.getSelectedGraphNodeId(),
         isTourActive: () => this.tourActive,
         applyGuidedFilter: () => this.applyGuidedGraphFilter(),
-        refreshEdgeHighlights: () => this.refreshEdgeHighlights(),
         updateLabelVisibility: () => this.updateLabelVisibility(),
         setDisplayNodes: (nodes) => {
           this.displayNodeById = new Map(nodes.map((node) => [node.id, node]));
@@ -3264,7 +3373,13 @@ ${secondPart}`;
             this.graphView.resetFocus();
             this.refreshGraphViewport();
           } else if (action === "reveal") {
-            this.revealMoreNodes();
+            if (!this.currentChapterId) {
+              return;
+            }
+            const nodes = this.filterNodesForChapter(this.currentChapterId);
+            if (this.graphView.revealMoreNodes(this.currentScope, nodes.length)) {
+              this.refreshGraphView();
+            }
           } else if (action === "zoom-in") {
             this.graphView.zoom(1.2);
           } else if (action === "zoom-out") {
@@ -3596,7 +3711,7 @@ ${secondPart}`;
         edges: graphView.edges,
         layoutMode: this.graphLayoutMode
       });
-      this.updateGraphNodeStatus(graphView);
+      this.graphView.updateNodeStatus(graphView);
       this.loadSymbolSnippet(focus).catch(() => {
         this.readerController.render(focus);
         void this.updateNarrator(focus);
@@ -3645,7 +3760,7 @@ ${secondPart}`;
         edges: graphView.edges,
         layoutMode: this.graphLayoutMode
       });
-      this.updateGraphNodeStatus(graphView);
+      this.graphView.updateNodeStatus(graphView);
       const entryNode = (_a = this.nodeById.get(arc.entry_id)) != null ? _a : this.pickFocusNode(graphView.nodes);
       if (entryNode) {
         if (this.graphInstance) {
@@ -3696,23 +3811,12 @@ ${secondPart}`;
       this.graphCache.set(scope, graphData);
       this.setGraphData(graphData);
     }
-    getNodeCapForScope(scope, totalNodes) {
-      let cap = this.graphNodeCapByScope.get(scope);
-      if (cap === void 0) {
-        cap = Math.min(this.graphNodeCap, totalNodes);
-        this.graphNodeCapByScope.set(scope, cap);
-      } else if (cap > totalNodes) {
-        cap = totalNodes;
-        this.graphNodeCapByScope.set(scope, cap);
-      }
-      return cap;
-    }
     buildGraphView(nodes, edges, scope) {
       if (this.graphLayoutMode === "cluster") {
         return this.buildClusterView(nodes, edges);
       }
       const totalNodes = nodes.length;
-      const cap = this.getNodeCapForScope(scope, totalNodes);
+      const cap = this.graphView.getNodeCapForScope(scope, totalNodes);
       if (cap >= totalNodes) {
         return {
           nodes,
@@ -4015,49 +4119,6 @@ ${secondPart}`;
         isCapped: false
       };
     }
-    updateGraphNodeStatus(graphView) {
-      if (graphView.totalNodes === 0) {
-        this.graphNodeStatus.textContent = "";
-        this.graphRevealButton.disabled = true;
-        return;
-      }
-      if (this.tourActive) {
-        this.graphNodeStatus.textContent = `Guided view: ${graphView.visibleNodes}/${graphView.totalNodes}`;
-        this.graphRevealButton.disabled = true;
-        this.graphRevealButton.textContent = "Guided";
-        return;
-      }
-      if (this.graphLayoutMode === "cluster") {
-        this.graphNodeStatus.textContent = `Cluster view: ${graphView.visibleNodes} groups from ${graphView.totalNodes}`;
-        this.graphRevealButton.disabled = true;
-        this.graphRevealButton.textContent = "Show more";
-        return;
-      }
-      if (!graphView.isCapped) {
-        this.graphNodeStatus.textContent = `Showing ${graphView.visibleNodes} nodes`;
-        this.graphRevealButton.disabled = true;
-        this.graphRevealButton.textContent = "Show more";
-        return;
-      }
-      this.graphNodeStatus.textContent = `Showing ${graphView.visibleNodes} of ${graphView.totalNodes}`;
-      const nextCap = Math.min(graphView.totalNodes, graphView.visibleNodes + this.graphNodeCapStep);
-      this.graphRevealButton.textContent = nextCap >= graphView.totalNodes ? "Show all" : "Show more";
-      this.graphRevealButton.disabled = false;
-    }
-    revealMoreNodes() {
-      if (!this.currentChapterId) {
-        return;
-      }
-      const nodes = this.filterNodesForChapter(this.currentChapterId);
-      const total = nodes.length;
-      const cap = this.getNodeCapForScope(this.currentScope, total);
-      if (cap >= total) {
-        return;
-      }
-      const nextCap = Math.min(total, cap + this.graphNodeCapStep);
-      this.graphNodeCapByScope.set(this.currentScope, nextCap);
-      this.refreshGraphView();
-    }
     refreshGraphView() {
       if (!this.currentChapterId) {
         return;
@@ -4070,7 +4131,7 @@ ${secondPart}`;
         edges: graphView.edges,
         layoutMode: this.graphLayoutMode
       });
-      this.updateGraphNodeStatus(graphView);
+      this.graphView.updateNodeStatus(graphView);
     }
     setGraphData(graphData) {
       this.graphNodes = Array.isArray(graphData.nodes) ? graphData.nodes : [];
@@ -4520,7 +4581,7 @@ ${secondPart}`;
       if (this.graphInstance) {
         this.graphInstance.elements().remove();
       }
-      this.hideGraphTooltip();
+      this.graphView.hideTooltip();
     }
     bindGraphEvents() {
       if (!this.graphInstance) {
@@ -4556,12 +4617,12 @@ ${secondPart}`;
           loadSymbolSnippet: (node) => this.loadSymbolSnippet(node),
           renderCode: (node) => this.readerController.render(node),
           updateNarrator: (node) => this.updateNarrator(node),
-          refreshEdgeHighlights: () => this.refreshEdgeHighlights(),
+          refreshEdgeHighlights: () => this.graphView.refreshEdgeHighlights(),
           updateLabelVisibility: () => this.updateLabelVisibility(),
-          setHoveredNode: (nodeId) => this.setHoveredNode(nodeId),
-          showGraphTooltip: (node, event) => this.showGraphTooltip(node, event),
-          hideGraphTooltip: () => this.hideGraphTooltip(),
-          updateTooltipPosition: (event) => this.updateTooltipPosition(event)
+          setHoveredNode: (nodeId) => this.graphView.setHoveredNode(nodeId),
+          showGraphTooltip: (node, event) => this.graphView.showTooltip(node, event),
+          hideGraphTooltip: () => this.graphView.hideTooltip(),
+          updateTooltipPosition: (event) => this.graphView.updateTooltipPosition(event)
         }
       });
       if (didBind) {
@@ -4586,23 +4647,6 @@ ${secondPart}`;
     getKindLabel(kind) {
       return getKindLabel(kind);
     }
-    refreshEdgeHighlights() {
-      if (!this.graphInstance) {
-        return;
-      }
-      const cy = this.graphInstance;
-      cy.edges().removeClass("is-active");
-      const selectedNodes = cy.$("node:selected");
-      selectedNodes.forEach((node) => {
-        node.connectedEdges().addClass("is-active");
-      });
-      if (this.hoveredNodeId) {
-        const hovered = cy.getElementById(this.hoveredNodeId);
-        if (hovered && !hovered.empty()) {
-          hovered.connectedEdges().addClass("is-active");
-        }
-      }
-    }
     updateLabelVisibility() {
       if (!this.graphInstance) {
         return;
@@ -4614,47 +4658,6 @@ ${secondPart}`;
         const shouldShow = showAll || node.selected() || node.hasClass("is-hovered") || (guidedAllowed ? guidedAllowed.has(node.id()) : false);
         node.data("labelVisible", shouldShow ? "true" : "false");
       });
-    }
-    setHoveredNode(nodeId) {
-      this.hoveredNodeId = nodeId;
-      this.refreshEdgeHighlights();
-    }
-    showGraphTooltip(node, event) {
-      if (!this.graphTooltip) {
-        return;
-      }
-      const fullLabel = node.data("fullLabel") || node.data("label");
-      const kindLabel = node.data("kindLabel") || node.data("kind") || "Symbol";
-      const path = node.data("path");
-      this.graphTooltip.innerHTML = buildGraphTooltipHtml({
-        fullLabel: String(fullLabel),
-        kindLabel: String(kindLabel),
-        path: path ? String(path) : void 0
-      });
-      this.graphTooltip.setAttribute("aria-hidden", "false");
-      this.graphTooltip.classList.add("is-visible");
-      this.updateTooltipPosition(event);
-    }
-    hideGraphTooltip() {
-      if (!this.graphTooltip) {
-        return;
-      }
-      this.graphTooltip.classList.remove("is-visible");
-      this.graphTooltip.setAttribute("aria-hidden", "true");
-    }
-    updateTooltipPosition(event) {
-      if (!this.graphTooltip || !this.canvasSurface) {
-        return;
-      }
-      const rendered = event.renderedPosition || event.position;
-      if (!rendered) {
-        return;
-      }
-      const offset = 12;
-      const surfaceRect = this.canvasSurface.getBoundingClientRect();
-      const x = Math.min(surfaceRect.width - 20, Math.max(0, rendered.x + offset));
-      const y = Math.min(surfaceRect.height - 20, Math.max(0, rendered.y + offset));
-      this.graphTooltip.style.transform = `translate(${x}px, ${y}px)`;
     }
     async updateNarrator(symbol) {
       if (symbol.kind === "folder") {
@@ -4947,7 +4950,7 @@ ${secondPart}`;
           edges: graphView.edges,
           layoutMode: this.graphLayoutMode
         });
-        this.updateGraphNodeStatus(graphView);
+        this.graphView.updateNodeStatus(graphView);
       }
       if (this.graphInstance) {
         this.graphInstance.$("node:selected").unselect();
