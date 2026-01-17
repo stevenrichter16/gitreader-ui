@@ -369,6 +369,30 @@ body {
     border-radius: 8px;
 }
 
+.code-line.is-import-usage {
+    background: rgba(126, 93, 52, 0.35);
+    border-radius: 8px;
+}
+
+.code-import {
+    border: none;
+    background: rgba(35, 122, 120, 0.18);
+    color: #e9f5f4;
+    border-radius: 6px;
+    padding: 0 4px;
+    cursor: pointer;
+    font: inherit;
+}
+
+.code-import:hover {
+    background: rgba(35, 122, 120, 0.35);
+}
+
+.code-import:focus-visible {
+    outline: 2px solid rgba(35, 122, 120, 0.6);
+    outline-offset: 2px;
+}
+
 .line-no {
     color: rgba(247, 242, 233, 0.55);
     text-align: right;

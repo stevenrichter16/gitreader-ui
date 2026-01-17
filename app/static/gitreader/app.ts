@@ -658,15 +658,31 @@ class GitReaderApp {
         });
 
         this.codeSurface.addEventListener('click', (event) => {
-            const target = (event.target as HTMLElement).closest<HTMLElement>('[data-reader-action]');
-            if (!target) {
+            const target = event.target as HTMLElement;
+            const actionTarget = target.closest<HTMLElement>('[data-reader-action]');
+            if (actionTarget) {
+                const action = actionTarget.dataset.readerAction;
+                if (action === 'copy') {
+                    void this.copySnippet();
+                } else if (action === 'jump') {
+                    this.jumpToInputLine();
+                }
                 return;
             }
-            const action = target.dataset.readerAction;
-            if (action === 'copy') {
-                void this.copySnippet();
-            } else if (action === 'jump') {
-                this.jumpToInputLine();
+            const importTarget = target.closest<HTMLElement>('[data-import-name]');
+            if (importTarget) {
+                const importName = importTarget.dataset.importName;
+                if (importName) {
+                    this.highlightImportUsage(importName);
+                }
+                return;
+            }
+            const importLine = target.closest<HTMLElement>('.code-line[data-imports]');
+            if (importLine) {
+                const imports = (importLine.dataset.imports || '').split(',').map((value) => value.trim()).filter(Boolean);
+                if (imports.length > 0) {
+                    this.highlightImportUsage(imports[0]);
+                }
             }
         });
 
@@ -1668,6 +1684,298 @@ class GitReaderApp {
             </article>
         `;
         this.applyGuidedCodeFocus();
+        this.decorateImportLines(snippet, language);
+    }
+
+    private decorateImportLines(snippet?: SymbolSnippetResponse, language?: string): void {
+        if (!snippet?.snippet || !this.currentSymbol || this.currentSymbol.kind !== 'file') {
+            return;
+        }
+        this.clearImportUsageHighlights();
+        const raw = snippet.snippet.replace(/\n$/, '');
+        if (!raw) {
+            return;
+        }
+        const lines = raw.split('\n');
+        const startLine = snippet.start_line ?? 1;
+        lines.forEach((lineText, index) => {
+            const importNames = this.extractImportNames(lineText, language);
+            if (importNames.length === 0) {
+                return;
+            }
+            const lineNumber = startLine + index;
+            const lineEl = this.codeSurface.querySelector<HTMLElement>(`[data-line="${lineNumber}"]`);
+            if (!lineEl) {
+                return;
+            }
+            lineEl.dataset.imports = importNames.join(',');
+            this.decorateImportLine(lineEl, importNames);
+        });
+    }
+
+    private decorateImportLine(lineEl: HTMLElement, importNames: string[]): void {
+        if (importNames.length === 0) {
+            return;
+        }
+        const escaped = importNames.map((name) => this.escapeRegex(name));
+        const matcher = new RegExp(`\\b(${escaped.join('|')})\\b`, 'g');
+        const walker = document.createTreeWalker(lineEl, NodeFilter.SHOW_TEXT, {
+            acceptNode: (node) => {
+                if (!node.textContent || !matcher.test(node.textContent)) {
+                    matcher.lastIndex = 0;
+                    return NodeFilter.FILTER_REJECT;
+                }
+                matcher.lastIndex = 0;
+                const parent = node.parentElement;
+                if (!parent || parent.closest('.line-no')) {
+                    return NodeFilter.FILTER_REJECT;
+                }
+                if (parent.closest('.code-import')) {
+                    return NodeFilter.FILTER_REJECT;
+                }
+                return NodeFilter.FILTER_ACCEPT;
+            },
+        });
+        const textNodes: Text[] = [];
+        while (walker.nextNode()) {
+            textNodes.push(walker.currentNode as Text);
+        }
+        textNodes.forEach((textNode) => {
+            const text = textNode.textContent ?? '';
+            const fragment = document.createDocumentFragment();
+            let lastIndex = 0;
+            let match = matcher.exec(text);
+            while (match) {
+                const start = match.index;
+                const end = start + match[0].length;
+                if (start > lastIndex) {
+                    fragment.append(text.slice(lastIndex, start));
+                }
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'code-import';
+                button.dataset.importName = match[0];
+                button.textContent = match[0];
+                fragment.append(button);
+                lastIndex = end;
+                match = matcher.exec(text);
+            }
+            matcher.lastIndex = 0;
+            if (lastIndex < text.length) {
+                fragment.append(text.slice(lastIndex));
+            }
+            textNode.parentNode?.replaceChild(fragment, textNode);
+        });
+    }
+
+    private highlightImportUsage(importName: string): void {
+        if (!importName) {
+            return;
+        }
+        this.clearImportUsageHighlights();
+        const lines = Array.from(this.codeSurface.querySelectorAll<HTMLElement>('.code-line'));
+        let firstMatch: HTMLElement | null = null;
+        let matchCount = 0;
+        lines.forEach((line) => {
+            const imports = (line.dataset.imports || '').split(',').map((value) => value.trim());
+            if (imports.includes(importName)) {
+                return;
+            }
+            if (this.lineHasIdentifierUsage(line, importName)) {
+                line.classList.add('is-import-usage');
+                matchCount += 1;
+                if (!firstMatch) {
+                    firstMatch = line;
+                }
+            }
+        });
+        if (!firstMatch) {
+            this.setCodeStatus(`No usages of ${importName} in this snippet.`);
+            return;
+        }
+        this.setCodeStatus(`Found ${matchCount} usage${matchCount === 1 ? '' : 's'} of ${importName}.`);
+        firstMatch.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    private lineHasIdentifierUsage(lineEl: HTMLElement, importName: string): boolean {
+        const escaped = this.escapeRegex(importName);
+        const matcher = new RegExp(`\\b${escaped}\\b`);
+        const walker = document.createTreeWalker(lineEl, NodeFilter.SHOW_TEXT, {
+            acceptNode: (node) => {
+                if (!node.textContent || !matcher.test(node.textContent)) {
+                    matcher.lastIndex = 0;
+                    return NodeFilter.FILTER_REJECT;
+                }
+                matcher.lastIndex = 0;
+                const parent = node.parentElement;
+                if (!parent || parent.closest('.line-no')) {
+                    return NodeFilter.FILTER_REJECT;
+                }
+                if (parent.closest('.hljs-string') || parent.closest('.hljs-comment')) {
+                    return NodeFilter.FILTER_REJECT;
+                }
+                return NodeFilter.FILTER_ACCEPT;
+            },
+        });
+        while (walker.nextNode()) {
+            return true;
+        }
+        return false;
+    }
+
+    private clearImportUsageHighlights(): void {
+        this.codeSurface.querySelectorAll<HTMLElement>('.code-line.is-import-usage')
+            .forEach((line) => line.classList.remove('is-import-usage'));
+    }
+
+    private extractImportNames(lineText: string, language?: string): string[] {
+        const trimmed = lineText.trim();
+        if (!trimmed) {
+            return [];
+        }
+        if (trimmed.startsWith('#') || trimmed.startsWith('//') || trimmed.startsWith('/*') || trimmed.startsWith('*')) {
+            return [];
+        }
+        if (language === 'python') {
+            return this.extractPythonImportNames(trimmed);
+        }
+        if (language === 'swift') {
+            return this.extractSwiftImportNames(trimmed);
+        }
+        if (language === 'javascript' || language === 'typescript' || language === 'tsx') {
+            return this.extractJsImportNames(trimmed);
+        }
+        return [];
+    }
+
+    private extractPythonImportNames(lineText: string): string[] {
+        if (lineText.startsWith('import ')) {
+            const rest = lineText.slice('import '.length);
+            return rest.split(',')
+                .map((part) => part.trim())
+                .map((part) => part.split(/\s+as\s+/).pop() ?? '')
+                .map((part) => part.trim())
+                .filter(Boolean);
+        }
+        if (lineText.startsWith('from ')) {
+            const match = lineText.match(/^from\s+.+?\s+import\s+(.+)$/);
+            if (!match) {
+                return [];
+            }
+            const importPart = match[1];
+            if (importPart.includes('*')) {
+                return [];
+            }
+            return importPart.split(',')
+                .map((part) => part.trim())
+                .map((part) => part.split(/\s+as\s+/).pop() ?? '')
+                .map((part) => part.trim())
+                .filter(Boolean);
+        }
+        return [];
+    }
+
+    private extractSwiftImportNames(lineText: string): string[] {
+        if (!lineText.startsWith('import ')) {
+            return [];
+        }
+        const rest = lineText.slice('import '.length).trim();
+        const moduleName = rest.split(/\s+/)[0];
+        return moduleName ? [moduleName] : [];
+    }
+
+    private extractJsImportNames(lineText: string): string[] {
+        const names: string[] = [];
+        const bindingMatch = lineText.match(/^import\s+(?:type\s+)?(.+?)\s+from\s+['"]/);
+        if (bindingMatch) {
+            names.push(...this.parseJsImportBindings(bindingMatch[1]));
+        }
+        const exportMatch = lineText.match(/^export\s+(?:type\s+)?(.+?)\s+from\s+['"]/);
+        if (exportMatch) {
+            names.push(...this.parseJsImportBindings(exportMatch[1]));
+        }
+        const importEqualsMatch = lineText.match(/^import\s+([A-Za-z_$][\w$]*)\s*=\s*require\s*\(/);
+        if (importEqualsMatch) {
+            names.push(importEqualsMatch[1]);
+        }
+        const requireMatch = lineText.match(/^(?:const|let|var)\s+(.+?)\s*=\s*require\s*\(/);
+        if (requireMatch) {
+            names.push(...this.parseJsRequireBinding(requireMatch[1]));
+        }
+        return Array.from(new Set(names.filter(Boolean)));
+    }
+
+    private parseJsImportBindings(binding: string): string[] {
+        const names: string[] = [];
+        const trimmed = binding.trim();
+        if (!trimmed) {
+            return names;
+        }
+        if (trimmed.startsWith('{')) {
+            names.push(...this.parseBraceList(trimmed));
+            return names;
+        }
+        if (trimmed.startsWith('*')) {
+            const starMatch = trimmed.match(/\*\s+as\s+([A-Za-z_$][\w$]*)/);
+            if (starMatch) {
+                names.push(starMatch[1]);
+            }
+            return names;
+        }
+        const parts = trimmed.split(',');
+        if (parts.length > 0) {
+            const defaultName = parts[0].trim();
+            if (defaultName) {
+                names.push(defaultName);
+            }
+        }
+        if (parts.length > 1) {
+            const rest = parts.slice(1).join(',').trim();
+            if (rest.startsWith('{')) {
+                names.push(...this.parseBraceList(rest));
+            } else if (rest.startsWith('*')) {
+                const starMatch = rest.match(/\*\s+as\s+([A-Za-z_$][\w$]*)/);
+                if (starMatch) {
+                    names.push(starMatch[1]);
+                }
+            }
+        }
+        return names;
+    }
+
+    private parseJsRequireBinding(binding: string): string[] {
+        const trimmed = binding.trim();
+        if (trimmed.startsWith('{')) {
+            return this.parseBraceList(trimmed);
+        }
+        if (trimmed.startsWith('[')) {
+            return [];
+        }
+        return trimmed ? [trimmed.split(/\s+/)[0]] : [];
+    }
+
+    private parseBraceList(segment: string): string[] {
+        const content = segment.replace(/^{/, '').replace(/}.*$/, '');
+        return content.split(',')
+            .map((part) => part.trim())
+            .map((part) => {
+                if (!part) {
+                    return '';
+                }
+                if (part.includes(' as ')) {
+                    return part.split(/\s+as\s+/).pop() ?? '';
+                }
+                if (part.includes(':')) {
+                    return part.split(':').pop() ?? '';
+                }
+                return part;
+            })
+            .map((part) => part.trim())
+            .filter((part) => /^[A-Za-z_$][\w$]*$/.test(part));
+    }
+
+    private escapeRegex(value: string): string {
+        return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
 
     private getDisplayRange(

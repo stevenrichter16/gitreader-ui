@@ -349,42 +349,7 @@ def _resolve_snippet_range(
             end_line = min(total_lines, body_start + DEFAULT_FALLBACK_CONTEXT - 1)
         if end_line - header_start + 1 > max_lines:
             end_line = min(total_lines, header_start + max_lines - 1)
-        highlights = []
-        if header_start < signature_line:
-            highlights.append({
-                'label': 'decorators',
-                'start_line': header_start,
-                'end_line': signature_line - 1,
-            })
-        highlights.append({
-            'label': 'signature',
-            'start_line': signature_line,
-            'end_line': signature_line,
-        })
-        if body_start <= end_line:
-            highlights.append({
-                'label': 'body_start',
-                'start_line': body_start,
-                'end_line': body_start,
-            })
-            if end_line != body_start:
-                highlights.append({
-                    'label': 'body_end',
-                    'start_line': end_line,
-                    'end_line': end_line,
-                })
-        return header_start, end_line, highlights
+        return header_start, end_line, []
 
     start_line, end_line = _resolve_line_range(node.kind, node.location, total_lines, max_lines)
-    highlights = [{
-        'label': 'snippet_start',
-        'start_line': start_line,
-        'end_line': start_line,
-    }]
-    if end_line != start_line:
-        highlights.append({
-            'label': 'snippet_end',
-            'start_line': end_line,
-            'end_line': end_line,
-        })
-    return start_line, end_line, highlights
+    return start_line, end_line, []

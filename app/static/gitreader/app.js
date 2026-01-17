@@ -383,15 +383,31 @@
         });
 
         this.codeSurface.addEventListener('click', function (event) {
-            var target = event.target.closest('[data-reader-action]');
-            if (!target) {
+            var target = event.target;
+            var actionTarget = target.closest('[data-reader-action]');
+            if (actionTarget) {
+                var action = actionTarget.dataset.readerAction;
+                if (action === 'copy') {
+                    _this.copySnippet();
+                } else if (action === 'jump') {
+                    _this.jumpToInputLine();
+                }
                 return;
             }
-            var action = target.dataset.readerAction;
-            if (action === 'copy') {
-                _this.copySnippet();
-            } else if (action === 'jump') {
-                _this.jumpToInputLine();
+            var importTarget = target.closest('[data-import-name]');
+            if (importTarget) {
+                var importName = importTarget.dataset.importName;
+                if (importName) {
+                    _this.highlightImportUsage(importName);
+                }
+                return;
+            }
+            var importLine = target.closest('.code-line[data-imports]');
+            if (importLine) {
+                var imports = (importLine.dataset.imports || '').split(',').map(function (value) { return value.trim(); }).filter(Boolean);
+                if (imports.length > 0) {
+                    _this.highlightImportUsage(imports[0]);
+                }
             }
         });
 
@@ -1399,6 +1415,302 @@
             '</details>' +
             '</article>';
         this.applyGuidedCodeFocus();
+        this.decorateImportLines(snippet, language);
+    };
+
+    GitReaderApp.prototype.decorateImportLines = function (snippet, language) {
+        var _this = this;
+        if (!(snippet && snippet.snippet) || !this.currentSymbol || this.currentSymbol.kind !== 'file') {
+            return;
+        }
+        this.clearImportUsageHighlights();
+        var raw = snippet.snippet.replace(/\n$/, '');
+        if (!raw) {
+            return;
+        }
+        var lines = raw.split('\n');
+        var startLine = (snippet && snippet.start_line) || 1;
+        lines.forEach(function (lineText, index) {
+            var importNames = _this.extractImportNames(lineText, language);
+            if (importNames.length === 0) {
+                return;
+            }
+            var lineNumber = startLine + index;
+            var lineEl = _this.codeSurface.querySelector('[data-line="' + lineNumber + '"]');
+            if (!lineEl) {
+                return;
+            }
+            lineEl.dataset.imports = importNames.join(',');
+            _this.decorateImportLine(lineEl, importNames);
+        });
+    };
+
+    GitReaderApp.prototype.decorateImportLine = function (lineEl, importNames) {
+        if (importNames.length === 0) {
+            return;
+        }
+        var escaped = importNames.map(this.escapeRegex.bind(this));
+        var matcher = new RegExp('\\b(' + escaped.join('|') + ')\\b', 'g');
+        var walker = document.createTreeWalker(lineEl, NodeFilter.SHOW_TEXT, {
+            acceptNode: function (node) {
+                if (!node.textContent || !matcher.test(node.textContent)) {
+                    matcher.lastIndex = 0;
+                    return NodeFilter.FILTER_REJECT;
+                }
+                matcher.lastIndex = 0;
+                var parent = node.parentElement;
+                if (!parent || parent.closest('.line-no')) {
+                    return NodeFilter.FILTER_REJECT;
+                }
+                if (parent.closest('.code-import')) {
+                    return NodeFilter.FILTER_REJECT;
+                }
+                return NodeFilter.FILTER_ACCEPT;
+            }
+        });
+        var textNodes = [];
+        while (walker.nextNode()) {
+            textNodes.push(walker.currentNode);
+        }
+        textNodes.forEach(function (textNode) {
+            var text = textNode.textContent || '';
+            var fragment = document.createDocumentFragment();
+            var lastIndex = 0;
+            var match = matcher.exec(text);
+            while (match) {
+                var start = match.index;
+                var end = start + match[0].length;
+                if (start > lastIndex) {
+                    fragment.append(text.slice(lastIndex, start));
+                }
+                var button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'code-import';
+                button.dataset.importName = match[0];
+                button.textContent = match[0];
+                fragment.append(button);
+                lastIndex = end;
+                match = matcher.exec(text);
+            }
+            matcher.lastIndex = 0;
+            if (lastIndex < text.length) {
+                fragment.append(text.slice(lastIndex));
+            }
+            if (textNode.parentNode) {
+                textNode.parentNode.replaceChild(fragment, textNode);
+            }
+        });
+    };
+
+    GitReaderApp.prototype.highlightImportUsage = function (importName) {
+        if (!importName) {
+            return;
+        }
+        var _this = this;
+        this.clearImportUsageHighlights();
+        var lines = Array.from(this.codeSurface.querySelectorAll('.code-line'));
+        var firstMatch = null;
+        var matchCount = 0;
+        lines.forEach(function (line) {
+            var imports = (line.dataset.imports || '').split(',').map(function (value) { return value.trim(); });
+            if (imports.includes(importName)) {
+                return;
+            }
+            if (_this.lineHasIdentifierUsage(line, importName)) {
+                line.classList.add('is-import-usage');
+                matchCount += 1;
+                if (!firstMatch) {
+                    firstMatch = line;
+                }
+            }
+        });
+        if (!firstMatch) {
+            this.setCodeStatus('No usages of ' + importName + ' in this snippet.');
+            return;
+        }
+        this.setCodeStatus('Found ' + matchCount + ' usage' + (matchCount === 1 ? '' : 's') + ' of ' + importName + '.');
+        firstMatch.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
+
+    GitReaderApp.prototype.lineHasIdentifierUsage = function (lineEl, importName) {
+        var escaped = this.escapeRegex(importName);
+        var matcher = new RegExp('\\b' + escaped + '\\b');
+        var walker = document.createTreeWalker(lineEl, NodeFilter.SHOW_TEXT, {
+            acceptNode: function (node) {
+                if (!node.textContent || !matcher.test(node.textContent)) {
+                    matcher.lastIndex = 0;
+                    return NodeFilter.FILTER_REJECT;
+                }
+                matcher.lastIndex = 0;
+                var parent = node.parentElement;
+                if (!parent || parent.closest('.line-no')) {
+                    return NodeFilter.FILTER_REJECT;
+                }
+                if (parent.closest('.hljs-string') || parent.closest('.hljs-comment')) {
+                    return NodeFilter.FILTER_REJECT;
+                }
+                return NodeFilter.FILTER_ACCEPT;
+            }
+        });
+        while (walker.nextNode()) {
+            return true;
+        }
+        return false;
+    };
+
+    GitReaderApp.prototype.clearImportUsageHighlights = function () {
+        this.codeSurface.querySelectorAll('.code-line.is-import-usage')
+            .forEach(function (line) { return line.classList.remove('is-import-usage'); });
+    };
+
+    GitReaderApp.prototype.extractImportNames = function (lineText, language) {
+        var trimmed = lineText.trim();
+        if (!trimmed) {
+            return [];
+        }
+        if (trimmed.startsWith('#') || trimmed.startsWith('//') || trimmed.startsWith('/*') || trimmed.startsWith('*')) {
+            return [];
+        }
+        if (language === 'python') {
+            return this.extractPythonImportNames(trimmed);
+        }
+        if (language === 'swift') {
+            return this.extractSwiftImportNames(trimmed);
+        }
+        if (language === 'javascript' || language === 'typescript' || language === 'tsx') {
+            return this.extractJsImportNames(trimmed);
+        }
+        return [];
+    };
+
+    GitReaderApp.prototype.extractPythonImportNames = function (lineText) {
+        if (lineText.startsWith('import ')) {
+            var rest = lineText.slice('import '.length);
+            return rest.split(',')
+                .map(function (part) { return part.trim(); })
+                .map(function (part) { return part.split(/\s+as\s+/).pop() || ''; })
+                .map(function (part) { return part.trim(); })
+                .filter(Boolean);
+        }
+        if (lineText.startsWith('from ')) {
+            var match = lineText.match(/^from\s+.+?\s+import\s+(.+)$/);
+            if (!match) {
+                return [];
+            }
+            var importPart = match[1];
+            if (importPart.includes('*')) {
+                return [];
+            }
+            return importPart.split(',')
+                .map(function (part) { return part.trim(); })
+                .map(function (part) { return part.split(/\s+as\s+/).pop() || ''; })
+                .map(function (part) { return part.trim(); })
+                .filter(Boolean);
+        }
+        return [];
+    };
+
+    GitReaderApp.prototype.extractSwiftImportNames = function (lineText) {
+        if (!lineText.startsWith('import ')) {
+            return [];
+        }
+        var rest = lineText.slice('import '.length).trim();
+        var moduleName = rest.split(/\s+/)[0];
+        return moduleName ? [moduleName] : [];
+    };
+
+    GitReaderApp.prototype.extractJsImportNames = function (lineText) {
+        var names = [];
+        var bindingMatch = lineText.match(/^import\s+(?:type\s+)?(.+?)\s+from\s+['"]/);
+        if (bindingMatch) {
+            names.push.apply(names, this.parseJsImportBindings(bindingMatch[1]));
+        }
+        var exportMatch = lineText.match(/^export\s+(?:type\s+)?(.+?)\s+from\s+['"]/);
+        if (exportMatch) {
+            names.push.apply(names, this.parseJsImportBindings(exportMatch[1]));
+        }
+        var importEqualsMatch = lineText.match(/^import\s+([A-Za-z_$][\w$]*)\s*=\s*require\s*\(/);
+        if (importEqualsMatch) {
+            names.push(importEqualsMatch[1]);
+        }
+        var requireMatch = lineText.match(/^(?:const|let|var)\s+(.+?)\s*=\s*require\s*\(/);
+        if (requireMatch) {
+            names.push.apply(names, this.parseJsRequireBinding(requireMatch[1]));
+        }
+        return Array.from(new Set(names.filter(Boolean)));
+    };
+
+    GitReaderApp.prototype.parseJsImportBindings = function (binding) {
+        var names = [];
+        var trimmed = binding.trim();
+        if (!trimmed) {
+            return names;
+        }
+        if (trimmed.startsWith('{')) {
+            names.push.apply(names, this.parseBraceList(trimmed));
+            return names;
+        }
+        if (trimmed.startsWith('*')) {
+            var starMatch = trimmed.match(/\*\s+as\s+([A-Za-z_$][\w$]*)/);
+            if (starMatch) {
+                names.push(starMatch[1]);
+            }
+            return names;
+        }
+        var parts = trimmed.split(',');
+        if (parts.length > 0) {
+            var defaultName = parts[0].trim();
+            if (defaultName) {
+                names.push(defaultName);
+            }
+        }
+        if (parts.length > 1) {
+            var rest = parts.slice(1).join(',').trim();
+            if (rest.startsWith('{')) {
+                names.push.apply(names, this.parseBraceList(rest));
+            } else if (rest.startsWith('*')) {
+                var starMatch = rest.match(/\*\s+as\s+([A-Za-z_$][\w$]*)/);
+                if (starMatch) {
+                    names.push(starMatch[1]);
+                }
+            }
+        }
+        return names;
+    };
+
+    GitReaderApp.prototype.parseJsRequireBinding = function (binding) {
+        var trimmed = binding.trim();
+        if (trimmed.startsWith('{')) {
+            return this.parseBraceList(trimmed);
+        }
+        if (trimmed.startsWith('[')) {
+            return [];
+        }
+        return trimmed ? [trimmed.split(/\s+/)[0]] : [];
+    };
+
+    GitReaderApp.prototype.parseBraceList = function (segment) {
+        var content = segment.replace(/^{/, '').replace(/}.*$/, '');
+        return content.split(',')
+            .map(function (part) { return part.trim(); })
+            .map(function (part) {
+                if (!part) {
+                    return '';
+                }
+                if (part.includes(' as ')) {
+                    return part.split(/\s+as\s+/).pop() || '';
+                }
+                if (part.includes(':')) {
+                    return part.split(':').pop() || '';
+                }
+                return part;
+            })
+            .map(function (part) { return part.trim(); })
+            .filter(function (part) { return /^[A-Za-z_$][\w$]*$/.test(part); });
+    };
+
+    GitReaderApp.prototype.escapeRegex = function (value) {
+        return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     };
 
     GitReaderApp.prototype.getDisplayRange = function (symbol, snippet) {
