@@ -51,7 +51,7 @@ export interface GraphEventHandlers {
     // Selects visible method nodes that belong to an expanded class node.
     handleShiftClassSelection(node: any): boolean;
     // Selects visible sibling nodes that share the same parent as the clicked node.
-    handleSiblingSelection(node: any): boolean;
+        handleSiblingSelection(node: any): boolean;
     // Opens the graph context menu for a node on right-click.
     openGraphContextMenu(node: any, event: any): void;
     // Closes any open graph context menu.
@@ -68,6 +68,8 @@ export interface GraphEventHandlers {
     hideGraphTooltip(): void;
     // Repositions the tooltip as the pointer moves over the node.
     updateTooltipPosition(event: any): void;
+    // Repositions the organized-children overlay when the graph pans or zooms.
+    updateOrganizedCircleOverlay(): void;
 }
 
 // Configuration container for binding all Cytoscape graph events in one place.
@@ -196,6 +198,10 @@ export function bindGraphEvents(bindings: GraphEventBindings): boolean {
     });
     graph.on('zoom', () => {
         handlers.updateLabelVisibility();
+        handlers.updateOrganizedCircleOverlay();
+    });
+    graph.on('pan', () => {
+        handlers.updateOrganizedCircleOverlay();
     });
     return true;
 }

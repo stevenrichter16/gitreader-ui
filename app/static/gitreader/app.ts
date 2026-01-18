@@ -56,6 +56,13 @@ import type {
     TourState,
 } from './modules/types';
 
+// Tracks the last "organize children: circle" action so we can draw and adjust the selection ring.
+interface OrganizedCircleState {
+    parentId: string;
+    childIds: string[];
+    radius: number;
+}
+
 declare const hljs: any;
 
 class GitReaderApp {
@@ -81,6 +88,8 @@ class GitReaderApp {
     private graphNodeStatus: HTMLElement;
     private graphRevealButton: HTMLButtonElement;
     private graphTooltip: HTMLElement;
+    private organizedCircleOverlay: HTMLDivElement;
+    private organizedCircleButton: HTMLButtonElement;
     private narratorPane: HTMLElement;
     private readerFileTreeButton: HTMLButtonElement;
     private routePicker: HTMLElement;
@@ -153,6 +162,12 @@ class GitReaderApp {
     private lastTapAt = 0;
     private doubleTapDelay = 320;
     private siblingSelectKeyActive = false;
+    private organizedCircleState: OrganizedCircleState | null = null;
+    private organizedCircleDragActive = false;
+    private organizedCircleDragPointerId: number | null = null;
+    private organizedCircleDismissStart: { x: number; y: number } | null = null;
+    private organizedCircleDismissPointerId: number | null = null;
+    private organizedCircleDismissMoved = false;
     private importBreadcrumbs: string[] = [];
     private foldedSymbolIds: Set<string> = new Set();
     private currentFoldRanges: Map<string, FoldRange> = new Map();
@@ -183,6 +198,7 @@ class GitReaderApp {
         this.graphNodeStatus = this.getElement('graph-node-status');
         this.graphRevealButton = this.getElement('graph-reveal') as HTMLButtonElement;
         this.graphTooltip = this.getElement('graph-tooltip');
+        this.initializeOrganizedCircleOverlay();
         this.narratorPane = this.getElement('narrator');
         this.readerFileTreeButton = this.getElement('reader-file-tree') as HTMLButtonElement;
         this.routePicker = this.getElement('route-picker');
@@ -1359,6 +1375,7 @@ class GitReaderApp {
             layoutMode: this.graphLayoutMode,
         });
         this.graphView.updateNodeStatus(graphView);
+        this.updateOrganizedCircleOverlay();
     }
 
     private setGraphData(graphData: ApiGraphResponse): void {
@@ -2125,17 +2142,21 @@ class GitReaderApp {
         if (!parentElement || parentElement.empty() || !children || children.empty()) {
             return;
         }
+        this.clearOrganizedCircleOverlay();
         const center = parentElement.position();
         const count = children.length;
         if (layout === 'circle') {
             const radius = Math.max(80, 28 * count);
+            const childIds: string[] = [];
             children.forEach((child: any, index: number) => {
+                childIds.push(child.id());
                 const angle = (2 * Math.PI * index) / Math.max(1, count);
                 child.position({
                     x: center.x + radius * Math.cos(angle),
                     y: center.y + radius * Math.sin(angle),
                 });
             });
+            this.setOrganizedCircleState(parentElement.id(), childIds, radius);
             return;
         }
         const columns = Math.max(1, Math.ceil(Math.sqrt(count)));
@@ -2151,6 +2172,302 @@ class GitReaderApp {
                 y: startY + row * spacing,
             });
         });
+    }
+
+    // Builds the overlay UI that lets users tighten an organized circle of children.
+    private initializeOrganizedCircleOverlay(): void {
+        this.organizedCircleOverlay = document.createElement('div');
+        this.organizedCircleOverlay.className = 'graph-orbit';
+        this.organizedCircleOverlay.setAttribute('aria-hidden', 'true');
+
+        this.organizedCircleButton = document.createElement('button');
+        this.organizedCircleButton.type = 'button';
+        this.organizedCircleButton.className = 'graph-orbit__button';
+        this.organizedCircleButton.textContent = '<->';
+        this.organizedCircleButton.setAttribute('aria-label', 'Drag to move children inward or outward');
+        this.organizedCircleButton.addEventListener('pointerdown', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            this.handleOrganizedCircleDragStart(event);
+        });
+
+        this.organizedCircleOverlay.appendChild(this.organizedCircleButton);
+        this.canvasSurface.appendChild(this.organizedCircleOverlay);
+
+        this.canvasSurface.addEventListener('pointerdown', (event) => {
+            this.handleOrganizedCircleDismissStart(event);
+        });
+        window.addEventListener('pointermove', (event) => {
+            this.handleOrganizedCircleDragMove(event);
+            this.handleOrganizedCircleDismissMove(event);
+        });
+        window.addEventListener('pointerup', (event) => {
+            this.handleOrganizedCircleDragEnd(event);
+            this.handleOrganizedCircleDismissEnd(event);
+        });
+        window.addEventListener('pointercancel', (event) => {
+            this.handleOrganizedCircleDragEnd(event);
+            this.handleOrganizedCircleDismissEnd(event);
+        });
+    }
+
+    // Stores the last organized circle state so we can re-render its overlay on zoom or pan.
+    private setOrganizedCircleState(parentId: string, childIds: string[], radius: number): void {
+        if (!parentId || childIds.length === 0) {
+            this.clearOrganizedCircleOverlay();
+            return;
+        }
+        this.organizedCircleState = {
+            parentId,
+            childIds,
+            radius,
+        };
+        this.updateOrganizedCircleOverlay();
+    }
+
+    // Clears the organized circle overlay when it is no longer relevant.
+    private clearOrganizedCircleOverlay(): void {
+        this.organizedCircleState = null;
+        if (!this.organizedCircleOverlay) {
+            return;
+        }
+        this.organizedCircleOverlay.classList.remove('is-visible');
+        this.organizedCircleOverlay.setAttribute('aria-hidden', 'true');
+    }
+
+    // Repositions the organized circle overlay to stay centered on the parent and sized to the child radius.
+    private updateOrganizedCircleOverlay(): void {
+        if (!this.organizedCircleState || !this.graphInstance || this.graphLayoutMode !== 'cluster') {
+            this.clearOrganizedCircleOverlay();
+            return;
+        }
+        const parentElement = this.graphInstance.$id(this.organizedCircleState.parentId);
+        if (!parentElement || parentElement.empty() || parentElement.hidden()) {
+            this.clearOrganizedCircleOverlay();
+            return;
+        }
+        const children = this.getOrganizedChildrenElements(this.organizedCircleState);
+        if (!children || children.empty()) {
+            this.clearOrganizedCircleOverlay();
+            return;
+        }
+        const zoom = this.graphInstance.zoom();
+        const center = parentElement.position();
+        const renderedCenter = this.getRenderedPoint(center);
+        const ringPadding = this.getOrganizedCirclePadding();
+        const renderedRadius = Math.max(24, (this.organizedCircleState.radius + ringPadding) * zoom);
+        const surfaceRect = this.canvasSurface.getBoundingClientRect();
+        const graphRect = this.canvasGraph.getBoundingClientRect();
+        const offsetX = graphRect.left - surfaceRect.left;
+        const offsetY = graphRect.top - surfaceRect.top;
+        this.organizedCircleOverlay.style.left = `${offsetX + renderedCenter.x - renderedRadius}px`;
+        this.organizedCircleOverlay.style.top = `${offsetY + renderedCenter.y - renderedRadius}px`;
+        this.organizedCircleOverlay.style.width = `${renderedRadius * 2}px`;
+        this.organizedCircleOverlay.style.height = `${renderedRadius * 2}px`;
+        this.organizedCircleOverlay.classList.add('is-visible');
+        this.organizedCircleOverlay.setAttribute('aria-hidden', 'false');
+        this.organizedCircleButton.disabled = this.organizedCircleState.radius <= this.getOrganizedCircleMinRadius();
+    }
+
+    // Moves the organized children closer to their parent by shrinking the circle radius.
+    private nudgeOrganizedChildrenInward(): void {
+        if (!this.graphInstance || !this.organizedCircleState) {
+            return;
+        }
+        const parentElement = this.graphInstance.$id(this.organizedCircleState.parentId);
+        const children = this.getOrganizedChildrenElements(this.organizedCircleState);
+        if (!parentElement || parentElement.empty() || !children || children.empty()) {
+            this.clearOrganizedCircleOverlay();
+            return;
+        }
+        const center = parentElement.position();
+        const minRadius = this.getOrganizedCircleMinRadius();
+        const nextRadius = Math.max(minRadius, this.organizedCircleState.radius * 0.82);
+        this.graphInstance.batch(() => {
+            this.positionChildrenOnCircle(children, center, nextRadius);
+        });
+        this.organizedCircleState.radius = nextRadius;
+        this.updateOrganizedCircleOverlay();
+    }
+
+    // Begins dragging the orbit handle so pointer movement can resize the circle.
+    private handleOrganizedCircleDragStart(event: PointerEvent): void {
+        if (!this.organizedCircleState) {
+            return;
+        }
+        this.organizedCircleDragActive = true;
+        this.organizedCircleDragPointerId = event.pointerId;
+        if (typeof this.organizedCircleButton.setPointerCapture === 'function') {
+            this.organizedCircleButton.setPointerCapture(event.pointerId);
+        }
+        this.updateOrganizedCircleRadiusFromPointer(event);
+    }
+
+    // Updates the organized circle radius while dragging the handle.
+    private handleOrganizedCircleDragMove(event: PointerEvent): void {
+        if (!this.organizedCircleDragActive) {
+            return;
+        }
+        if (this.organizedCircleDragPointerId !== null && event.pointerId !== this.organizedCircleDragPointerId) {
+            return;
+        }
+        this.updateOrganizedCircleRadiusFromPointer(event);
+    }
+
+    // Ends the drag interaction and releases the pointer capture when finished.
+    private handleOrganizedCircleDragEnd(event: PointerEvent): void {
+        if (!this.organizedCircleDragActive) {
+            return;
+        }
+        if (this.organizedCircleDragPointerId !== null && event.pointerId !== this.organizedCircleDragPointerId) {
+            return;
+        }
+        this.organizedCircleDragActive = false;
+        this.organizedCircleDragPointerId = null;
+        if (typeof this.organizedCircleButton.releasePointerCapture === 'function') {
+            this.organizedCircleButton.releasePointerCapture(event.pointerId);
+        }
+    }
+
+    // Begins tracking a pointerdown so a simple click can dismiss the orbit without affecting drags.
+    private handleOrganizedCircleDismissStart(event: PointerEvent): void {
+        if (!this.organizedCircleState || this.organizedCircleDragActive) {
+            return;
+        }
+        if (event.target === this.organizedCircleButton) {
+            return;
+        }
+        if (event.target instanceof Node && this.organizedCircleOverlay.contains(event.target)) {
+            return;
+        }
+        this.organizedCircleDismissStart = { x: event.clientX, y: event.clientY };
+        this.organizedCircleDismissPointerId = event.pointerId;
+        this.organizedCircleDismissMoved = false;
+    }
+
+    // Tracks pointer movement to distinguish drags from simple clicks when dismissing the orbit.
+    private handleOrganizedCircleDismissMove(event: PointerEvent): void {
+        if (!this.organizedCircleDismissStart) {
+            return;
+        }
+        if (this.organizedCircleDismissPointerId !== null && event.pointerId !== this.organizedCircleDismissPointerId) {
+            return;
+        }
+        if (this.organizedCircleDragActive) {
+            this.resetOrganizedCircleDismissTracking();
+            return;
+        }
+        const dx = event.clientX - this.organizedCircleDismissStart.x;
+        const dy = event.clientY - this.organizedCircleDismissStart.y;
+        if (Math.hypot(dx, dy) > this.getOrganizedCircleDismissThreshold()) {
+            this.organizedCircleDismissMoved = true;
+        }
+    }
+
+    // Clears the orbit only when the user clicks without dragging on the canvas.
+    private handleOrganizedCircleDismissEnd(event: PointerEvent): void {
+        if (!this.organizedCircleDismissStart) {
+            return;
+        }
+        if (this.organizedCircleDismissPointerId !== null && event.pointerId !== this.organizedCircleDismissPointerId) {
+            return;
+        }
+        const shouldDismiss = !this.organizedCircleDismissMoved && !this.organizedCircleDragActive;
+        this.resetOrganizedCircleDismissTracking();
+        if (shouldDismiss) {
+            this.clearOrganizedCircleOverlay();
+        }
+    }
+
+    // Resets tracking data used for click-to-dismiss detection.
+    private resetOrganizedCircleDismissTracking(): void {
+        this.organizedCircleDismissStart = null;
+        this.organizedCircleDismissPointerId = null;
+        this.organizedCircleDismissMoved = false;
+    }
+
+    // Computes a new radius from pointer distance and reapplies the circular layout.
+    private updateOrganizedCircleRadiusFromPointer(event: PointerEvent): void {
+        if (!this.graphInstance || !this.organizedCircleState) {
+            return;
+        }
+        const parentElement = this.graphInstance.$id(this.organizedCircleState.parentId);
+        const children = this.getOrganizedChildrenElements(this.organizedCircleState);
+        if (!parentElement || parentElement.empty() || !children || children.empty()) {
+            this.clearOrganizedCircleOverlay();
+            return;
+        }
+        const graphRect = this.canvasGraph.getBoundingClientRect();
+        const pointerX = event.clientX - graphRect.left;
+        const pointerY = event.clientY - graphRect.top;
+        const zoom = this.graphInstance.zoom();
+        const center = parentElement.position();
+        const renderedCenter = this.getRenderedPoint(center);
+        const distance = Math.hypot(pointerX - renderedCenter.x, pointerY - renderedCenter.y);
+        const ringPadding = this.getOrganizedCirclePadding();
+        const minRadius = this.getOrganizedCircleMinRadius();
+        const nextRadius = Math.max(minRadius, (distance / zoom) - ringPadding);
+        this.graphInstance.batch(() => {
+            this.positionChildrenOnCircle(children, center, nextRadius);
+        });
+        this.organizedCircleState.radius = nextRadius;
+        this.updateOrganizedCircleOverlay();
+    }
+
+    // Positions the provided child nodes around the parent at a fixed radius.
+    private positionChildrenOnCircle(children: any, center: { x: number; y: number }, radius: number): void {
+        children.forEach((child: any) => {
+            const position = child.position();
+            const angle = Math.atan2(position.y - center.y, position.x - center.x);
+            child.position({
+                x: center.x + radius * Math.cos(angle),
+                y: center.y + radius * Math.sin(angle),
+            });
+        });
+    }
+
+    // Returns the ring padding applied around organized children for the orbit overlay.
+    private getOrganizedCirclePadding(): number {
+        return 32;
+    }
+
+    // Returns the pixel distance threshold used to treat a pointer interaction as a drag.
+    private getOrganizedCircleDismissThreshold(): number {
+        return 6;
+    }
+
+    // Returns the smallest radius allowed when tightening the orbit around a parent.
+    private getOrganizedCircleMinRadius(): number {
+        return 56;
+    }
+
+    // Resolves the visible child node elements for the active organized circle state.
+    private getOrganizedChildrenElements(state: OrganizedCircleState): any {
+        if (!this.graphInstance) {
+            return null;
+        }
+        const visibleIds = state.childIds.filter((childId) => {
+            const element = this.graphInstance.$id(childId);
+            return element && !element.empty() && !element.hidden();
+        });
+        if (visibleIds.length === 0) {
+            return null;
+        }
+        const visibleIdSet = new Set(visibleIds);
+        return this.graphInstance.nodes(':visible').filter((element: any) => visibleIdSet.has(element.id()));
+    }
+
+    // Converts a model-space point into rendered pixel coordinates in the graph container.
+    private getRenderedPoint(position: { x: number; y: number }): { x: number; y: number } {
+        if (!this.graphInstance) {
+            return { x: 0, y: 0 };
+        }
+        const zoom = this.graphInstance.zoom();
+        const pan = this.graphInstance.pan();
+        return {
+            x: position.x * zoom + pan.x,
+            y: position.y * zoom + pan.y,
+        };
     }
 
     // Finds the parent node id for the provided symbol based on contains edges or folder paths.
@@ -2495,6 +2812,7 @@ class GitReaderApp {
                 showGraphTooltip: (node, event) => this.graphView.showTooltip(node, event),
                 hideGraphTooltip: () => this.graphView.hideTooltip(),
                 updateTooltipPosition: (event) => this.graphView.updateTooltipPosition(event),
+                updateOrganizedCircleOverlay: () => this.updateOrganizedCircleOverlay(),
             },
         });
         if (didBind) {
@@ -3189,6 +3507,9 @@ class GitReaderApp {
         this.graphLayoutMode = mode;
         window.localStorage.setItem('gitreader.graphLayoutMode', mode);
         this.updateGraphControls();
+        if (mode !== 'cluster') {
+            this.clearOrganizedCircleOverlay();
+        }
         if (wasCluster || mode === 'cluster') {
             this.refreshGraphView();
             return;

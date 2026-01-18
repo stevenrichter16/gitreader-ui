@@ -781,6 +781,42 @@ body {
     font-size: 11px;
 }
 
+.graph-orbit {
+    position: absolute;
+    border-radius: 50%;
+    border: 1px dashed rgba(35, 122, 120, 0.35);
+    background: rgba(35, 122, 120, 0.06);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    z-index: 4;
+}
+
+.graph-orbit.is-visible {
+    opacity: 1;
+}
+
+.graph-orbit__button {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(35, 122, 120, 0.35);
+    background: rgba(255, 255, 255, 0.92);
+    color: rgba(23, 29, 27, 0.88);
+    font-size: 11px;
+    cursor: pointer;
+    pointer-events: auto;
+    box-shadow: 0 8px 16px rgba(36, 26, 18, 0.12);
+}
+
+.graph-orbit__button:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
 .graph-context-menu {
     position: fixed;
     z-index: 50;
