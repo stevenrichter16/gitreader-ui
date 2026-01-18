@@ -68,9 +68,11 @@ declare const hljs: any;
 class GitReaderApp {
     private tocList: HTMLElement;
     private codeSurface: HTMLElement;
+    private codePane: HTMLElement;
     private canvasGraph: HTMLElement;
     private canvasSurface: HTMLElement;
     private canvasOverlay: HTMLElement;
+    private canvasPane: HTMLElement;
     private narratorOutput: HTMLElement;
     private narratorFileTree: HTMLElement;
     private modeButtons: NodeListOf<HTMLButtonElement>;
@@ -83,6 +85,7 @@ class GitReaderApp {
     private graphActionButtons: NodeListOf<HTMLButtonElement>;
     private narratorToggle: HTMLButtonElement;
     private workspace: HTMLElement;
+    private workspaceSplitter: HTMLElement;
     private tocPill: HTMLElement;
     private tocSubtitle: HTMLElement;
     private graphNodeStatus: HTMLElement;
@@ -92,6 +95,7 @@ class GitReaderApp {
     private organizedCircleButton: HTMLButtonElement;
     private narratorPane: HTMLElement;
     private readerFileTreeButton: HTMLButtonElement;
+    private readerMeta: HTMLElement;
     private routePicker: HTMLElement;
     private routeSelect: HTMLSelectElement;
     private routeJump: HTMLButtonElement;
@@ -178,9 +182,11 @@ class GitReaderApp {
     constructor() {
         this.tocList = this.getElement('toc-list');
         this.codeSurface = this.getElement('code-surface');
+        this.codePane = this.getElement('code-view');
         this.canvasGraph = this.getElement('canvas-graph');
         this.canvasSurface = this.getElement('canvas-surface');
         this.canvasOverlay = this.getElement('canvas-overlay');
+        this.canvasPane = this.getElement('graph-canvas');
         this.narratorOutput = this.getElement('narrator-output');
         this.narratorFileTree = this.getElement('narrator-file-tree');
         this.modeButtons = document.querySelectorAll<HTMLButtonElement>('.mode-btn');
@@ -193,6 +199,7 @@ class GitReaderApp {
         this.graphActionButtons = document.querySelectorAll<HTMLButtonElement>('[data-graph-action]');
         this.narratorToggle = this.getElement('narrator-toggle') as HTMLButtonElement;
         this.workspace = this.getElement('workspace');
+        this.workspaceSplitter = this.getElement('workspace-splitter');
         this.tocPill = this.getElement('toc-pill');
         this.tocSubtitle = this.getElement('toc-subtitle');
         this.graphNodeStatus = this.getElement('graph-node-status');
@@ -201,6 +208,7 @@ class GitReaderApp {
         this.initializeOrganizedCircleOverlay();
         this.narratorPane = this.getElement('narrator');
         this.readerFileTreeButton = this.getElement('reader-file-tree') as HTMLButtonElement;
+        this.readerMeta = this.getElement('reader-meta');
         this.routePicker = this.getElement('route-picker');
         this.routeSelect = this.getElement('route-select') as HTMLSelectElement;
         this.routeJump = this.getElement('route-jump') as HTMLButtonElement;
@@ -274,6 +282,7 @@ class GitReaderApp {
         };
         this.readerInteractions = new ReaderInteractions({
             codeSurface: this.codeSurface,
+            readerMeta: this.readerMeta,
             snippetModeButtons: this.snippetModeButtons,
             readerFileTreeButton: this.readerFileTreeButton,
             getHighlightLanguage: (path) => this.getHighlightLanguage(path),
@@ -331,6 +340,7 @@ class GitReaderApp {
         });
         this.readerView = new ReaderView({
             codeSurface: this.codeSurface,
+            readerMeta: this.readerMeta,
             snippetModeButtons: this.snippetModeButtons,
             escapeHtml: (value) => this.escapeHtml(value),
             formatLocation: (location, startLine, endLine) => this.formatLocation(location, startLine, endLine),
@@ -425,6 +435,7 @@ class GitReaderApp {
 
     private renderLoadingState(): void {
         this.tocList.innerHTML = '<li class="toc-item"><div class="toc-title">Loading chapters</div><p class="toc-summary">Scanning repository...</p></li>';
+        this.readerMeta.innerHTML = '';
         this.codeSurface.innerHTML = '<article class="code-card"><h3>Loading symbols...</h3><p>Fetching graph data.</p></article>';
         this.setCanvasOverlay('Preparing nodes and edges...', true);
         this.narratorOutput.innerHTML = '<p class="eyebrow">Narrator</p><h3>Loading</h3><p>Gathering the first clues.</p>';
@@ -432,6 +443,7 @@ class GitReaderApp {
 
     private renderErrorState(message: string): void {
         this.tocList.innerHTML = `<li class="toc-item"><div class="toc-title">Failed to load</div><p class="toc-summary">${this.escapeHtml(message)}</p></li>`;
+        this.readerMeta.innerHTML = '';
         this.codeSurface.innerHTML = `<article class="code-card"><h3>Unable to load</h3><p>${this.escapeHtml(message)}</p></article>`;
         this.setCanvasOverlay(message, true);
         this.narratorOutput.innerHTML = `<p class="eyebrow">Narrator</p><h3>Paused</h3><p>${this.escapeHtml(message)}</p>`;
@@ -640,6 +652,14 @@ class GitReaderApp {
             this.readerController.handleCodeSurfaceKeydown(event as KeyboardEvent);
         });
 
+        this.readerMeta.addEventListener('click', (event) => {
+            this.readerController.handleCodeSurfaceClick(event as MouseEvent);
+        });
+
+        this.readerMeta.addEventListener('keydown', (event) => {
+            this.readerController.handleCodeSurfaceKeydown(event as KeyboardEvent);
+        });
+
         this.narratorOutput.addEventListener('click', (event) => {
             const target = (event.target as HTMLElement).closest<HTMLElement>('[data-arc-id]');
             if (!target) {
@@ -696,6 +716,73 @@ class GitReaderApp {
         this.repoForm.addEventListener('submit', (event) => {
             event.preventDefault();
             this.applyRepoSelection();
+        });
+
+        this.bindWorkspaceResize();
+    }
+
+    private bindWorkspaceResize(): void {
+        const minPaneWidth = 320;
+
+        this.workspaceSplitter.addEventListener('pointerdown', (event) => {
+            if (event.pointerType === 'mouse' && event.button !== 0) {
+                return;
+            }
+            if (this.workspace.dataset.layout !== 'both') {
+                return;
+            }
+
+            event.preventDefault();
+
+            const splitterRect = this.workspaceSplitter.getBoundingClientRect();
+            const codeRect = this.codePane.getBoundingClientRect();
+            const canvasRect = this.canvasPane.getBoundingClientRect();
+            const totalWidth = codeRect.width + canvasRect.width + splitterRect.width;
+            const maxReaderWidth = Math.max(minPaneWidth, totalWidth - splitterRect.width - minPaneWidth);
+            const startX = event.clientX;
+            const startReaderWidth = codeRect.width;
+
+            const updateSplitterAria = (value: number) => {
+                this.workspaceSplitter.setAttribute('aria-valuemin', String(minPaneWidth));
+                this.workspaceSplitter.setAttribute('aria-valuemax', String(Math.round(maxReaderWidth)));
+                this.workspaceSplitter.setAttribute('aria-valuenow', String(Math.round(value)));
+            };
+
+            updateSplitterAria(startReaderWidth);
+
+            const handleMove = (moveEvent: PointerEvent) => {
+                if (moveEvent.pointerId !== event.pointerId) {
+                    return;
+                }
+                const delta = moveEvent.clientX - startX;
+                const nextWidth = Math.min(
+                    maxReaderWidth,
+                    Math.max(minPaneWidth, startReaderWidth + delta),
+                );
+                this.workspace.style.setProperty('--reader-width', `${nextWidth}px`);
+                updateSplitterAria(nextWidth);
+            };
+
+            const stopResize = (endEvent: PointerEvent) => {
+                if (endEvent.pointerId !== event.pointerId) {
+                    return;
+                }
+                this.workspaceSplitter.releasePointerCapture(event.pointerId);
+                this.workspaceSplitter.removeEventListener('pointermove', handleMove);
+                this.workspaceSplitter.removeEventListener('pointerup', stopResize);
+                this.workspaceSplitter.removeEventListener('pointercancel', stopResize);
+                document.body.classList.remove('is-resizing');
+                if (this.graphInstance) {
+                    this.graphInstance.resize();
+                    this.updateLabelVisibility();
+                }
+            };
+
+            document.body.classList.add('is-resizing');
+            this.workspaceSplitter.setPointerCapture(event.pointerId);
+            this.workspaceSplitter.addEventListener('pointermove', handleMove);
+            this.workspaceSplitter.addEventListener('pointerup', stopResize);
+            this.workspaceSplitter.addEventListener('pointercancel', stopResize);
         });
     }
 
@@ -3464,7 +3551,8 @@ class GitReaderApp {
     }
 
     private jumpToInputLine(): void {
-        const input = this.codeSurface.querySelector<HTMLInputElement>('[data-line-input]');
+        const input = this.readerMeta.querySelector<HTMLInputElement>('[data-line-input]')
+            ?? this.codeSurface.querySelector<HTMLInputElement>('[data-line-input]');
         if (!input) {
             return;
         }
@@ -3489,7 +3577,8 @@ class GitReaderApp {
     }
 
     private setCodeStatus(message: string): void {
-        const status = this.codeSurface.querySelector<HTMLElement>('[data-code-status]');
+        const status = this.readerMeta.querySelector<HTMLElement>('[data-code-status]')
+            ?? this.codeSurface.querySelector<HTMLElement>('[data-code-status]');
         if (status) {
             status.textContent = message;
         }

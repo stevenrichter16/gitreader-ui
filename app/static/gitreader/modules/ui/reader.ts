@@ -16,6 +16,8 @@ export interface ReaderStateUpdate {
 export interface ReaderViewDependencies {
     // Code surface element that receives the rendered reader HTML.
     codeSurface: HTMLElement;
+    // Container that hosts reader metadata outside the scrollable code area.
+    readerMeta: HTMLElement;
     // Mode buttons used to reflect the current snippet mode.
     snippetModeButtons: NodeListOf<HTMLButtonElement>;
     // Escapes user-provided text before injecting into HTML.
@@ -110,9 +112,9 @@ export class ReaderView {
             codeClass,
             snippetHtml,
         });
+        this.deps.readerMeta.innerHTML = header;
         this.deps.codeSurface.innerHTML = `
-            <article class="code-card">
-                ${header}
+            <article class="code-card code-card--body">
                 ${footer}
             </article>
         `;
@@ -161,7 +163,7 @@ export class ReaderView {
         snippetHtml: string;
     }): string {
         return `
-            <details class="code-details" open>
+            <details class="code-details code-details--scroll" open>
                 <summary>${params.revealLabel}</summary>
                 <pre><code class="${params.codeClass}">${params.snippetHtml}</code></pre>
             </details>

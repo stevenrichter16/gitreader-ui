@@ -38,6 +38,8 @@ export interface ReaderInteractionState {
 export interface ReaderInteractionDependencies {
     // Code surface element that receives reader HTML and event handling.
     codeSurface: HTMLElement;
+    // Container that hosts reader metadata outside the scrollable code area.
+    readerMeta: HTMLElement;
     // Buttons used to show snippet mode state in the reader controls.
     snippetModeButtons: NodeListOf<HTMLButtonElement>;
     // Button that toggles reader file tree mode (may be null in minimal layouts).
@@ -168,16 +170,20 @@ export class ReaderInteractions {
         });
         const { html } = this.deps.fileTreeView.renderReaderTree(normalized);
         const treeHtml = html;
+        this.deps.readerMeta.innerHTML = `
+            <div class="code-meta">
+                <span>FOLDER</span>
+                <span>${escapeHtml(normalized || 'Repository')}</span>
+            </div>
+            <div class="code-actions">
+                <span class="code-status">Folder contents</span>
+            </div>
+        `;
         this.deps.codeSurface.innerHTML = `
-            <article class="code-card">
-                <div class="code-meta">
-                    <span>FOLDER</span>
-                    <span>${escapeHtml(normalized || 'Repository')}</span>
+            <article class="code-card code-card--body">
+                <div class="code-details code-details--scroll">
+                    <div class="file-tree">${treeHtml}</div>
                 </div>
-                <div class="code-actions">
-                    <span class="code-status">Folder contents</span>
-                </div>
-                <div class="file-tree">${treeHtml}</div>
             </article>
         `;
         this.updateReaderControls();

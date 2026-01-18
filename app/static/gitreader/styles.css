@@ -32,8 +32,10 @@ body {
 
 .app-shell {
     min-height: 100vh;
+    height: 100vh;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
 }
 
 .app-header {
@@ -141,11 +143,14 @@ body {
 .workspace {
     flex: 1;
     display: grid;
-    grid-template-columns: minmax(320px, 1.4fr) minmax(320px, 1fr);
-    grid-template-areas: "code canvas";
-    gap: 16px;
+    --reader-width: 1.4fr;
+    --splitter-size: 12px;
+    grid-template-columns: minmax(320px, var(--reader-width)) var(--splitter-size) minmax(320px, 1fr);
+    grid-template-areas: "code splitter canvas";
+    gap: 0;
     padding: 2px 24px 24px;
     min-height: 0;
+    overflow: hidden;
 }
 
 .workspace[data-layout="reader"] {
@@ -157,12 +162,20 @@ body {
     display: none;
 }
 
+.workspace[data-layout="reader"] .pane-splitter {
+    display: none;
+}
+
 .workspace[data-layout="canvas"] {
     grid-template-columns: 1fr;
     grid-template-areas: "canvas";
 }
 
 .workspace[data-layout="canvas"] .code-pane {
+    display: none;
+}
+
+.workspace[data-layout="canvas"] .pane-splitter {
     display: none;
 }
 
@@ -176,6 +189,7 @@ body {
     flex-direction: column;
     gap: 12px;
     min-height: 0;
+    min-width: 0;
     box-shadow: 0 18px 30px var(--panel-shadow);
     animation: fadeUp 0.6s ease both;
     animation-delay: var(--delay, 0s);
@@ -193,6 +207,12 @@ body {
     gap: 6px;
 }
 
+.narrator-header,
+.narrator-body,
+#narrator-toggle {
+    display: none !important;
+}
+
 .narrator-header.is-hidden {
     display: none;
 }
@@ -205,6 +225,38 @@ body {
 .canvas-pane {
     grid-area: canvas;
     --delay: 0.18s;
+}
+
+.pane-splitter {
+    grid-area: splitter;
+    cursor: col-resize;
+    position: relative;
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+    min-height: 0;
+    touch-action: none;
+}
+
+.pane-splitter::before {
+    content: "";
+    width: 4px;
+    border-radius: 999px;
+    background: var(--line);
+    opacity: 0.7;
+    margin: 8px 0;
+    transition: background 0.2s ease, opacity 0.2s ease;
+}
+
+.pane-splitter:hover::before,
+.pane-splitter:focus-visible::before {
+    background: var(--accent);
+    opacity: 0.9;
+}
+
+body.is-resizing {
+    cursor: col-resize;
+    user-select: none;
 }
 
 
@@ -286,11 +338,21 @@ body {
     overflow: hidden;
 }
 
+.app-shell {
+  height: calc(100vh + 860px);
+}
+
 .code-surface {
     display: flex;
     flex-direction: column;
     gap: 12px;
     min-height: 0;
+    flex: 1;
+    overflow: hidden;
+}
+
+.reader-meta:empty {
+    display: none;
 }
 
 .code-card {
@@ -301,6 +363,13 @@ body {
     display: grid;
     gap: 12px;
     box-shadow: inset 0 0 0 1px rgba(35, 122, 120, 0.05);
+}
+
+.code-card--body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
 }
 
 .code-meta {
@@ -364,6 +433,22 @@ body {
     color: #0e4b4a;
 }
 
+.code-details {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.code-card--body .code-details {
+    flex: 1;
+}
+
+.code-details--scroll {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+}
+
 .code-details summary {
     cursor: pointer;
     font-weight: 600;
@@ -379,11 +464,15 @@ body {
     color: #f7f2e9;
     font-family: "IBM Plex Mono", "Courier New", monospace;
     font-size: 12px;
-    overflow-x: auto;
+    overflow: visible;
+    display: inline-block;
+    width: max-content;
+    min-width: 100%;
 }
 
 .code-details code {
-    display: block;
+    display: inline-block;
+    min-width: 100%;
 }
 
 .code-details code.hljs {
@@ -393,9 +482,11 @@ body {
 
 .code-line {
     display: grid;
-    grid-template-columns: 6ch 1fr;
+    grid-template-columns: 6ch max-content;
     gap: 12px;
     padding: 2px 6px;
+    min-width: 100%;
+    width: max-content;
 }
 
 .line-text {
@@ -1140,11 +1231,18 @@ body {
 }
 
 @media (max-width: 1100px) {
+    .app-shell {
+        height: auto;
+        overflow: visible;
+    }
+
     .workspace {
         grid-template-columns: 1fr;
         grid-template-areas:
             "code"
             "canvas";
+        flex: 0 0 auto;
+        overflow: visible;
     }
 
     .workspace[data-layout="reader"] {
@@ -1157,6 +1255,10 @@ body {
         grid-template-columns: 1fr;
         grid-template-areas:
             "canvas";
+    }
+
+    .pane-splitter {
+        display: none;
     }
 
     .narrator-header {
@@ -1183,6 +1285,10 @@ body {
     .workspace[data-layout="reader"],
     .workspace[data-layout="canvas"] {
         grid-template-columns: 1fr;
+    }
+
+    .pane-splitter {
+        display: none;
     }
 
     .nav-actions {

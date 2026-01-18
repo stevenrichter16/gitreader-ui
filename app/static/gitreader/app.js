@@ -1407,9 +1407,9 @@ ${secondPart}`;
         codeClass,
         snippetHtml
       });
+      this.deps.readerMeta.innerHTML = header;
       this.deps.codeSurface.innerHTML = `
-            <article class="code-card">
-                ${header}
+            <article class="code-card code-card--body">
                 ${footer}
             </article>
         `;
@@ -1445,7 +1445,7 @@ ${secondPart}`;
     // Renders the snippet body footer (details + highlighted code).
     renderSnippetFooter(params) {
       return `
-            <details class="code-details" open>
+            <details class="code-details code-details--scroll" open>
                 <summary>${params.revealLabel}</summary>
                 <pre><code class="${params.codeClass}">${params.snippetHtml}</code></pre>
             </details>
@@ -1670,16 +1670,20 @@ ${secondPart}`;
       });
       const { html } = this.deps.fileTreeView.renderReaderTree(normalized);
       const treeHtml = html;
+      this.deps.readerMeta.innerHTML = `
+            <div class="code-meta">
+                <span>FOLDER</span>
+                <span>${escapeHtml(normalized || "Repository")}</span>
+            </div>
+            <div class="code-actions">
+                <span class="code-status">Folder contents</span>
+            </div>
+        `;
       this.deps.codeSurface.innerHTML = `
-            <article class="code-card">
-                <div class="code-meta">
-                    <span>FOLDER</span>
-                    <span>${escapeHtml(normalized || "Repository")}</span>
+            <article class="code-card code-card--body">
+                <div class="code-details code-details--scroll">
+                    <div class="file-tree">${treeHtml}</div>
                 </div>
-                <div class="code-actions">
-                    <span class="code-status">Folder contents</span>
-                </div>
-                <div class="file-tree">${treeHtml}</div>
             </article>
         `;
       this.updateReaderControls();
@@ -3191,9 +3195,11 @@ ${secondPart}`;
     constructor() {
       __publicField(this, "tocList");
       __publicField(this, "codeSurface");
+      __publicField(this, "codePane");
       __publicField(this, "canvasGraph");
       __publicField(this, "canvasSurface");
       __publicField(this, "canvasOverlay");
+      __publicField(this, "canvasPane");
       __publicField(this, "narratorOutput");
       __publicField(this, "narratorFileTree");
       __publicField(this, "modeButtons");
@@ -3206,6 +3212,7 @@ ${secondPart}`;
       __publicField(this, "graphActionButtons");
       __publicField(this, "narratorToggle");
       __publicField(this, "workspace");
+      __publicField(this, "workspaceSplitter");
       __publicField(this, "tocPill");
       __publicField(this, "tocSubtitle");
       __publicField(this, "graphNodeStatus");
@@ -3215,6 +3222,7 @@ ${secondPart}`;
       __publicField(this, "organizedCircleButton");
       __publicField(this, "narratorPane");
       __publicField(this, "readerFileTreeButton");
+      __publicField(this, "readerMeta");
       __publicField(this, "routePicker");
       __publicField(this, "routeSelect");
       __publicField(this, "routeJump");
@@ -3299,9 +3307,11 @@ ${secondPart}`;
       __publicField(this, "pendingSnippet", null);
       this.tocList = this.getElement("toc-list");
       this.codeSurface = this.getElement("code-surface");
+      this.codePane = this.getElement("code-view");
       this.canvasGraph = this.getElement("canvas-graph");
       this.canvasSurface = this.getElement("canvas-surface");
       this.canvasOverlay = this.getElement("canvas-overlay");
+      this.canvasPane = this.getElement("graph-canvas");
       this.narratorOutput = this.getElement("narrator-output");
       this.narratorFileTree = this.getElement("narrator-file-tree");
       this.modeButtons = document.querySelectorAll(".mode-btn");
@@ -3314,6 +3324,7 @@ ${secondPart}`;
       this.graphActionButtons = document.querySelectorAll("[data-graph-action]");
       this.narratorToggle = this.getElement("narrator-toggle");
       this.workspace = this.getElement("workspace");
+      this.workspaceSplitter = this.getElement("workspace-splitter");
       this.tocPill = this.getElement("toc-pill");
       this.tocSubtitle = this.getElement("toc-subtitle");
       this.graphNodeStatus = this.getElement("graph-node-status");
@@ -3322,6 +3333,7 @@ ${secondPart}`;
       this.initializeOrganizedCircleOverlay();
       this.narratorPane = this.getElement("narrator");
       this.readerFileTreeButton = this.getElement("reader-file-tree");
+      this.readerMeta = this.getElement("reader-meta");
       this.routePicker = this.getElement("route-picker");
       this.routeSelect = this.getElement("route-select");
       this.routeJump = this.getElement("route-jump");
@@ -3396,6 +3408,7 @@ ${secondPart}`;
       };
       this.readerInteractions = new ReaderInteractions({
         codeSurface: this.codeSurface,
+        readerMeta: this.readerMeta,
         snippetModeButtons: this.snippetModeButtons,
         readerFileTreeButton: this.readerFileTreeButton,
         getHighlightLanguage: (path) => this.getHighlightLanguage(path),
@@ -3453,6 +3466,7 @@ ${secondPart}`;
       });
       this.readerView = new ReaderView({
         codeSurface: this.codeSurface,
+        readerMeta: this.readerMeta,
         snippetModeButtons: this.snippetModeButtons,
         escapeHtml: (value) => this.escapeHtml(value),
         formatLocation: (location, startLine, endLine) => this.formatLocation(location, startLine, endLine),
@@ -3541,12 +3555,14 @@ ${secondPart}`;
     }
     renderLoadingState() {
       this.tocList.innerHTML = '<li class="toc-item"><div class="toc-title">Loading chapters</div><p class="toc-summary">Scanning repository...</p></li>';
+      this.readerMeta.innerHTML = "";
       this.codeSurface.innerHTML = '<article class="code-card"><h3>Loading symbols...</h3><p>Fetching graph data.</p></article>';
       this.setCanvasOverlay("Preparing nodes and edges...", true);
       this.narratorOutput.innerHTML = '<p class="eyebrow">Narrator</p><h3>Loading</h3><p>Gathering the first clues.</p>';
     }
     renderErrorState(message) {
       this.tocList.innerHTML = `<li class="toc-item"><div class="toc-title">Failed to load</div><p class="toc-summary">${this.escapeHtml(message)}</p></li>`;
+      this.readerMeta.innerHTML = "";
       this.codeSurface.innerHTML = `<article class="code-card"><h3>Unable to load</h3><p>${this.escapeHtml(message)}</p></article>`;
       this.setCanvasOverlay(message, true);
       this.narratorOutput.innerHTML = `<p class="eyebrow">Narrator</p><h3>Paused</h3><p>${this.escapeHtml(message)}</p>`;
@@ -3732,6 +3748,12 @@ ${secondPart}`;
       this.codeSurface.addEventListener("keydown", (event) => {
         this.readerController.handleCodeSurfaceKeydown(event);
       });
+      this.readerMeta.addEventListener("click", (event) => {
+        this.readerController.handleCodeSurfaceClick(event);
+      });
+      this.readerMeta.addEventListener("keydown", (event) => {
+        this.readerController.handleCodeSurfaceKeydown(event);
+      });
       this.narratorOutput.addEventListener("click", (event) => {
         const target = event.target.closest("[data-arc-id]");
         if (!target) {
@@ -3783,6 +3805,63 @@ ${secondPart}`;
       this.repoForm.addEventListener("submit", (event) => {
         event.preventDefault();
         this.applyRepoSelection();
+      });
+      this.bindWorkspaceResize();
+    }
+    bindWorkspaceResize() {
+      const minPaneWidth = 320;
+      this.workspaceSplitter.addEventListener("pointerdown", (event) => {
+        if (event.pointerType === "mouse" && event.button !== 0) {
+          return;
+        }
+        if (this.workspace.dataset.layout !== "both") {
+          return;
+        }
+        event.preventDefault();
+        const splitterRect = this.workspaceSplitter.getBoundingClientRect();
+        const codeRect = this.codePane.getBoundingClientRect();
+        const canvasRect = this.canvasPane.getBoundingClientRect();
+        const totalWidth = codeRect.width + canvasRect.width + splitterRect.width;
+        const maxReaderWidth = Math.max(minPaneWidth, totalWidth - splitterRect.width - minPaneWidth);
+        const startX = event.clientX;
+        const startReaderWidth = codeRect.width;
+        const updateSplitterAria = (value) => {
+          this.workspaceSplitter.setAttribute("aria-valuemin", String(minPaneWidth));
+          this.workspaceSplitter.setAttribute("aria-valuemax", String(Math.round(maxReaderWidth)));
+          this.workspaceSplitter.setAttribute("aria-valuenow", String(Math.round(value)));
+        };
+        updateSplitterAria(startReaderWidth);
+        const handleMove = (moveEvent) => {
+          if (moveEvent.pointerId !== event.pointerId) {
+            return;
+          }
+          const delta = moveEvent.clientX - startX;
+          const nextWidth = Math.min(
+            maxReaderWidth,
+            Math.max(minPaneWidth, startReaderWidth + delta)
+          );
+          this.workspace.style.setProperty("--reader-width", `${nextWidth}px`);
+          updateSplitterAria(nextWidth);
+        };
+        const stopResize = (endEvent) => {
+          if (endEvent.pointerId !== event.pointerId) {
+            return;
+          }
+          this.workspaceSplitter.releasePointerCapture(event.pointerId);
+          this.workspaceSplitter.removeEventListener("pointermove", handleMove);
+          this.workspaceSplitter.removeEventListener("pointerup", stopResize);
+          this.workspaceSplitter.removeEventListener("pointercancel", stopResize);
+          document.body.classList.remove("is-resizing");
+          if (this.graphInstance) {
+            this.graphInstance.resize();
+            this.updateLabelVisibility();
+          }
+        };
+        document.body.classList.add("is-resizing");
+        this.workspaceSplitter.setPointerCapture(event.pointerId);
+        this.workspaceSplitter.addEventListener("pointermove", handleMove);
+        this.workspaceSplitter.addEventListener("pointerup", stopResize);
+        this.workspaceSplitter.addEventListener("pointercancel", stopResize);
       });
     }
     scheduleChapterLoad(chapterId) {
@@ -6407,7 +6486,8 @@ ${secondPart}`;
       this.setCodeStatus("Copy not supported.");
     }
     jumpToInputLine() {
-      const input = this.codeSurface.querySelector("[data-line-input]");
+      var _a;
+      const input = (_a = this.readerMeta.querySelector("[data-line-input]")) != null ? _a : this.codeSurface.querySelector("[data-line-input]");
       if (!input) {
         return;
       }
@@ -6430,7 +6510,8 @@ ${secondPart}`;
       window.setTimeout(() => lineEl.classList.remove("is-jump"), 1200);
     }
     setCodeStatus(message) {
-      const status = this.codeSurface.querySelector("[data-code-status]");
+      var _a;
+      const status = (_a = this.readerMeta.querySelector("[data-code-status]")) != null ? _a : this.codeSurface.querySelector("[data-code-status]");
       if (status) {
         status.textContent = message;
       }
