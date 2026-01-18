@@ -59,3 +59,9 @@ This reduces per-interaction work and helps the canvas stay responsive under hea
 Graph filtering used to re-run a full show/hide pass on every call to `applyFilters`, even when only selection or hover state changed. This meant all nodes/edges were iterated repeatedly during normal interaction.
 
 We now cache a visibility signature (edge filters + external toggle + focused node + guided mode) and only run the expensive visibility pass when that signature changes or when a caller explicitly forces it (e.g., filter toggles, focus changes, guided steps, or graph re-render). Selection/hover updates only refresh edge highlights and label visibility, which are much cheaper.
+
+## Tooltip update throttling
+
+The graph tooltip previously recomputed container bounds and updated its transform on every `mousemove`, which forced frequent layout reads and writes.
+
+We now cache the tooltip container bounds on hover start and throttle position updates with `requestAnimationFrame`. Mousemove events only store the latest position, and a single rAF tick applies the transform. This reduces layout thrash while keeping the tooltip responsive.

@@ -70,6 +70,9 @@ export class GraphViewController {
     private focusedNodeId: string | null = null;
     private hoveredNodeId: string | null = null;
     private lastVisibilitySignature: string | null = null;
+    private tooltipRaf: number | null = null;
+    private tooltipPendingPosition: { x: number; y: number } | null = null;
+    private tooltipContainerRect: DOMRect | null = null;
     private nodeCapByScope: Map<string, number> = new Map();
     private nodeCap = 300;
     private nodeCapStep = 200;
@@ -315,6 +318,7 @@ export class GraphViewController {
         });
         this.deps.tooltipElement.setAttribute('aria-hidden', 'false');
         this.deps.tooltipElement.classList.add('is-visible');
+        this.tooltipContainerRect = this.deps.tooltipContainer.getBoundingClientRect();
         this.updateTooltipPosition(event);
     }
 
@@ -322,6 +326,12 @@ export class GraphViewController {
     hideTooltip(): void {
         this.deps.tooltipElement.classList.remove('is-visible');
         this.deps.tooltipElement.setAttribute('aria-hidden', 'true');
+        this.tooltipContainerRect = null;
+        this.tooltipPendingPosition = null;
+        if (this.tooltipRaf !== null) {
+            window.cancelAnimationFrame(this.tooltipRaf);
+            this.tooltipRaf = null;
+        }
     }
 
     // Repositions the tooltip to follow the cursor within the canvas bounds.
@@ -330,10 +340,28 @@ export class GraphViewController {
         if (!rendered) {
             return;
         }
+        this.tooltipPendingPosition = { x: rendered.x, y: rendered.y };
+        if (this.tooltipRaf !== null) {
+            return;
+        }
+        this.tooltipRaf = window.requestAnimationFrame(() => {
+            this.tooltipRaf = null;
+            this.applyTooltipPosition();
+        });
+    }
+
+    // Applies the latest tooltip position using cached bounds to avoid layout thrash.
+    private applyTooltipPosition(): void {
+        if (!this.tooltipPendingPosition) {
+            return;
+        }
+        if (!this.tooltipContainerRect) {
+            this.tooltipContainerRect = this.deps.tooltipContainer.getBoundingClientRect();
+        }
         const offset = 12;
-        const surfaceRect = this.deps.tooltipContainer.getBoundingClientRect();
-        const x = Math.min(surfaceRect.width - 20, Math.max(0, rendered.x + offset));
-        const y = Math.min(surfaceRect.height - 20, Math.max(0, rendered.y + offset));
+        const surfaceRect = this.tooltipContainerRect;
+        const x = Math.min(surfaceRect.width - 20, Math.max(0, this.tooltipPendingPosition.x + offset));
+        const y = Math.min(surfaceRect.height - 20, Math.max(0, this.tooltipPendingPosition.y + offset));
         this.deps.tooltipElement.style.transform = `translate(${x}px, ${y}px)`;
     }
 

@@ -2189,6 +2189,9 @@ ${secondPart}`;
       __publicField(this, "focusedNodeId", null);
       __publicField(this, "hoveredNodeId", null);
       __publicField(this, "lastVisibilitySignature", null);
+      __publicField(this, "tooltipRaf", null);
+      __publicField(this, "tooltipPendingPosition", null);
+      __publicField(this, "tooltipContainerRect", null);
       __publicField(this, "nodeCapByScope", /* @__PURE__ */ new Map());
       __publicField(this, "nodeCap", 300);
       __publicField(this, "nodeCapStep", 200);
@@ -2414,12 +2417,19 @@ ${secondPart}`;
       });
       this.deps.tooltipElement.setAttribute("aria-hidden", "false");
       this.deps.tooltipElement.classList.add("is-visible");
+      this.tooltipContainerRect = this.deps.tooltipContainer.getBoundingClientRect();
       this.updateTooltipPosition(event);
     }
     // Hides the hover tooltip when the pointer leaves the node.
     hideTooltip() {
       this.deps.tooltipElement.classList.remove("is-visible");
       this.deps.tooltipElement.setAttribute("aria-hidden", "true");
+      this.tooltipContainerRect = null;
+      this.tooltipPendingPosition = null;
+      if (this.tooltipRaf !== null) {
+        window.cancelAnimationFrame(this.tooltipRaf);
+        this.tooltipRaf = null;
+      }
     }
     // Repositions the tooltip to follow the cursor within the canvas bounds.
     updateTooltipPosition(event) {
@@ -2427,10 +2437,27 @@ ${secondPart}`;
       if (!rendered) {
         return;
       }
+      this.tooltipPendingPosition = { x: rendered.x, y: rendered.y };
+      if (this.tooltipRaf !== null) {
+        return;
+      }
+      this.tooltipRaf = window.requestAnimationFrame(() => {
+        this.tooltipRaf = null;
+        this.applyTooltipPosition();
+      });
+    }
+    // Applies the latest tooltip position using cached bounds to avoid layout thrash.
+    applyTooltipPosition() {
+      if (!this.tooltipPendingPosition) {
+        return;
+      }
+      if (!this.tooltipContainerRect) {
+        this.tooltipContainerRect = this.deps.tooltipContainer.getBoundingClientRect();
+      }
       const offset = 12;
-      const surfaceRect = this.deps.tooltipContainer.getBoundingClientRect();
-      const x = Math.min(surfaceRect.width - 20, Math.max(0, rendered.x + offset));
-      const y = Math.min(surfaceRect.height - 20, Math.max(0, rendered.y + offset));
+      const surfaceRect = this.tooltipContainerRect;
+      const x = Math.min(surfaceRect.width - 20, Math.max(0, this.tooltipPendingPosition.x + offset));
+      const y = Math.min(surfaceRect.height - 20, Math.max(0, this.tooltipPendingPosition.y + offset));
       this.deps.tooltipElement.style.transform = `translate(${x}px, ${y}px)`;
     }
     // Focuses the graph around the currently selected node, if any.
