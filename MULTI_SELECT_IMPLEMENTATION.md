@@ -5,7 +5,10 @@ Add cmd/ctrl-click multi-select on graph nodes so users can highlight multiple n
 
 ## Primary Integration Points
 - `app/static/gitreader/modules/ui/graphEvents.ts`: central node tap handler.
-- `app/static/gitreader/app.ts`: graph initialization + event wiring.
+- `app/static/gitreader/modules/ui/graphView.ts`: graph initialization + selection behavior.
+- `app/static/gitreader/app.ts`: event wiring.
+
+**Note:** `GraphViewController` now owns the Cytoscape lifecycle (creation, styling, layout) via `graphView.ts`, so multi-select behavior should be implemented there rather than in `app.ts`.
 
 ## Behavior Specification
 - Cmd/ctrl-click toggles node selection state.
@@ -26,7 +29,7 @@ Add cmd/ctrl-click multi-select on graph nodes so users can highlight multiple n
      - `return;` to skip reader navigation + cluster behavior.
 
 3. **Enable additive selection for multi-select**
-   - Set Cytoscape `selectionType: 'additive'` in `ensureGraph()`.
+   - Set Cytoscape `selectionType: 'additive'` in `GraphViewController.ensureGraph()` (`app/static/gitreader/modules/ui/graphView.ts`).
    - On normal (non-modifier) click, manually clear selection before selecting the clicked node so behavior stays single-select by default.
 
 4. **Bulk movement**
