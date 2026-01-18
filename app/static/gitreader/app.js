@@ -311,6 +311,23 @@
         return;
       }
       const modifierEvent = (_a = event.originalEvent) != null ? _a : event;
+      if (handlers.isShiftClick(modifierEvent)) {
+        if (handlers.handleShiftFolderSelection(node)) {
+          state.setLastTapNodeId(null);
+          state.setLastTapAt(0);
+          return;
+        }
+        if (handlers.handleShiftClassSelection(node)) {
+          state.setLastTapNodeId(null);
+          state.setLastTapAt(0);
+          return;
+        }
+        if (handlers.handleFileClassSelection(event.target)) {
+          state.setLastTapNodeId(null);
+          state.setLastTapAt(0);
+          return;
+        }
+      }
       if (handlers.isModifierClick(modifierEvent)) {
         state.setLastTapNodeId(null);
         state.setLastTapAt(0);
@@ -3036,6 +3053,7 @@ ${secondPart}`;
       __publicField(this, "clusterExpanded", /* @__PURE__ */ new Set());
       __publicField(this, "clusterAutoExpanded", /* @__PURE__ */ new Set());
       __publicField(this, "clusterFocusPath", null);
+      __publicField(this, "classExpanded", /* @__PURE__ */ new Set());
       __publicField(this, "tocDebounceTimer", null);
       __publicField(this, "tocDebounceDelay", 200);
       __publicField(this, "pendingChapterId", null);
@@ -3939,16 +3957,47 @@ ${secondPart}`;
         pathToFileNode.set(normalized, node);
         filePathById.set(node.id, normalized);
       });
-      const symbolsByFile = /* @__PURE__ */ new Map();
-      nodes.forEach((node) => {
-        var _a, _b;
-        if (node.kind === "file" || node.kind === "external" || !((_a = node.location) == null ? void 0 : _a.path)) {
+      const nodeMap = new Map(nodes.map((node) => [node.id, node]));
+      const directChildrenByFile = /* @__PURE__ */ new Map();
+      const directChildIdsByFile = /* @__PURE__ */ new Map();
+      const directChildrenByClass = /* @__PURE__ */ new Map();
+      const directChildIdsByClass = /* @__PURE__ */ new Map();
+      edges.forEach((edge) => {
+        var _a, _b, _c, _d;
+        if (edge.kind !== "contains") {
           return;
         }
-        const normalized = this.normalizePath(node.location.path);
-        const list = (_b = symbolsByFile.get(normalized)) != null ? _b : [];
-        list.push(node);
-        symbolsByFile.set(normalized, list);
+        const sourceNode = nodeMap.get(edge.source);
+        const targetNode = nodeMap.get(edge.target);
+        if (!sourceNode || !targetNode) {
+          return;
+        }
+        if (sourceNode.kind === "file") {
+          if (targetNode.kind === "file" || targetNode.kind === "external") {
+            return;
+          }
+          const existing = (_a = directChildrenByFile.get(sourceNode.id)) != null ? _a : [];
+          const existingIds = (_b = directChildIdsByFile.get(sourceNode.id)) != null ? _b : /* @__PURE__ */ new Set();
+          if (existingIds.has(targetNode.id)) {
+            return;
+          }
+          existing.push(targetNode);
+          existingIds.add(targetNode.id);
+          directChildrenByFile.set(sourceNode.id, existing);
+          directChildIdsByFile.set(sourceNode.id, existingIds);
+          return;
+        }
+        if (sourceNode.kind === "class" && targetNode.kind === "method") {
+          const existing = (_c = directChildrenByClass.get(sourceNode.id)) != null ? _c : [];
+          const existingIds = (_d = directChildIdsByClass.get(sourceNode.id)) != null ? _d : /* @__PURE__ */ new Set();
+          if (existingIds.has(targetNode.id)) {
+            return;
+          }
+          existing.push(targetNode);
+          existingIds.add(targetNode.id);
+          directChildrenByClass.set(sourceNode.id, existing);
+          directChildIdsByClass.set(sourceNode.id, existingIds);
+        }
       });
       const visibleNodes = [];
       const visibleNodeIds = /* @__PURE__ */ new Set();
@@ -4040,17 +4089,25 @@ ${secondPart}`;
         if (!this.clusterExpanded.has(fileId)) {
           return;
         }
-        const path = filePathById.get(fileId);
-        if (!path) {
-          return;
-        }
-        const children = symbolsByFile.get(path);
-        if (!children) {
+        const children = directChildrenByFile.get(fileId);
+        if (!children || children.length === 0) {
           return;
         }
         children.forEach((child) => addNode(child));
       });
-      const nodeMap = new Map(nodes.map((node) => [node.id, node]));
+      visibleNodes.forEach((node) => {
+        if (node.kind !== "class") {
+          return;
+        }
+        if (!this.classExpanded.has(node.id)) {
+          return;
+        }
+        const children = directChildrenByClass.get(node.id);
+        if (!children || children.length === 0) {
+          return;
+        }
+        children.forEach((child) => addNode(child));
+      });
       const edgeMap = /* @__PURE__ */ new Map();
       const confidenceRank = { low: 0, medium: 1, high: 2 };
       const addEdge = (source, target, kind, confidence) => {
@@ -4395,6 +4452,7 @@ ${secondPart}`;
       }
       return (_b = this.fileNodesByPath.get(this.normalizePath(path))) != null ? _b : null;
     }
+    // Detects cmd/ctrl clicks so graph interactions can support multi-select behavior.
     isModifierClick(event) {
       if (!event) {
         return false;
@@ -4406,6 +4464,19 @@ ${secondPart}`;
         }
       }
       return Boolean(anyEvent.metaKey || anyEvent.ctrlKey);
+    }
+    // Detects shift-clicks so folder selections can bulk-highlight descendants.
+    isShiftClick(event) {
+      if (!event) {
+        return false;
+      }
+      const anyEvent = event;
+      if (typeof anyEvent.getModifierState === "function") {
+        if (anyEvent.getModifierState("Shift")) {
+          return true;
+        }
+      }
+      return Boolean(anyEvent.shiftKey);
     }
     isFileNodeActive(fileNode) {
       var _a, _b;
@@ -4452,10 +4523,131 @@ ${secondPart}`;
       void this.highlightSymbolInFile(fileNode, symbol);
       return true;
     }
+    // Selects visible descendants of a folder node so groups can be moved together.
+    handleShiftFolderSelection(symbol) {
+      var _a;
+      if (this.graphLayoutMode !== "cluster") {
+        return false;
+      }
+      if (symbol.kind !== "folder") {
+        return false;
+      }
+      if (!this.graphInstance) {
+        return false;
+      }
+      const folderElement = this.graphInstance.$id(symbol.id);
+      if (!folderElement || folderElement.empty()) {
+        return false;
+      }
+      const folderPath = folderElement.data("path") || ((_a = symbol.location) == null ? void 0 : _a.path);
+      if (!folderPath) {
+        this.graphInstance.$("node:selected").unselect();
+        this.graphView.refreshEdgeHighlights();
+        this.updateLabelVisibility();
+        return true;
+      }
+      const normalizedFolderPath = this.normalizePath(String(folderPath));
+      const prefix = normalizedFolderPath ? `${normalizedFolderPath}/` : "";
+      const visibleNodes = this.graphInstance.nodes(":visible");
+      const nodesToSelect = visibleNodes.filter((node) => {
+        const nodePath = node.data("path");
+        if (!nodePath) {
+          return false;
+        }
+        const normalizedNodePath = this.normalizePath(String(nodePath));
+        return Boolean(prefix && normalizedNodePath.startsWith(prefix));
+      });
+      this.graphInstance.$("node:selected").unselect();
+      nodesToSelect.select();
+      this.graphView.refreshEdgeHighlights();
+      this.updateLabelVisibility();
+      return true;
+    }
+    // Replaces selection with visible class nodes that belong to a file node element.
+    handleFileClassSelection(node) {
+      if (!this.graphInstance) {
+        return false;
+      }
+      if (!node || typeof node.data !== "function") {
+        return false;
+      }
+      if (node.data("kind") !== "file") {
+        return false;
+      }
+      const filePath = node.data("path");
+      if (!filePath) {
+        return false;
+      }
+      const normalizedFilePath = this.normalizePath(String(filePath));
+      const visibleClasses = this.graphInstance.nodes(":visible").filter((element) => {
+        if (element.data("kind") !== "class") {
+          return false;
+        }
+        const classPath = element.data("path");
+        if (!classPath) {
+          return false;
+        }
+        return this.normalizePath(String(classPath)) === normalizedFilePath;
+      });
+      if (!visibleClasses || visibleClasses.empty()) {
+        return false;
+      }
+      this.graphInstance.$("node:selected").unselect();
+      if (typeof node.unselect === "function") {
+        node.unselect();
+      }
+      visibleClasses.select();
+      return true;
+    }
+    // Replaces selection with visible method nodes when a class is expanded and shift-clicked.
+    handleShiftClassSelection(symbol) {
+      if (this.graphLayoutMode !== "cluster") {
+        return false;
+      }
+      if (!symbol || symbol.kind !== "class") {
+        return false;
+      }
+      if (!this.classExpanded.has(symbol.id)) {
+        return false;
+      }
+      if (!this.graphInstance) {
+        return false;
+      }
+      const methodIds = this.graphEdges.filter((edge) => edge.kind === "contains" && edge.source === symbol.id).map((edge) => edge.target).filter((targetId) => {
+        var _a;
+        return ((_a = this.nodeById.get(targetId)) == null ? void 0 : _a.kind) === "method";
+      });
+      if (methodIds.length === 0) {
+        return false;
+      }
+      const methodIdSet = new Set(methodIds);
+      const visibleMethods = this.graphInstance.nodes(":visible").filter((element) => {
+        if (element.data("kind") !== "method") {
+          return false;
+        }
+        return methodIdSet.has(element.id());
+      });
+      if (!visibleMethods || visibleMethods.empty()) {
+        return false;
+      }
+      this.graphInstance.$("node:selected").unselect();
+      visibleMethods.select();
+      return true;
+    }
     handleClusterNodeToggle(symbol, event) {
       var _a;
       if (symbol.kind === "folder") {
         this.toggleClusterExpansion(symbol.id);
+        return true;
+      }
+      if (symbol.kind === "class") {
+        if (this.isModifierClick(event)) {
+          return false;
+        }
+        if (!this.classHasClusterChildren(symbol)) {
+          return false;
+        }
+        this.toggleClassExpansion(symbol.id);
         return true;
       }
       if (symbol.kind !== "file") {
@@ -4497,6 +4689,15 @@ ${secondPart}`;
       }
       this.refreshGraphView();
     }
+    // Toggles class expansion so double-click reveals method nodes for that class.
+    toggleClassExpansion(nodeId) {
+      if (this.classExpanded.has(nodeId)) {
+        this.classExpanded.delete(nodeId);
+      } else {
+        this.classExpanded.add(nodeId);
+      }
+      this.refreshGraphView();
+    }
     fileHasClusterChildren(fileNode) {
       var _a;
       const path = (_a = fileNode.location) == null ? void 0 : _a.path;
@@ -4513,6 +4714,19 @@ ${secondPart}`;
           return false;
         }
         return this.normalizePath(node.location.path) === normalized;
+      });
+    }
+    // Checks whether a class node has method children so it can be expanded.
+    classHasClusterChildren(classNode) {
+      if (!classNode.id) {
+        return false;
+      }
+      return this.graphEdges.some((edge) => {
+        if (edge.kind !== "contains" || edge.source !== classNode.id) {
+          return false;
+        }
+        const target = this.nodeById.get(edge.target);
+        return (target == null ? void 0 : target.kind) === "method";
       });
     }
     applyFocusHighlight(symbol) {
@@ -4633,6 +4847,10 @@ ${secondPart}`;
           renderCode: (node) => this.readerController.render(node),
           updateNarrator: (node) => this.updateNarrator(node),
           isModifierClick: (event) => this.isModifierClick(event),
+          isShiftClick: (event) => this.isShiftClick(event),
+          handleShiftFolderSelection: (node) => this.handleShiftFolderSelection(node),
+          handleFileClassSelection: (node) => this.handleFileClassSelection(node),
+          handleShiftClassSelection: (node) => this.handleShiftClassSelection(node),
           refreshEdgeHighlights: () => this.graphView.refreshEdgeHighlights(),
           updateLabelVisibility: () => this.updateLabelVisibility(),
           setHoveredNode: (nodeId) => this.graphView.setHoveredNode(nodeId),

@@ -141,6 +141,7 @@ class GitReaderApp {
     private clusterExpanded: Set<string> = new Set();
     private clusterAutoExpanded: Set<string> = new Set();
     private clusterFocusPath: string | null = null;
+    private classExpanded: Set<string> = new Set();
     private tocDebounceTimer: number | null = null;
     private tocDebounceDelay = 200;
     private pendingChapterId: string | null = null;
@@ -1086,15 +1087,48 @@ class GitReaderApp {
             pathToFileNode.set(normalized, node);
             filePathById.set(node.id, normalized);
         });
-        const symbolsByFile = new Map<string, SymbolNode[]>();
-        nodes.forEach((node) => {
-            if (node.kind === 'file' || node.kind === 'external' || !node.location?.path) {
+        const nodeMap = new Map(nodes.map((node) => [node.id, node]));
+        // Tracks direct file children using "contains" edges so file expansion stops at one level.
+        const directChildrenByFile = new Map<string, SymbolNode[]>();
+        const directChildIdsByFile = new Map<string, Set<string>>();
+        // Tracks direct class children (methods) using "contains" edges for class expansion.
+        const directChildrenByClass = new Map<string, SymbolNode[]>();
+        const directChildIdsByClass = new Map<string, Set<string>>();
+        edges.forEach((edge) => {
+            if (edge.kind !== 'contains') {
                 return;
             }
-            const normalized = this.normalizePath(node.location.path);
-            const list = symbolsByFile.get(normalized) ?? [];
-            list.push(node);
-            symbolsByFile.set(normalized, list);
+            const sourceNode = nodeMap.get(edge.source);
+            const targetNode = nodeMap.get(edge.target);
+            if (!sourceNode || !targetNode) {
+                return;
+            }
+            if (sourceNode.kind === 'file') {
+                if (targetNode.kind === 'file' || targetNode.kind === 'external') {
+                    return;
+                }
+                const existing = directChildrenByFile.get(sourceNode.id) ?? [];
+                const existingIds = directChildIdsByFile.get(sourceNode.id) ?? new Set<string>();
+                if (existingIds.has(targetNode.id)) {
+                    return;
+                }
+                existing.push(targetNode);
+                existingIds.add(targetNode.id);
+                directChildrenByFile.set(sourceNode.id, existing);
+                directChildIdsByFile.set(sourceNode.id, existingIds);
+                return;
+            }
+            if (sourceNode.kind === 'class' && targetNode.kind === 'method') {
+                const existing = directChildrenByClass.get(sourceNode.id) ?? [];
+                const existingIds = directChildIdsByClass.get(sourceNode.id) ?? new Set<string>();
+                if (existingIds.has(targetNode.id)) {
+                    return;
+                }
+                existing.push(targetNode);
+                existingIds.add(targetNode.id);
+                directChildrenByClass.set(sourceNode.id, existing);
+                directChildIdsByClass.set(sourceNode.id, existingIds);
+            }
         });
         const visibleNodes: SymbolNode[] = [];
         const visibleNodeIds = new Set<string>();
@@ -1188,18 +1222,26 @@ class GitReaderApp {
             if (!this.clusterExpanded.has(fileId)) {
                 return;
             }
-            const path = filePathById.get(fileId);
-            if (!path) {
-                return;
-            }
-            const children = symbolsByFile.get(path);
-            if (!children) {
+            const children = directChildrenByFile.get(fileId);
+            if (!children || children.length === 0) {
                 return;
             }
             children.forEach((child) => addNode(child));
         });
-
-        const nodeMap = new Map(nodes.map((node) => [node.id, node]));
+        // Expand class nodes to show methods only when the class itself is expanded.
+        visibleNodes.forEach((node) => {
+            if (node.kind !== 'class') {
+                return;
+            }
+            if (!this.classExpanded.has(node.id)) {
+                return;
+            }
+            const children = directChildrenByClass.get(node.id);
+            if (!children || children.length === 0) {
+                return;
+            }
+            children.forEach((child) => addNode(child));
+        });
         const edgeMap = new Map<string, GraphEdge>();
         const confidenceRank: Record<EdgeConfidence, number> = { low: 0, medium: 1, high: 2 };
         const addEdge = (source: string, target: string, kind: EdgeKind, confidence: EdgeConfidence) => {
@@ -1565,6 +1607,7 @@ class GitReaderApp {
         return this.fileNodesByPath.get(this.normalizePath(path)) ?? null;
     }
 
+    // Detects cmd/ctrl clicks so graph interactions can support multi-select behavior.
     private isModifierClick(event?: MouseEvent | PointerEvent | KeyboardEvent | Event): boolean {
         if (!event) {
             return false;
@@ -1576,6 +1619,20 @@ class GitReaderApp {
             }
         }
         return Boolean(anyEvent.metaKey || anyEvent.ctrlKey);
+    }
+
+    // Detects shift-clicks so folder selections can bulk-highlight descendants.
+    private isShiftClick(event?: MouseEvent | PointerEvent | KeyboardEvent | Event): boolean {
+        if (!event) {
+            return false;
+        }
+        const anyEvent = event as { shiftKey?: boolean; getModifierState?: (key: string) => boolean };
+        if (typeof anyEvent.getModifierState === 'function') {
+            if (anyEvent.getModifierState('Shift')) {
+                return true;
+            }
+        }
+        return Boolean(anyEvent.shiftKey);
     }
 
     private isFileNodeActive(fileNode: SymbolNode): boolean {
@@ -1625,9 +1682,132 @@ class GitReaderApp {
         return true;
     }
 
+    // Selects visible descendants of a folder node so groups can be moved together.
+    private handleShiftFolderSelection(symbol: SymbolNode): boolean {
+        if (this.graphLayoutMode !== 'cluster') {
+            return false;
+        }
+        if (symbol.kind !== 'folder') {
+            return false;
+        }
+        if (!this.graphInstance) {
+            return false;
+        }
+        const folderElement = this.graphInstance.$id(symbol.id);
+        if (!folderElement || folderElement.empty()) {
+            return false;
+        }
+        const folderPath = folderElement.data('path') || symbol.location?.path;
+        if (!folderPath) {
+            this.graphInstance.$('node:selected').unselect();
+            this.graphView.refreshEdgeHighlights();
+            this.updateLabelVisibility();
+            return true;
+        }
+        const normalizedFolderPath = this.normalizePath(String(folderPath));
+        const prefix = normalizedFolderPath ? `${normalizedFolderPath}/` : '';
+        const visibleNodes = this.graphInstance.nodes(':visible');
+        const nodesToSelect = visibleNodes.filter((node: any) => {
+            const nodePath = node.data('path');
+            if (!nodePath) {
+                return false;
+            }
+            const normalizedNodePath = this.normalizePath(String(nodePath));
+            return Boolean(prefix && normalizedNodePath.startsWith(prefix));
+        });
+        this.graphInstance.$('node:selected').unselect();
+        nodesToSelect.select();
+        this.graphView.refreshEdgeHighlights();
+        this.updateLabelVisibility();
+        return true;
+    }
+
+    // Replaces selection with visible class nodes that belong to a file node element.
+    private handleFileClassSelection(node: any): boolean {
+        if (!this.graphInstance) {
+            return false;
+        }
+        if (!node || typeof node.data !== 'function') {
+            return false;
+        }
+        if (node.data('kind') !== 'file') {
+            return false;
+        }
+        const filePath = node.data('path');
+        if (!filePath) {
+            return false;
+        }
+        const normalizedFilePath = this.normalizePath(String(filePath));
+        const visibleClasses = this.graphInstance.nodes(':visible').filter((element: any) => {
+            if (element.data('kind') !== 'class') {
+                return false;
+            }
+            const classPath = element.data('path');
+            if (!classPath) {
+                return false;
+            }
+            return this.normalizePath(String(classPath)) === normalizedFilePath;
+        });
+        if (!visibleClasses || visibleClasses.empty()) {
+            return false;
+        }
+        this.graphInstance.$('node:selected').unselect();
+        if (typeof node.unselect === 'function') {
+            node.unselect();
+        }
+        visibleClasses.select();
+        return true;
+    }
+
+    // Replaces selection with visible method nodes when a class is expanded and shift-clicked.
+    private handleShiftClassSelection(symbol: SymbolNode): boolean {
+        if (this.graphLayoutMode !== 'cluster') {
+            return false;
+        }
+        if (!symbol || symbol.kind !== 'class') {
+            return false;
+        }
+        if (!this.classExpanded.has(symbol.id)) {
+            return false;
+        }
+        if (!this.graphInstance) {
+            return false;
+        }
+        const methodIds = this.graphEdges
+            .filter((edge) => edge.kind === 'contains' && edge.source === symbol.id)
+            .map((edge) => edge.target)
+            .filter((targetId) => this.nodeById.get(targetId)?.kind === 'method');
+        if (methodIds.length === 0) {
+            return false;
+        }
+        const methodIdSet = new Set(methodIds);
+        const visibleMethods = this.graphInstance.nodes(':visible').filter((element: any) => {
+            if (element.data('kind') !== 'method') {
+                return false;
+            }
+            return methodIdSet.has(element.id());
+        });
+        if (!visibleMethods || visibleMethods.empty()) {
+            return false;
+        }
+        this.graphInstance.$('node:selected').unselect();
+        visibleMethods.select();
+        return true;
+    }
+
     private handleClusterNodeToggle(symbol: SymbolNode, event?: MouseEvent): boolean {
         if (symbol.kind === 'folder') {
             this.toggleClusterExpansion(symbol.id);
+            return true;
+        }
+        if (symbol.kind === 'class') {
+            if (this.isModifierClick(event)) {
+                return false;
+            }
+            if (!this.classHasClusterChildren(symbol)) {
+                return false;
+            }
+            this.toggleClassExpansion(symbol.id);
             return true;
         }
         if (symbol.kind !== 'file') {
@@ -1671,6 +1851,16 @@ class GitReaderApp {
         this.refreshGraphView();
     }
 
+    // Toggles class expansion so double-click reveals method nodes for that class.
+    private toggleClassExpansion(nodeId: string): void {
+        if (this.classExpanded.has(nodeId)) {
+            this.classExpanded.delete(nodeId);
+        } else {
+            this.classExpanded.add(nodeId);
+        }
+        this.refreshGraphView();
+    }
+
     private fileHasClusterChildren(fileNode: SymbolNode): boolean {
         const path = fileNode.location?.path;
         if (!path) {
@@ -1685,6 +1875,20 @@ class GitReaderApp {
                 return false;
             }
             return this.normalizePath(node.location.path) === normalized;
+        });
+    }
+
+    // Checks whether a class node has method children so it can be expanded.
+    private classHasClusterChildren(classNode: SymbolNode): boolean {
+        if (!classNode.id) {
+            return false;
+        }
+        return this.graphEdges.some((edge) => {
+            if (edge.kind !== 'contains' || edge.source !== classNode.id) {
+                return false;
+            }
+            const target = this.nodeById.get(edge.target);
+            return target?.kind === 'method';
         });
     }
 
@@ -1810,6 +2014,10 @@ class GitReaderApp {
                 renderCode: (node) => this.readerController.render(node),
                 updateNarrator: (node) => this.updateNarrator(node),
                 isModifierClick: (event) => this.isModifierClick(event),
+                isShiftClick: (event) => this.isShiftClick(event),
+                handleShiftFolderSelection: (node) => this.handleShiftFolderSelection(node),
+                handleFileClassSelection: (node) => this.handleFileClassSelection(node),
+                handleShiftClassSelection: (node) => this.handleShiftClassSelection(node),
                 refreshEdgeHighlights: () => this.graphView.refreshEdgeHighlights(),
                 updateLabelVisibility: () => this.updateLabelVisibility(),
                 setHoveredNode: (nodeId) => this.graphView.setHoveredNode(nodeId),

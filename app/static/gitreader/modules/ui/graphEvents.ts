@@ -40,6 +40,14 @@ export interface GraphEventHandlers {
     updateNarrator(node: any): void;
     // Detects cmd/ctrl clicks for multi-select toggling.
     isModifierClick(event?: MouseEvent): boolean;
+    // Detects shift-clicks so folder selections can bulk-highlight descendants.
+    isShiftClick(event?: MouseEvent): boolean;
+    // Selects all visible descendants of a folder node on shift-click.
+    handleShiftFolderSelection(node: any): boolean;
+    // Selects visible class nodes that belong to a file node element.
+    handleFileClassSelection(node: any): boolean;
+    // Selects visible method nodes that belong to an expanded class node.
+    handleShiftClassSelection(node: any): boolean;
     // Refreshes edge emphasis when selection state changes.
     refreshEdgeHighlights(): void;
     // Recalculates label visibility to match zoom, hover, and selection states.
@@ -87,6 +95,23 @@ export function bindGraphEvents(bindings: GraphEventBindings): boolean {
             return;
         }
         const modifierEvent = event.originalEvent ?? event;
+        if (handlers.isShiftClick(modifierEvent as MouseEvent)) {
+            if (handlers.handleShiftFolderSelection(node)) {
+                state.setLastTapNodeId(null);
+                state.setLastTapAt(0);
+                return;
+            }
+            if (handlers.handleShiftClassSelection(node)) {
+                state.setLastTapNodeId(null);
+                state.setLastTapAt(0);
+                return;
+            }
+            if (handlers.handleFileClassSelection(event.target)) {
+                state.setLastTapNodeId(null);
+                state.setLastTapAt(0);
+                return;
+            }
+        }
         if (handlers.isModifierClick(modifierEvent as MouseEvent)) {
             state.setLastTapNodeId(null);
             state.setLastTapAt(0);
