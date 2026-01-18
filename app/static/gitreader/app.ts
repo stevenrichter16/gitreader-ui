@@ -552,6 +552,9 @@ class GitReaderApp {
                     this.graphView.zoom(0.8);
                 } else if (action === 'fit') {
                     this.graphView.fit();
+                } else if (action === 'organize-grid') {
+                    this.graphView.setClusterManualLayout(true);
+                    this.graphView.organizeGrid();
                 }
             });
         });
@@ -633,6 +636,10 @@ class GitReaderApp {
             }
             if (event.key === 's' || event.key === 'S') {
                 this.siblingSelectKeyActive = true;
+                return;
+            }
+            if (event.shiftKey && (event.key === 'p' || event.key === 'P')) {
+                this.selectParentOfSelectedNode();
             }
         });
 
@@ -2915,7 +2922,7 @@ class GitReaderApp {
         }
     }
 
-    private formatNodeLabel(node: SymbolNode): { label: string; fullLabel: string; path: string; kindLabel: string } {
+    private formatNodeLabel(node: SymbolNode & { childCount?: number }): { label: string; fullLabel: string; path: string; kindLabel: string } {
         return formatGraphNodeLabel(node, this.labelLineLength);
     }
 
@@ -3017,6 +3024,33 @@ class GitReaderApp {
             window.cancelAnimationFrame(this.labelVisibilityRaf);
             this.labelVisibilityRaf = null;
         }
+    }
+
+    private selectParentOfSelectedNode(): void {
+        if (!this.graphInstance) {
+            return;
+        }
+        const selected = this.graphInstance.$('node:selected');
+        if (!selected || selected.length === 0) {
+            this.setCanvasOverlay('Select a node to reveal its parent.', true);
+            window.setTimeout(() => this.setCanvasOverlay('', false), 1200);
+            return;
+        }
+        const node = selected[0];
+        const parentEdges = node.incomers('edge[kind = "contains"]');
+        if (!parentEdges || parentEdges.length === 0) {
+            this.setCanvasOverlay('No parent node found.', true);
+            window.setTimeout(() => this.setCanvasOverlay('', false), 1200);
+            return;
+        }
+        const parent = parentEdges.sources()[0];
+        if (!parent || parent.empty()) {
+            this.setCanvasOverlay('No parent node found.', true);
+            window.setTimeout(() => this.setCanvasOverlay('', false), 1200);
+            return;
+        }
+        this.graphInstance.$('node:selected').unselect();
+        parent.select();
     }
 
     private async updateNarrator(symbol: SymbolNode): Promise<void> {

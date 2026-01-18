@@ -30,7 +30,7 @@ export interface GraphViewDependencies {
     // Updates the display-node map used by event resolution callbacks.
     setDisplayNodes: (nodes: SymbolNode[]) => void;
     // Formats node labels for display and tooltip metadata.
-    formatLabel: (node: SymbolNode) => { label: string; fullLabel: string; path: string; kindLabel: string };
+    formatLabel: (node: SymbolNode & { childCount?: number }) => { label: string; fullLabel: string; path: string; kindLabel: string };
     // Receives the Cytoscape instance so app.ts can bind events + keep state.
     onGraphReady: (graph: any) => void;
 }
@@ -472,6 +472,23 @@ export class GraphViewController {
         this.deps.updateLabelVisibility();
     }
 
+    // Organizes all visible nodes into a grid layout without changing the active layout mode.
+    organizeGrid(): void {
+        if (!this.graph) {
+            return;
+        }
+        const layout = this.graph.layout({
+            name: 'grid',
+            animate: false,
+            fit: true,
+            padding: 32,
+            avoidOverlap: true,
+            avoidOverlapPadding: 18,
+        });
+        layout.run();
+        this.deps.updateLabelVisibility();
+    }
+
     // Chooses layout options based on the current layout mode.
     private getLayoutOptions(): {
         name: string;
@@ -520,6 +537,27 @@ export class GraphViewController {
         positionCache: Map<string, { x: number; y: number }> | null,
     ): Array<{ data: Record<string, unknown>; position?: { x: number; y: number } }> {
         const useManualLayout = this.shouldUseManualClusterLayout() && positionCache;
+        const kindById = new Map<string, string>();
+        nodes.forEach((node) => {
+            kindById.set(node.id, node.kind);
+        });
+        const childCountById = new Map<string, number>();
+        edges.forEach((edge) => {
+            if (edge.kind !== 'contains') {
+                return;
+            }
+            const parentKind = kindById.get(edge.source);
+            const childKind = kindById.get(edge.target);
+            if (!parentKind || !childKind) {
+                return;
+            }
+            const isFileChild = parentKind === 'file' && (childKind === 'class' || childKind === 'function');
+            const isClassChild = parentKind === 'class' && childKind === 'method';
+            if (!isFileChild && !isClassChild) {
+                return;
+            }
+            childCountById.set(edge.source, (childCountById.get(edge.source) ?? 0) + 1);
+        });
         const parentByChild = new Map<string, string>();
         const childrenByParent = new Map<string, string[]>();
         if (useManualLayout) {
@@ -534,7 +572,11 @@ export class GraphViewController {
             });
         }
         const nodeElements = nodes.map((node) => {
-            const labelData = this.deps.formatLabel(node);
+            const childCount = childCountById.get(node.id) ?? 0;
+            const labelData = this.deps.formatLabel({
+                ...node,
+                childCount: childCount > 0 ? childCount : undefined,
+            });
             const element: { data: Record<string, unknown>; position?: { x: number; y: number } } = {
                 data: {
                     id: node.id,
@@ -545,6 +587,7 @@ export class GraphViewController {
                     summary: node.summary || '',
                     path: labelData.path,
                     labelVisible: 'true',
+                    childCount: childCount > 0 ? childCount : undefined,
                 },
             };
             if (useManualLayout) {

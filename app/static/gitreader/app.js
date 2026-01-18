@@ -1976,9 +1976,11 @@
     const path = (_b = (_a = node.location) == null ? void 0 : _a.path) != null ? _b : "";
     const fullLabel = node.name || path;
     const displayName = getDisplayName(node, fullLabel, path);
+    const shouldShowCount = Boolean(node.childCount) && (node.kind === "file" || node.kind === "class");
+    const labelName = shouldShowCount ? `${displayName} (${node.childCount})` : displayName;
     const badge = getKindBadge(node.kind);
     const kindLabel = getKindLabel(node.kind);
-    const label = wrapLabel(`[${badge}]`, displayName, lineLength);
+    const label = wrapLabel(`[${badge}]`, labelName, lineLength);
     return { label, fullLabel, path, kindLabel };
   }
   function getDisplayName(node, fullLabel, path) {
@@ -2559,6 +2561,22 @@ ${secondPart}`;
       this.graph.fit(void 0, 40);
       this.deps.updateLabelVisibility();
     }
+    // Organizes all visible nodes into a grid layout without changing the active layout mode.
+    organizeGrid() {
+      if (!this.graph) {
+        return;
+      }
+      const layout = this.graph.layout({
+        name: "grid",
+        animate: false,
+        fit: true,
+        padding: 32,
+        avoidOverlap: true,
+        avoidOverlapPadding: 18
+      });
+      layout.run();
+      this.deps.updateLabelVisibility();
+    }
     // Chooses layout options based on the current layout mode.
     getLayoutOptions() {
       if (this.layoutMode === "layer") {
@@ -2592,6 +2610,28 @@ ${secondPart}`;
     // Builds Cytoscape element data for nodes and edges using shared label formatting.
     buildGraphElements(nodes, edges, positionCache) {
       const useManualLayout = this.shouldUseManualClusterLayout() && positionCache;
+      const kindById = /* @__PURE__ */ new Map();
+      nodes.forEach((node) => {
+        kindById.set(node.id, node.kind);
+      });
+      const childCountById = /* @__PURE__ */ new Map();
+      edges.forEach((edge) => {
+        var _a;
+        if (edge.kind !== "contains") {
+          return;
+        }
+        const parentKind = kindById.get(edge.source);
+        const childKind = kindById.get(edge.target);
+        if (!parentKind || !childKind) {
+          return;
+        }
+        const isFileChild = parentKind === "file" && (childKind === "class" || childKind === "function");
+        const isClassChild = parentKind === "class" && childKind === "method";
+        if (!isFileChild && !isClassChild) {
+          return;
+        }
+        childCountById.set(edge.source, ((_a = childCountById.get(edge.source)) != null ? _a : 0) + 1);
+      });
       const parentByChild = /* @__PURE__ */ new Map();
       const childrenByParent = /* @__PURE__ */ new Map();
       if (useManualLayout) {
@@ -2607,7 +2647,12 @@ ${secondPart}`;
         });
       }
       const nodeElements = nodes.map((node) => {
-        const labelData = this.deps.formatLabel(node);
+        var _a;
+        const childCount = (_a = childCountById.get(node.id)) != null ? _a : 0;
+        const labelData = this.deps.formatLabel({
+          ...node,
+          childCount: childCount > 0 ? childCount : void 0
+        });
         const element = {
           data: {
             id: node.id,
@@ -2617,7 +2662,8 @@ ${secondPart}`;
             kind: node.kind,
             summary: node.summary || "",
             path: labelData.path,
-            labelVisible: "true"
+            labelVisible: "true",
+            childCount: childCount > 0 ? childCount : void 0
           }
         };
         if (useManualLayout) {
@@ -8056,6 +8102,9 @@ ${secondPart}`;
             this.graphView.zoom(0.8);
           } else if (action === "fit") {
             this.graphView.fit();
+          } else if (action === "organize-grid") {
+            this.graphView.setClusterManualLayout(true);
+            this.graphView.organizeGrid();
           }
         });
       });
@@ -8126,6 +8175,10 @@ ${secondPart}`;
         }
         if (event.key === "s" || event.key === "S") {
           this.siblingSelectKeyActive = true;
+          return;
+        }
+        if (event.shiftKey && (event.key === "p" || event.key === "P")) {
+          this.selectParentOfSelectedNode();
         }
       });
       document.addEventListener("keyup", (event) => {
@@ -10381,6 +10434,32 @@ ${secondPart}`;
         window.cancelAnimationFrame(this.labelVisibilityRaf);
         this.labelVisibilityRaf = null;
       }
+    }
+    selectParentOfSelectedNode() {
+      if (!this.graphInstance) {
+        return;
+      }
+      const selected = this.graphInstance.$("node:selected");
+      if (!selected || selected.length === 0) {
+        this.setCanvasOverlay("Select a node to reveal its parent.", true);
+        window.setTimeout(() => this.setCanvasOverlay("", false), 1200);
+        return;
+      }
+      const node = selected[0];
+      const parentEdges = node.incomers('edge[kind = "contains"]');
+      if (!parentEdges || parentEdges.length === 0) {
+        this.setCanvasOverlay("No parent node found.", true);
+        window.setTimeout(() => this.setCanvasOverlay("", false), 1200);
+        return;
+      }
+      const parent = parentEdges.sources()[0];
+      if (!parent || parent.empty()) {
+        this.setCanvasOverlay("No parent node found.", true);
+        window.setTimeout(() => this.setCanvasOverlay("", false), 1200);
+        return;
+      }
+      this.graphInstance.$("node:selected").unselect();
+      parent.select();
     }
     async updateNarrator(symbol) {
       if (symbol.kind === "folder") {

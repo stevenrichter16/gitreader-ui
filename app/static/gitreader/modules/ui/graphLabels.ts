@@ -6,6 +6,7 @@ export interface GraphLabelNode {
     kind?: string;
     name?: string;
     location?: { path?: string };
+    childCount?: number;
 }
 
 // Output payload stored in Cytoscape node data and reused by tooltip rendering.

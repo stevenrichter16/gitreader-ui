@@ -4,6 +4,7 @@ export interface LabelNodeLike {
     kind?: string;
     name?: string;
     location?: { path?: string };
+    childCount?: number;
 }
 
 export function formatNodeLabel(
@@ -13,9 +14,14 @@ export function formatNodeLabel(
     const path = node.location?.path ?? '';
     const fullLabel = node.name || path;
     const displayName = getDisplayName(node, fullLabel, path);
+    const shouldShowCount = Boolean(node.childCount)
+        && (node.kind === 'file' || node.kind === 'class');
+    const labelName = shouldShowCount
+        ? `${displayName} (${node.childCount})`
+        : displayName;
     const badge = getKindBadge(node.kind);
     const kindLabel = getKindLabel(node.kind);
-    const label = wrapLabel(`[${badge}]`, displayName, lineLength);
+    const label = wrapLabel(`[${badge}]`, labelName, lineLength);
     return { label, fullLabel, path, kindLabel };
 }
 
