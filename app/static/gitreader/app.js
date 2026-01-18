@@ -4579,24 +4579,25 @@ ${secondPart}`;
         return false;
       }
       const normalizedFilePath = this.normalizePath(String(filePath));
-      const visibleClasses = this.graphInstance.nodes(":visible").filter((element) => {
-        if (element.data("kind") !== "class") {
+      const visibleSymbols = this.graphInstance.nodes(":visible").filter((element) => {
+        const kind = element.data("kind");
+        if (kind !== "class" && kind !== "function") {
           return false;
         }
-        const classPath = element.data("path");
-        if (!classPath) {
+        const symbolPath = element.data("path");
+        if (!symbolPath) {
           return false;
         }
-        return this.normalizePath(String(classPath)) === normalizedFilePath;
+        return this.normalizePath(String(symbolPath)) === normalizedFilePath;
       });
-      if (!visibleClasses || visibleClasses.empty()) {
+      if (!visibleSymbols || visibleSymbols.empty()) {
         return false;
       }
       this.graphInstance.$("node:selected").unselect();
       if (typeof node.unselect === "function") {
         node.unselect();
       }
-      visibleClasses.select();
+      visibleSymbols.select();
       return true;
     }
     // Replaces selection with visible method nodes when a class is expanded and shift-clicked.
