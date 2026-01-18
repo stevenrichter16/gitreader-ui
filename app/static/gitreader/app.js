@@ -295,8 +295,12 @@
     if (isBound || !graph) {
       return false;
     }
+    graph.on("tap", () => {
+      handlers.hideGraphContextMenu();
+    });
     graph.on("tap", "node", (event) => {
       var _a;
+      handlers.hideGraphContextMenu();
       const nodeId = event.target.id();
       const node = handlers.resolveNode(nodeId);
       if (!node) {
@@ -311,6 +315,13 @@
         return;
       }
       const modifierEvent = (_a = event.originalEvent) != null ? _a : event;
+      if (handlers.isSiblingSelectClick(modifierEvent)) {
+        if (handlers.handleSiblingSelection(node)) {
+          state.setLastTapNodeId(null);
+          state.setLastTapAt(0);
+          return;
+        }
+      }
       if (handlers.isShiftClick(modifierEvent)) {
         if (handlers.handleShiftFolderSelection(node)) {
           state.setLastTapNodeId(null);
@@ -356,6 +367,17 @@
     graph.on("select", "node", () => {
       handlers.refreshEdgeHighlights();
       handlers.updateLabelVisibility();
+    });
+    graph.on("cxttap", "node", (event) => {
+      if (event.originalEvent && typeof event.originalEvent.preventDefault === "function") {
+        event.originalEvent.preventDefault();
+      }
+      const nodeId = event.target.id();
+      const node = handlers.resolveNode(nodeId);
+      if (!node) {
+        return;
+      }
+      handlers.openGraphContextMenu(node, event);
     });
     graph.on("unselect", "node", () => {
       handlers.refreshEdgeHighlights();
@@ -477,6 +499,118 @@ ${secondPart}`;
         <div class="tooltip-meta">${escapeHtml(String(details))}</div>
     `;
   }
+
+  // app/static/gitreader/modules/ui/graphContextMenu.ts
+  var GraphContextMenu = class {
+    // Creates the menu DOM and wires global dismiss handlers.
+    constructor(deps) {
+      this.deps = deps;
+      __publicField(this, "menuElement");
+      __publicField(this, "titleElement");
+      __publicField(this, "listElement");
+      __publicField(this, "visible", false);
+      // Closes the menu when clicking outside its bounds.
+      __publicField(this, "handleGlobalPointerDown", (event) => {
+        if (!this.visible) {
+          return;
+        }
+        if (event.target instanceof Node && this.menuElement.contains(event.target)) {
+          return;
+        }
+        this.hide();
+      });
+      // Closes the menu when the user presses Escape.
+      __publicField(this, "handleGlobalKeydown", (event) => {
+        if (!this.visible) {
+          return;
+        }
+        if (event.key === "Escape") {
+          this.hide();
+        }
+      });
+      this.menuElement = document.createElement("div");
+      this.menuElement.className = "graph-context-menu";
+      this.menuElement.setAttribute("role", "menu");
+      this.menuElement.setAttribute("aria-hidden", "true");
+      this.titleElement = document.createElement("div");
+      this.titleElement.className = "graph-context-menu__title";
+      this.menuElement.appendChild(this.titleElement);
+      this.listElement = document.createElement("ul");
+      this.listElement.className = "graph-context-menu__list";
+      this.menuElement.appendChild(this.listElement);
+      this.menuElement.addEventListener("click", (event) => {
+        event.stopPropagation();
+      });
+      this.deps.container.appendChild(this.menuElement);
+      document.addEventListener("pointerdown", this.handleGlobalPointerDown);
+      document.addEventListener("keydown", this.handleGlobalKeydown);
+    }
+    // Returns whether the menu is currently visible.
+    isOpen() {
+      return this.visible;
+    }
+    // Renders the menu actions and positions the menu at the given coordinates.
+    show(options) {
+      var _a;
+      const actions = options.actions.filter((action) => action && action.label);
+      if (actions.length === 0) {
+        this.hide();
+        return;
+      }
+      this.titleElement.textContent = (_a = options.title) != null ? _a : "";
+      this.titleElement.classList.toggle("is-hidden", !options.title);
+      this.listElement.innerHTML = "";
+      actions.forEach((action) => {
+        const item = document.createElement("li");
+        item.className = "graph-context-menu__item";
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "graph-context-menu__button";
+        button.textContent = action.label;
+        button.disabled = Boolean(action.disabled);
+        if (action.disabled) {
+          button.classList.add("is-disabled");
+        }
+        button.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          if (action.disabled) {
+            return;
+          }
+          this.hide();
+          action.onSelect();
+        });
+        item.appendChild(button);
+        this.listElement.appendChild(item);
+      });
+      this.menuElement.classList.add("is-visible");
+      this.menuElement.setAttribute("aria-hidden", "false");
+      this.visible = true;
+      this.positionMenu(options.x, options.y);
+    }
+    // Hides the menu and resets its visibility state.
+    hide() {
+      if (!this.visible) {
+        return;
+      }
+      this.menuElement.classList.remove("is-visible");
+      this.menuElement.setAttribute("aria-hidden", "true");
+      this.visible = false;
+    }
+    // Positions the menu while keeping it within the viewport.
+    positionMenu(x, y) {
+      const padding = 12;
+      this.menuElement.style.left = `${x}px`;
+      this.menuElement.style.top = `${y}px`;
+      const rect = this.menuElement.getBoundingClientRect();
+      const maxX = window.innerWidth - rect.width - padding;
+      const maxY = window.innerHeight - rect.height - padding;
+      const clampedX = Math.max(padding, Math.min(x, maxX));
+      const clampedY = Math.max(padding, Math.min(y, maxY));
+      this.menuElement.style.left = `${clampedX}px`;
+      this.menuElement.style.top = `${clampedY}px`;
+    }
+  };
 
   // app/static/gitreader/modules/ui/graphView.ts
   var GraphViewController = class {
@@ -3016,6 +3150,7 @@ ${secondPart}`;
       __publicField(this, "fileTreeView");
       __publicField(this, "fileTreeController");
       __publicField(this, "graphView");
+      __publicField(this, "graphContextMenu");
       __publicField(this, "readerView");
       __publicField(this, "readerInteractions");
       __publicField(this, "readerController");
@@ -3062,6 +3197,7 @@ ${secondPart}`;
       __publicField(this, "lastTapNodeId", null);
       __publicField(this, "lastTapAt", 0);
       __publicField(this, "doubleTapDelay", 320);
+      __publicField(this, "siblingSelectKeyActive", false);
       __publicField(this, "importBreadcrumbs", []);
       __publicField(this, "foldedSymbolIds", /* @__PURE__ */ new Set());
       __publicField(this, "currentFoldRanges", /* @__PURE__ */ new Map());
@@ -3142,6 +3278,7 @@ ${secondPart}`;
           this.bindGraphEvents();
         }
       });
+      this.graphContextMenu = new GraphContextMenu({ container: document.body });
       const setReaderState = (update) => {
         var _a, _b, _c, _d, _e, _f;
         if (Object.prototype.hasOwnProperty.call(update, "currentSymbol")) {
@@ -3478,6 +3615,22 @@ ${secondPart}`;
         this.narratorPane.classList.toggle("is-hidden", !this.narratorVisible);
         this.updateNarratorToggle();
         this.refreshGraphViewport();
+      });
+      document.addEventListener("keydown", (event) => {
+        if (this.isEditableTarget(event.target)) {
+          return;
+        }
+        if (event.key === "s" || event.key === "S") {
+          this.siblingSelectKeyActive = true;
+        }
+      });
+      document.addEventListener("keyup", (event) => {
+        if (event.key === "s" || event.key === "S") {
+          this.siblingSelectKeyActive = false;
+        }
+      });
+      window.addEventListener("blur", () => {
+        this.siblingSelectKeyActive = false;
       });
       this.codeSurface.addEventListener("click", (event) => {
         this.readerController.handleCodeSurfaceClick(event);
@@ -4478,6 +4631,30 @@ ${secondPart}`;
       }
       return Boolean(anyEvent.shiftKey);
     }
+    // Detects the "s+click" chord so sibling selection can short-circuit normal click behavior.
+    isSiblingSelectClick(event) {
+      if (!this.siblingSelectKeyActive) {
+        return false;
+      }
+      if (!event) {
+        return true;
+      }
+      if (this.isShiftClick(event) || this.isModifierClick(event)) {
+        return false;
+      }
+      return true;
+    }
+    // Returns true when the event target is an editable surface that should ignore graph hotkeys.
+    isEditableTarget(target) {
+      if (!(target instanceof HTMLElement)) {
+        return false;
+      }
+      if (target.isContentEditable) {
+        return true;
+      }
+      const tag = target.tagName.toLowerCase();
+      return tag === "input" || tag === "textarea" || tag === "select";
+    }
     isFileNodeActive(fileNode) {
       var _a, _b;
       if (this.currentSymbol && this.currentSymbol.kind === "file") {
@@ -4635,6 +4812,378 @@ ${secondPart}`;
       visibleMethods.select();
       return true;
     }
+    // Selects visible siblings that share the same parent when the user s-clicks a node.
+    handleSiblingSelection(symbol) {
+      if (!this.graphInstance || !(symbol == null ? void 0 : symbol.id)) {
+        return false;
+      }
+      const parentElement = this.resolveVisibleParent(symbol);
+      if (!parentElement) {
+        return true;
+      }
+      const siblings = this.getVisibleSiblingNodes(parentElement.id(), symbol.id);
+      this.graphInstance.$("node:selected").unselect();
+      if (siblings && !siblings.empty()) {
+        siblings.select();
+      }
+      this.graphView.refreshEdgeHighlights();
+      this.updateLabelVisibility();
+      return true;
+    }
+    // Collects visible sibling nodes by following contains edges from a shared parent id.
+    getVisibleSiblingNodes(parentId, excludeId) {
+      if (!this.graphInstance) {
+        return null;
+      }
+      const edges = this.graphInstance.edges().filter((edge) => edge.data("kind") === "contains" && edge.data("source") === parentId);
+      return edges.targets().filter(":visible").filter((node) => node.id() !== excludeId);
+    }
+    // Hides the graph context menu when the user clicks elsewhere.
+    hideGraphContextMenu() {
+      this.graphContextMenu.hide();
+    }
+    // Opens the graph context menu for the given node and click event.
+    openGraphContextMenu(symbol, event) {
+      if (!(symbol == null ? void 0 : symbol.id)) {
+        return;
+      }
+      if (this.tourActive && !this.isGuidedNodeAllowed(symbol.id)) {
+        this.flashGuidedMessage("Follow the guide to unlock this step.");
+        return;
+      }
+      const anchor = this.getContextMenuAnchor(event);
+      const actions = this.buildGraphContextMenuActions(symbol);
+      if (actions.length === 0) {
+        this.graphContextMenu.hide();
+        return;
+      }
+      this.graphContextMenu.show({
+        x: anchor.x,
+        y: anchor.y,
+        title: symbol.name || symbol.id,
+        actions
+      });
+    }
+    // Computes the screen-space anchor for the context menu.
+    getContextMenuAnchor(event) {
+      const originalEvent = event == null ? void 0 : event.originalEvent;
+      if (originalEvent) {
+        return { x: originalEvent.clientX, y: originalEvent.clientY };
+      }
+      const rendered = event == null ? void 0 : event.renderedPosition;
+      if (rendered && this.canvasGraph) {
+        const rect = this.canvasGraph.getBoundingClientRect();
+        return { x: rect.left + rendered.x, y: rect.top + rendered.y };
+      }
+      return { x: 0, y: 0 };
+    }
+    // Builds the action list for the graph context menu based on node relationships.
+    buildGraphContextMenuActions(symbol) {
+      const actions = [];
+      const hasParent = Boolean(this.resolveVisibleParent(symbol));
+      const hasChildren = Boolean(this.getVisibleChildren(symbol));
+      const expansionState = this.getChildExpansionState(symbol);
+      const canOpenChildren = this.graphLayoutMode === "cluster" && expansionState.hasChildren && !expansionState.isExpanded;
+      const canCloseChildren = this.graphLayoutMode === "cluster" && expansionState.hasChildren && expansionState.isExpanded;
+      actions.push({
+        id: "select-parent",
+        label: "Select Parent",
+        disabled: !hasParent,
+        onSelect: () => {
+          this.selectParent(symbol);
+        }
+      });
+      actions.push({
+        id: "select-children",
+        label: "Select Children",
+        disabled: !hasChildren,
+        onSelect: () => {
+          this.selectChildren(symbol);
+        }
+      });
+      actions.push({
+        id: "open-children",
+        label: "Open Children",
+        disabled: !canOpenChildren,
+        onSelect: () => {
+          this.openChildren(symbol);
+        }
+      });
+      actions.push({
+        id: "close-children",
+        label: "Close Children",
+        disabled: !canCloseChildren,
+        onSelect: () => {
+          this.closeChildren(symbol);
+        }
+      });
+      actions.push({
+        id: "organize-children-circle",
+        label: "Organize Children: Circle",
+        disabled: !hasChildren,
+        onSelect: () => {
+          this.organizeChildren(symbol, "circle");
+        }
+      });
+      actions.push({
+        id: "organize-children-grid",
+        label: "Organize Children: Grid",
+        disabled: !hasChildren,
+        onSelect: () => {
+          this.organizeChildren(symbol, "grid");
+        }
+      });
+      return actions;
+    }
+    // Reports whether a node has expandable children and whether they're currently expanded so the context menu can enable Open/Close.
+    getChildExpansionState(symbol) {
+      if (!(symbol == null ? void 0 : symbol.id)) {
+        return { hasChildren: false, isExpanded: false };
+      }
+      if (symbol.kind === "folder") {
+        return {
+          hasChildren: this.folderHasClusterChildren(symbol),
+          isExpanded: this.isClusterFolderExpanded(symbol.id)
+        };
+      }
+      if (symbol.kind === "file") {
+        return {
+          hasChildren: this.fileHasClusterChildren(symbol),
+          isExpanded: this.clusterExpanded.has(symbol.id)
+        };
+      }
+      if (symbol.kind === "class") {
+        return {
+          hasChildren: this.classHasClusterChildren(symbol),
+          isExpanded: this.classExpanded.has(symbol.id)
+        };
+      }
+      return { hasChildren: false, isExpanded: false };
+    }
+    // Expands a node's immediate children in cluster view when the context menu requests "Open Children".
+    openChildren(symbol) {
+      if (this.graphLayoutMode !== "cluster" || !(symbol == null ? void 0 : symbol.id)) {
+        return;
+      }
+      let changed = false;
+      if (symbol.kind === "folder") {
+        if (this.folderHasClusterChildren(symbol) && !this.isClusterFolderExpanded(symbol.id)) {
+          this.clusterExpanded.add(symbol.id);
+          changed = true;
+        }
+      } else if (symbol.kind === "file") {
+        if (this.fileHasClusterChildren(symbol) && !this.clusterExpanded.has(symbol.id)) {
+          this.clusterExpanded.add(symbol.id);
+          changed = true;
+        }
+      } else if (symbol.kind === "class") {
+        if (this.classHasClusterChildren(symbol) && !this.classExpanded.has(symbol.id)) {
+          this.classExpanded.add(symbol.id);
+          changed = true;
+        }
+      }
+      if (changed) {
+        this.refreshGraphView();
+      }
+    }
+    // Collapses a node's immediate children in cluster view when the context menu requests "Close Children".
+    closeChildren(symbol) {
+      if (this.graphLayoutMode !== "cluster" || !(symbol == null ? void 0 : symbol.id)) {
+        return;
+      }
+      let changed = false;
+      if (symbol.kind === "folder") {
+        if (this.isClusterFolderExpanded(symbol.id)) {
+          this.clusterExpanded.delete(symbol.id);
+          this.clusterAutoExpanded.delete(symbol.id);
+          changed = true;
+        }
+      } else if (symbol.kind === "file") {
+        if (this.clusterExpanded.has(symbol.id)) {
+          this.clusterExpanded.delete(symbol.id);
+          changed = true;
+        }
+      } else if (symbol.kind === "class") {
+        if (this.classExpanded.has(symbol.id)) {
+          this.classExpanded.delete(symbol.id);
+          changed = true;
+        }
+      }
+      if (changed) {
+        this.refreshGraphView();
+      }
+    }
+    // Resolves a visible parent node element for the provided symbol.
+    resolveVisibleParent(symbol) {
+      if (!this.graphInstance) {
+        return null;
+      }
+      const parentId = this.getParentNodeId(symbol);
+      if (!parentId) {
+        return null;
+      }
+      const parentElement = this.graphInstance.$id(parentId);
+      if (!parentElement || parentElement.empty() || parentElement.hidden()) {
+        return null;
+      }
+      return parentElement;
+    }
+    // Selects the parent node and centers the canvas on it.
+    selectParent(symbol) {
+      if (!this.graphInstance) {
+        return;
+      }
+      const parentElement = this.resolveVisibleParent(symbol);
+      if (!parentElement) {
+        this.flashGuidedMessage("No parent available in the current view.");
+        return;
+      }
+      this.graphInstance.$("node:selected").unselect();
+      parentElement.select();
+      this.graphView.refreshEdgeHighlights();
+      this.updateLabelVisibility();
+      if (typeof this.graphInstance.center === "function") {
+        this.graphInstance.center(parentElement);
+      }
+    }
+    // Selects visible children for the given symbol based on contains edges or folder paths.
+    selectChildren(symbol) {
+      if (!this.graphInstance) {
+        return;
+      }
+      const children = this.getVisibleChildren(symbol);
+      if (!children || children.empty()) {
+        this.flashGuidedMessage("No visible children to select.");
+        return;
+      }
+      this.graphInstance.$("node:selected").unselect();
+      children.select();
+      this.graphView.refreshEdgeHighlights();
+      this.updateLabelVisibility();
+    }
+    // Organizes visible children around their parent using the chosen layout style.
+    organizeChildren(symbol, layout) {
+      if (!this.graphInstance) {
+        return;
+      }
+      const parentElement = this.graphInstance.$id(symbol.id);
+      const children = this.getVisibleChildren(symbol);
+      if (!parentElement || parentElement.empty() || !children || children.empty()) {
+        return;
+      }
+      const center = parentElement.position();
+      const count = children.length;
+      if (layout === "circle") {
+        const radius = Math.max(80, 28 * count);
+        children.forEach((child, index) => {
+          const angle = 2 * Math.PI * index / Math.max(1, count);
+          child.position({
+            x: center.x + radius * Math.cos(angle),
+            y: center.y + radius * Math.sin(angle)
+          });
+        });
+        return;
+      }
+      const columns = Math.max(1, Math.ceil(Math.sqrt(count)));
+      const spacing = 80;
+      const rows = Math.ceil(count / columns);
+      const startX = center.x - (columns - 1) * spacing / 2;
+      const startY = center.y - (rows - 1) * spacing / 2;
+      children.forEach((child, index) => {
+        const col = index % columns;
+        const row = Math.floor(index / columns);
+        child.position({
+          x: startX + col * spacing,
+          y: startY + row * spacing
+        });
+      });
+    }
+    // Finds the parent node id for the provided symbol based on contains edges or folder paths.
+    getParentNodeId(symbol) {
+      var _a, _b, _c;
+      if (!(symbol == null ? void 0 : symbol.id)) {
+        return null;
+      }
+      if (symbol.kind === "method") {
+        const edge = this.graphEdges.find((item) => {
+          var _a2;
+          return item.kind === "contains" && item.target === symbol.id && ((_a2 = this.nodeById.get(item.source)) == null ? void 0 : _a2.kind) === "class";
+        });
+        return (_a = edge == null ? void 0 : edge.source) != null ? _a : null;
+      }
+      if (symbol.kind === "class" || symbol.kind === "function") {
+        const edge = this.graphEdges.find((item) => {
+          var _a2;
+          return item.kind === "contains" && item.target === symbol.id && ((_a2 = this.nodeById.get(item.source)) == null ? void 0 : _a2.kind) === "file";
+        });
+        return (_b = edge == null ? void 0 : edge.source) != null ? _b : null;
+      }
+      if (symbol.kind === "file" || symbol.kind === "folder") {
+        const path = (_c = symbol.location) == null ? void 0 : _c.path;
+        if (!path) {
+          return null;
+        }
+        const normalized = this.normalizePath(path);
+        const parts = normalized.split("/").filter(Boolean);
+        if (parts.length <= 1) {
+          return null;
+        }
+        const parentPath = parts.slice(0, -1).join("/");
+        return this.getFolderClusterId(parentPath);
+      }
+      return null;
+    }
+    // Collects visible child node elements based on the symbol's kind.
+    getVisibleChildren(symbol) {
+      var _a;
+      if (!this.graphInstance || !(symbol == null ? void 0 : symbol.id)) {
+        return null;
+      }
+      const visibleNodes = this.graphInstance.nodes(":visible");
+      if (symbol.kind === "file") {
+        const childIds = this.graphEdges.filter((edge) => edge.kind === "contains" && edge.source === symbol.id).map((edge) => edge.target).filter((target) => {
+          var _a2;
+          const kind = (_a2 = this.nodeById.get(target)) == null ? void 0 : _a2.kind;
+          return kind === "class" || kind === "function";
+        });
+        if (childIds.length === 0) {
+          return null;
+        }
+        const childIdSet = new Set(childIds);
+        return visibleNodes.filter((node) => childIdSet.has(node.id()));
+      }
+      if (symbol.kind === "class") {
+        const childIds = this.graphEdges.filter((edge) => edge.kind === "contains" && edge.source === symbol.id).map((edge) => edge.target).filter((target) => {
+          var _a2;
+          return ((_a2 = this.nodeById.get(target)) == null ? void 0 : _a2.kind) === "method";
+        });
+        if (childIds.length === 0) {
+          return null;
+        }
+        const childIdSet = new Set(childIds);
+        return visibleNodes.filter((node) => childIdSet.has(node.id()));
+      }
+      if (symbol.kind === "folder") {
+        const path = (_a = symbol.location) == null ? void 0 : _a.path;
+        if (!path) {
+          return null;
+        }
+        const normalized = this.normalizePath(path);
+        const prefix = normalized ? `${normalized}/` : "";
+        if (!prefix) {
+          return null;
+        }
+        return visibleNodes.filter((node) => {
+          const nodePath = node.data("path");
+          if (!nodePath) {
+            return false;
+          }
+          const normalizedNodePath = this.normalizePath(String(nodePath));
+          return normalizedNodePath.startsWith(prefix);
+        });
+      }
+      return null;
+    }
     handleClusterNodeToggle(symbol, event) {
       var _a;
       if (symbol.kind === "folder") {
@@ -4715,6 +5264,26 @@ ${secondPart}`;
           return false;
         }
         return this.normalizePath(node.location.path) === normalized;
+      });
+    }
+    // Checks whether a cluster folder represents at least one file descendant so Open/Close actions only appear when meaningful.
+    folderHasClusterChildren(folderNode) {
+      var _a;
+      const path = (_a = folderNode.location) == null ? void 0 : _a.path;
+      if (!path) {
+        return false;
+      }
+      const normalized = this.normalizePath(path);
+      if (!normalized) {
+        return false;
+      }
+      const prefix = `${normalized}/`;
+      return this.graphNodes.some((node) => {
+        var _a2;
+        if (!((_a2 = node.location) == null ? void 0 : _a2.path)) {
+          return false;
+        }
+        return this.normalizePath(node.location.path).startsWith(prefix);
       });
     }
     // Checks whether a class node has method children so it can be expanded.
@@ -4849,9 +5418,13 @@ ${secondPart}`;
           updateNarrator: (node) => this.updateNarrator(node),
           isModifierClick: (event) => this.isModifierClick(event),
           isShiftClick: (event) => this.isShiftClick(event),
+          isSiblingSelectClick: (event) => this.isSiblingSelectClick(event),
           handleShiftFolderSelection: (node) => this.handleShiftFolderSelection(node),
           handleFileClassSelection: (node) => this.handleFileClassSelection(node),
           handleShiftClassSelection: (node) => this.handleShiftClassSelection(node),
+          handleSiblingSelection: (node) => this.handleSiblingSelection(node),
+          openGraphContextMenu: (node, event) => this.openGraphContextMenu(node, event),
+          hideGraphContextMenu: () => this.hideGraphContextMenu(),
           refreshEdgeHighlights: () => this.graphView.refreshEdgeHighlights(),
           updateLabelVisibility: () => this.updateLabelVisibility(),
           setHoveredNode: (nodeId) => this.graphView.setHoveredNode(nodeId),

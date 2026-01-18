@@ -42,12 +42,20 @@ export interface GraphEventHandlers {
     isModifierClick(event?: MouseEvent): boolean;
     // Detects shift-clicks so folder selections can bulk-highlight descendants.
     isShiftClick(event?: MouseEvent): boolean;
+    // Detects the "s+click" chord so sibling selection can override the normal click flow.
+    isSiblingSelectClick(event?: MouseEvent): boolean;
     // Selects all visible descendants of a folder node on shift-click.
     handleShiftFolderSelection(node: any): boolean;
     // Selects visible class nodes that belong to a file node element.
     handleFileClassSelection(node: any): boolean;
     // Selects visible method nodes that belong to an expanded class node.
     handleShiftClassSelection(node: any): boolean;
+    // Selects visible sibling nodes that share the same parent as the clicked node.
+    handleSiblingSelection(node: any): boolean;
+    // Opens the graph context menu for a node on right-click.
+    openGraphContextMenu(node: any, event: any): void;
+    // Closes any open graph context menu.
+    hideGraphContextMenu(): void;
     // Refreshes edge emphasis when selection state changes.
     refreshEdgeHighlights(): void;
     // Recalculates label visibility to match zoom, hover, and selection states.
@@ -80,7 +88,11 @@ export function bindGraphEvents(bindings: GraphEventBindings): boolean {
     if (isBound || !graph) {
         return false;
     }
+    graph.on('tap', () => {
+        handlers.hideGraphContextMenu();
+    });
     graph.on('tap', 'node', (event: { target: any; originalEvent?: MouseEvent }) => {
+        handlers.hideGraphContextMenu();
         const nodeId = event.target.id();
         const node = handlers.resolveNode(nodeId);
         if (!node) {
@@ -95,6 +107,13 @@ export function bindGraphEvents(bindings: GraphEventBindings): boolean {
             return;
         }
         const modifierEvent = event.originalEvent ?? event;
+        if (handlers.isSiblingSelectClick(modifierEvent as MouseEvent)) {
+            if (handlers.handleSiblingSelection(node)) {
+                state.setLastTapNodeId(null);
+                state.setLastTapAt(0);
+                return;
+            }
+        }
         if (handlers.isShiftClick(modifierEvent as MouseEvent)) {
             if (handlers.handleShiftFolderSelection(node)) {
                 state.setLastTapNodeId(null);
@@ -143,6 +162,17 @@ export function bindGraphEvents(bindings: GraphEventBindings): boolean {
     graph.on('select', 'node', () => {
         handlers.refreshEdgeHighlights();
         handlers.updateLabelVisibility();
+    });
+    graph.on('cxttap', 'node', (event: any) => {
+        if (event.originalEvent && typeof event.originalEvent.preventDefault === 'function') {
+            event.originalEvent.preventDefault();
+        }
+        const nodeId = event.target.id();
+        const node = handlers.resolveNode(nodeId);
+        if (!node) {
+            return;
+        }
+        handlers.openGraphContextMenu(node, event);
     });
     graph.on('unselect', 'node', () => {
         handlers.refreshEdgeHighlights();
