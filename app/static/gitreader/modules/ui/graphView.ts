@@ -69,6 +69,7 @@ export class GraphViewController {
     private showExternalNodes = true;
     private focusedNodeId: string | null = null;
     private hoveredNodeId: string | null = null;
+    private lastVisibilitySignature: string | null = null;
     private nodeCapByScope: Map<string, number> = new Map();
     private nodeCap = 300;
     private nodeCapStep = 200;
@@ -79,6 +80,7 @@ export class GraphViewController {
 
     // Renders the provided nodes/edges and rebuilds Cytoscape when needed.
     render(input: GraphRenderInput): void {
+        const previousLayout = this.layoutMode;
         this.layoutMode = input.layoutMode;
         if (input.nodes.length === 0) {
             this.deps.clearGraph();
@@ -91,29 +93,32 @@ export class GraphViewController {
         }
         this.deps.setDisplayNodes(input.nodes);
         this.deps.setCanvasOverlay('', false);
+        const hadGraph = Boolean(this.graph);
         this.ensureGraph();
         if (!this.graph) {
             return;
         }
-        const selectedNodeId = this.deps.getSelectedNodeId();
+        const selectedNodeIds = this.graph.$('node:selected').map((node: any) => node.id());
         const positionCache = this.shouldUseManualClusterLayout()
             ? this.captureNodePositions()
             : null;
         const elements = this.buildGraphElements(input.nodes, input.edges, positionCache);
-        this.graph.elements().remove();
-        this.graph.add(elements);
-        if (selectedNodeId) {
-            const selected = this.graph.$id(selectedNodeId);
-            if (selected) {
-                selected.select();
-            }
-        }
-        if (!this.shouldUseManualClusterLayout()) {
+        const { added, removed } = this.syncGraphElements(elements);
+        const layoutChanged = previousLayout !== this.layoutMode;
+        const needsLayout = !this.shouldUseManualClusterLayout()
+            && (!hadGraph || layoutChanged || added > 0 || removed > 0);
+        if (needsLayout) {
             this.runLayout();
         } else {
             this.deps.updateLabelVisibility();
         }
-        this.applyFilters();
+        selectedNodeIds.forEach((nodeId: string) => {
+            const selected = this.graph?.$id(nodeId);
+            if (selected && !selected.empty()) {
+                selected.select();
+            }
+        });
+        this.applyFilters({ forceVisibility: true });
     }
 
     // Updates the layout mode and reruns layout when graph data is already present.
@@ -134,13 +139,13 @@ export class GraphViewController {
     setFilters(filters: GraphViewFilters): void {
         this.edgeFilters = new Set(filters.edgeFilters);
         this.showExternalNodes = filters.showExternalNodes;
-        this.applyFilters();
+        this.applyFilters({ forceVisibility: true });
     }
 
     // Syncs focused node state from the orchestrator, then reapplies filters.
     setSelection(state: GraphViewSelectionState): void {
         this.focusedNodeId = state.focusedNodeId;
-        this.applyFilters();
+        this.applyFilters({ forceVisibility: true });
     }
 
     // Returns the current edge/node filter state so UI controls can reflect it.
@@ -223,7 +228,7 @@ export class GraphViewController {
         } else {
             this.edgeFilters.add(filter);
         }
-        this.applyFilters();
+        this.applyFilters({ forceVisibility: true });
     }
 
     // Toggles external-node visibility and returns the new state.
@@ -232,28 +237,43 @@ export class GraphViewController {
         return this.showExternalNodes;
     }
 
+    // Builds a signature of the current visibility-affecting state to detect changes.
+    private buildVisibilitySignature(): string {
+        const filters = Array.from(this.edgeFilters).sort().join('|');
+        const focus = this.focusedNodeId ?? '';
+        const external = this.showExternalNodes ? '1' : '0';
+        const guided = this.deps.isTourActive() ? '1' : '0';
+        return `${filters}|${external}|${focus}|${guided}`;
+    }
+
     // Applies edge/node filters, guided filters, and focus trimming in one pass.
-    applyFilters(): void {
+    applyFilters(options?: { forceVisibility?: boolean }): void {
         if (!this.graph) {
             return;
         }
         const cy = this.graph;
-        cy.elements().show();
-        if (!this.showExternalNodes) {
-            cy.nodes().filter('[kind = "external"]').hide();
+        const forceVisibility = options?.forceVisibility ?? false;
+        const signature = this.buildVisibilitySignature();
+        const shouldApplyVisibility = forceVisibility || this.lastVisibilitySignature !== signature;
+        if (shouldApplyVisibility) {
+            cy.elements().show();
+            if (!this.showExternalNodes) {
+                cy.nodes().filter('[kind = "external"]').hide();
+            }
+            cy.edges().forEach((edge: { data: (key: string) => EdgeKind; hide: () => void }) => {
+                if (!this.edgeFilters.has(edge.data('kind'))) {
+                    edge.hide();
+                }
+            });
+            cy.edges().forEach((edge: any) => {
+                if (edge.source().hidden() || edge.target().hidden()) {
+                    edge.hide();
+                }
+            });
+            this.deps.applyGuidedFilter();
+            this.applyFocus();
+            this.lastVisibilitySignature = signature;
         }
-        cy.edges().forEach((edge: { data: (key: string) => EdgeKind; hide: () => void }) => {
-            if (!this.edgeFilters.has(edge.data('kind'))) {
-                edge.hide();
-            }
-        });
-        cy.edges().forEach((edge: any) => {
-            if (edge.source().hidden() || edge.target().hidden()) {
-                edge.hide();
-            }
-        });
-        this.deps.applyGuidedFilter();
-        this.applyFocus();
         this.refreshEdgeHighlights();
         this.deps.updateLabelVisibility();
     }
@@ -328,13 +348,13 @@ export class GraphViewController {
             return;
         }
         this.focusedNodeId = selected[0].id();
-        this.applyFilters();
+        this.applyFilters({ forceVisibility: true });
     }
 
     // Clears the focused node and restores the default visibility rules.
     resetFocus(): void {
         this.focusedNodeId = null;
-        this.applyFilters();
+        this.applyFilters({ forceVisibility: true });
     }
 
     // Creates the Cytoscape instance once and informs the app for event binding.
@@ -519,6 +539,46 @@ export class GraphViewController {
             },
         }));
         return [...nodeElements, ...edgeElements];
+    }
+
+    // Applies a diff between the current graph and the next element set.
+    private syncGraphElements(elements: Array<{ data: Record<string, unknown>; position?: { x: number; y: number } }>): {
+        added: number;
+        removed: number;
+    } {
+        if (!this.graph) {
+            return { added: 0, removed: 0 };
+        }
+        const elementsById = new Map<string, { data: Record<string, unknown>; position?: { x: number; y: number } }>();
+        elements.forEach((element) => {
+            elementsById.set(String(element.data.id), element);
+        });
+        const currentElements = this.graph.elements();
+        const currentIds = new Set<string>();
+        currentElements.forEach((element: any) => {
+            currentIds.add(element.id());
+        });
+        let removed = 0;
+        currentElements.forEach((element: any) => {
+            const next = elementsById.get(element.id());
+            if (!next) {
+                element.remove();
+                removed += 1;
+                return;
+            }
+            element.data(next.data);
+        });
+        const toAdd: Array<{ data: Record<string, unknown>; position?: { x: number; y: number } }> = [];
+        elements.forEach((element) => {
+            const id = String(element.data.id);
+            if (!currentIds.has(id)) {
+                toAdd.push(element);
+            }
+        });
+        if (toAdd.length > 0) {
+            this.graph.add(toAdd);
+        }
+        return { added: toAdd.length, removed };
     }
 
     // Captures the current node positions so manual cluster layout can preserve them across refreshes.

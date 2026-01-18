@@ -23,6 +23,7 @@ import { getElement } from './modules/utils/dom';
 import { formatLocation as formatLocationUtil } from './modules/utils/format';
 import { getDisplayName as getDisplayNameUtil, getKindBadge as getKindBadgeUtil, getKindLabel as getKindLabelUtil, wrapLabel as wrapLabelUtil } from './modules/utils/labels';
 import { getBasename as getBasenameUtil } from './modules/utils/paths';
+import { hasHighlightSupport } from './modules/utils/highlight';
 import {
     formatArcOptionLabel as formatArcOptionLabelUtil,
     formatArcTitle as formatArcTitleUtil,
@@ -62,8 +63,6 @@ interface OrganizedCircleState {
     childIds: string[];
     radius: number;
 }
-
-declare const hljs: any;
 
 class GitReaderApp {
     private tocList: HTMLElement;
@@ -178,6 +177,9 @@ class GitReaderApp {
     private currentFoldPath: string | null = null;
     private pendingSymbol: SymbolNode | null = null;
     private pendingSnippet: SymbolSnippetResponse | null = null;
+    private labelVisibilityRaf: number | null = null;
+    private lastLabelZoomBucket: boolean | null = null;
+    private lastForcedLabelIds: Set<string> = new Set();
 
     constructor() {
         this.tocList = this.getElement('toc-list');
@@ -522,7 +524,7 @@ class GitReaderApp {
                     if (this.graphLayoutMode === 'cluster') {
                         this.refreshGraphView();
                     } else {
-                        this.graphView.applyFilters();
+                        this.graphView.applyFilters({ forceVisibility: true });
                     }
                 }
             });
@@ -993,6 +995,7 @@ class GitReaderApp {
         const edges = this.filterEdgesForNodes(nodes);
         const graphView = this.buildGraphView(nodes, edges, scope);
         const focus = this.pickFocusNode(graphView.nodes);
+        this.resetLabelVisibilityCache();
         this.graphView.render({
             nodes: graphView.nodes,
             edges: graphView.edges,
@@ -1042,6 +1045,7 @@ class GitReaderApp {
         const nodes = this.graphNodes;
         const edges = this.filterEdgesForNodes(nodes);
         const graphView = this.buildGraphView(nodes, edges, 'full');
+        this.resetLabelVisibilityCache();
         this.graphView.render({
             nodes: graphView.nodes,
             edges: graphView.edges,
@@ -1456,6 +1460,7 @@ class GitReaderApp {
         const nodes = this.filterNodesForChapter(this.currentChapterId);
         const edges = this.filterEdgesForNodes(nodes);
         const graphView = this.buildGraphView(nodes, edges, this.currentScope);
+        this.resetLabelVisibilityCache();
         this.graphView.render({
             nodes: graphView.nodes,
             edges: graphView.edges,
@@ -2938,16 +2943,80 @@ class GitReaderApp {
         if (!this.graphInstance) {
             return;
         }
+        if (this.labelVisibilityRaf !== null) {
+            return;
+        }
+        this.labelVisibilityRaf = window.requestAnimationFrame(() => {
+            this.labelVisibilityRaf = null;
+            this.updateLabelVisibilityNow();
+        });
+    }
+
+    private updateLabelVisibilityNow(): void {
+        if (!this.graphInstance) {
+            return;
+        }
         const zoom = this.graphInstance.zoom();
         const showAll = zoom >= this.labelZoomThreshold;
         const guidedAllowed = this.tourActive && this.guidedAllowedNodeIds ? this.guidedAllowedNodeIds : null;
-        this.graphInstance.nodes().forEach((node: any) => {
-            const shouldShow = showAll
-                || node.selected()
-                || node.hasClass('is-hovered')
-                || (guidedAllowed ? guidedAllowed.has(node.id()) : false);
-            node.data('labelVisible', shouldShow ? 'true' : 'false');
+        if (showAll) {
+            if (this.lastLabelZoomBucket === true) {
+                return;
+            }
+            this.graphInstance.nodes().forEach((node: any) => {
+                node.data('labelVisible', 'true');
+            });
+            this.lastLabelZoomBucket = true;
+            this.lastForcedLabelIds.clear();
+            return;
+        }
+
+        const forcedIds = new Set<string>();
+        this.graphInstance.$('node:selected').forEach((node: any) => {
+            forcedIds.add(node.id());
         });
+        this.graphInstance.$('node.is-hovered').forEach((node: any) => {
+            forcedIds.add(node.id());
+        });
+        if (guidedAllowed) {
+            guidedAllowed.forEach((id) => forcedIds.add(id));
+        }
+
+        if (this.lastLabelZoomBucket !== false) {
+            this.graphInstance.nodes().forEach((node: any) => {
+                node.data('labelVisible', 'false');
+            });
+        }
+
+        this.lastForcedLabelIds.forEach((id) => {
+            if (!forcedIds.has(id)) {
+                const node = this.graphInstance?.$id(id);
+                if (node && !node.empty()) {
+                    node.data('labelVisible', 'false');
+                }
+            }
+        });
+
+        forcedIds.forEach((id) => {
+            if (!this.lastForcedLabelIds.has(id)) {
+                const node = this.graphInstance?.$id(id);
+                if (node && !node.empty()) {
+                    node.data('labelVisible', 'true');
+                }
+            }
+        });
+
+        this.lastLabelZoomBucket = false;
+        this.lastForcedLabelIds = forcedIds;
+    }
+
+    private resetLabelVisibilityCache(): void {
+        this.lastLabelZoomBucket = null;
+        this.lastForcedLabelIds.clear();
+        if (this.labelVisibilityRaf !== null) {
+            window.cancelAnimationFrame(this.labelVisibilityRaf);
+            this.labelVisibilityRaf = null;
+        }
     }
 
     private async updateNarrator(symbol: SymbolNode): Promise<void> {
@@ -3256,12 +3325,13 @@ class GitReaderApp {
                 visibleNodes: nodes.length,
                 isCapped: false,
             };
-        this.graphView.render({
-            nodes: graphView.nodes,
-            edges: graphView.edges,
-            layoutMode: this.graphLayoutMode,
-        });
-        this.graphView.updateNodeStatus(graphView);
+            this.resetLabelVisibilityCache();
+            this.graphView.render({
+                nodes: graphView.nodes,
+                edges: graphView.edges,
+                layoutMode: this.graphLayoutMode,
+            });
+            this.graphView.updateNodeStatus(graphView);
         }
         if (this.graphInstance) {
             this.graphInstance.$('node:selected').unselect();
@@ -3405,7 +3475,7 @@ class GitReaderApp {
             this.guidedAllowedNodeIds = null;
             this.applyGuidedToc();
             this.applyGuidedCodeFocus();
-            this.graphView.applyFilters();
+            this.graphView.applyFilters({ forceVisibility: true });
             this.fileTreeController.render(null);
             return;
         }
@@ -3420,7 +3490,7 @@ class GitReaderApp {
         }
         this.guidedAllowedNodeIds = allowed.size > 0 ? allowed : null;
         this.applyGuidedToc();
-        this.graphView.applyFilters();
+        this.graphView.applyFilters({ forceVisibility: true });
         this.applyGuidedCodeFocus();
         this.fileTreeController.render(this.tourStep.focus?.file_path ?? null);
     }
@@ -3509,7 +3579,7 @@ class GitReaderApp {
     }
 
     private hasHighlightSupport(): boolean {
-        return typeof hljs !== 'undefined' && typeof hljs.highlight === 'function';
+        return hasHighlightSupport();
     }
 
     private getHighlightLanguage(path?: string): string | undefined {

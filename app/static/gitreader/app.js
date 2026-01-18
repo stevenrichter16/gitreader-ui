@@ -1,7 +1,1568 @@
 (() => {
+  var __create = Object.create;
   var __defProp = Object.defineProperty;
+  var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+  var __getOwnPropNames = Object.getOwnPropertyNames;
+  var __getProtoOf = Object.getPrototypeOf;
+  var __hasOwnProp = Object.prototype.hasOwnProperty;
   var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+  var __commonJS = (cb, mod) => function __require() {
+    return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+  };
+  var __copyProps = (to, from, except, desc) => {
+    if (from && typeof from === "object" || typeof from === "function") {
+      for (let key of __getOwnPropNames(from))
+        if (!__hasOwnProp.call(to, key) && key !== except)
+          __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+    }
+    return to;
+  };
+  var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+    // If the importer is in node compatibility mode or this is not an ESM
+    // file that has been converted to a CommonJS file using a Babel-
+    // compatible transform (i.e. "__esModule" has not been set), then set
+    // "default" to the CommonJS "module.exports" for node compatibility.
+    isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+    mod
+  ));
   var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
+
+  // node_modules/highlight.js/lib/core.js
+  var require_core = __commonJS({
+    "node_modules/highlight.js/lib/core.js"(exports, module) {
+      function deepFreeze(obj) {
+        if (obj instanceof Map) {
+          obj.clear = obj.delete = obj.set = function() {
+            throw new Error("map is read-only");
+          };
+        } else if (obj instanceof Set) {
+          obj.add = obj.clear = obj.delete = function() {
+            throw new Error("set is read-only");
+          };
+        }
+        Object.freeze(obj);
+        Object.getOwnPropertyNames(obj).forEach((name) => {
+          const prop = obj[name];
+          const type = typeof prop;
+          if ((type === "object" || type === "function") && !Object.isFrozen(prop)) {
+            deepFreeze(prop);
+          }
+        });
+        return obj;
+      }
+      var Response = class {
+        /**
+         * @param {CompiledMode} mode
+         */
+        constructor(mode) {
+          if (mode.data === void 0) mode.data = {};
+          this.data = mode.data;
+          this.isMatchIgnored = false;
+        }
+        ignoreMatch() {
+          this.isMatchIgnored = true;
+        }
+      };
+      function escapeHTML(value) {
+        return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#x27;");
+      }
+      function inherit$1(original, ...objects) {
+        const result = /* @__PURE__ */ Object.create(null);
+        for (const key in original) {
+          result[key] = original[key];
+        }
+        objects.forEach(function(obj) {
+          for (const key in obj) {
+            result[key] = obj[key];
+          }
+        });
+        return (
+          /** @type {T} */
+          result
+        );
+      }
+      var SPAN_CLOSE = "</span>";
+      var emitsWrappingTags = (node) => {
+        return !!node.scope;
+      };
+      var scopeToCSSClass = (name, { prefix }) => {
+        if (name.startsWith("language:")) {
+          return name.replace("language:", "language-");
+        }
+        if (name.includes(".")) {
+          const pieces = name.split(".");
+          return [
+            `${prefix}${pieces.shift()}`,
+            ...pieces.map((x, i) => `${x}${"_".repeat(i + 1)}`)
+          ].join(" ");
+        }
+        return `${prefix}${name}`;
+      };
+      var HTMLRenderer = class {
+        /**
+         * Creates a new HTMLRenderer
+         *
+         * @param {Tree} parseTree - the parse tree (must support `walk` API)
+         * @param {{classPrefix: string}} options
+         */
+        constructor(parseTree, options) {
+          this.buffer = "";
+          this.classPrefix = options.classPrefix;
+          parseTree.walk(this);
+        }
+        /**
+         * Adds texts to the output stream
+         *
+         * @param {string} text */
+        addText(text) {
+          this.buffer += escapeHTML(text);
+        }
+        /**
+         * Adds a node open to the output stream (if needed)
+         *
+         * @param {Node} node */
+        openNode(node) {
+          if (!emitsWrappingTags(node)) return;
+          const className = scopeToCSSClass(
+            node.scope,
+            { prefix: this.classPrefix }
+          );
+          this.span(className);
+        }
+        /**
+         * Adds a node close to the output stream (if needed)
+         *
+         * @param {Node} node */
+        closeNode(node) {
+          if (!emitsWrappingTags(node)) return;
+          this.buffer += SPAN_CLOSE;
+        }
+        /**
+         * returns the accumulated buffer
+        */
+        value() {
+          return this.buffer;
+        }
+        // helpers
+        /**
+         * Builds a span element
+         *
+         * @param {string} className */
+        span(className) {
+          this.buffer += `<span class="${className}">`;
+        }
+      };
+      var newNode = (opts = {}) => {
+        const result = { children: [] };
+        Object.assign(result, opts);
+        return result;
+      };
+      var TokenTree = class _TokenTree {
+        constructor() {
+          this.rootNode = newNode();
+          this.stack = [this.rootNode];
+        }
+        get top() {
+          return this.stack[this.stack.length - 1];
+        }
+        get root() {
+          return this.rootNode;
+        }
+        /** @param {Node} node */
+        add(node) {
+          this.top.children.push(node);
+        }
+        /** @param {string} scope */
+        openNode(scope) {
+          const node = newNode({ scope });
+          this.add(node);
+          this.stack.push(node);
+        }
+        closeNode() {
+          if (this.stack.length > 1) {
+            return this.stack.pop();
+          }
+          return void 0;
+        }
+        closeAllNodes() {
+          while (this.closeNode()) ;
+        }
+        toJSON() {
+          return JSON.stringify(this.rootNode, null, 4);
+        }
+        /**
+         * @typedef { import("./html_renderer").Renderer } Renderer
+         * @param {Renderer} builder
+         */
+        walk(builder) {
+          return this.constructor._walk(builder, this.rootNode);
+        }
+        /**
+         * @param {Renderer} builder
+         * @param {Node} node
+         */
+        static _walk(builder, node) {
+          if (typeof node === "string") {
+            builder.addText(node);
+          } else if (node.children) {
+            builder.openNode(node);
+            node.children.forEach((child) => this._walk(builder, child));
+            builder.closeNode(node);
+          }
+          return builder;
+        }
+        /**
+         * @param {Node} node
+         */
+        static _collapse(node) {
+          if (typeof node === "string") return;
+          if (!node.children) return;
+          if (node.children.every((el) => typeof el === "string")) {
+            node.children = [node.children.join("")];
+          } else {
+            node.children.forEach((child) => {
+              _TokenTree._collapse(child);
+            });
+          }
+        }
+      };
+      var TokenTreeEmitter = class extends TokenTree {
+        /**
+         * @param {*} options
+         */
+        constructor(options) {
+          super();
+          this.options = options;
+        }
+        /**
+         * @param {string} text
+         */
+        addText(text) {
+          if (text === "") {
+            return;
+          }
+          this.add(text);
+        }
+        /** @param {string} scope */
+        startScope(scope) {
+          this.openNode(scope);
+        }
+        endScope() {
+          this.closeNode();
+        }
+        /**
+         * @param {Emitter & {root: DataNode}} emitter
+         * @param {string} name
+         */
+        __addSublanguage(emitter, name) {
+          const node = emitter.root;
+          if (name) node.scope = `language:${name}`;
+          this.add(node);
+        }
+        toHTML() {
+          const renderer = new HTMLRenderer(this, this.options);
+          return renderer.value();
+        }
+        finalize() {
+          this.closeAllNodes();
+          return true;
+        }
+      };
+      function source2(re) {
+        if (!re) return null;
+        if (typeof re === "string") return re;
+        return re.source;
+      }
+      function lookahead2(re) {
+        return concat2("(?=", re, ")");
+      }
+      function anyNumberOfTimes(re) {
+        return concat2("(?:", re, ")*");
+      }
+      function optional(re) {
+        return concat2("(?:", re, ")?");
+      }
+      function concat2(...args) {
+        const joined = args.map((x) => source2(x)).join("");
+        return joined;
+      }
+      function stripOptionsFromArgs2(args) {
+        const opts = args[args.length - 1];
+        if (typeof opts === "object" && opts.constructor === Object) {
+          args.splice(args.length - 1, 1);
+          return opts;
+        } else {
+          return {};
+        }
+      }
+      function either2(...args) {
+        const opts = stripOptionsFromArgs2(args);
+        const joined = "(" + (opts.capture ? "" : "?:") + args.map((x) => source2(x)).join("|") + ")";
+        return joined;
+      }
+      function countMatchGroups(re) {
+        return new RegExp(re.toString() + "|").exec("").length - 1;
+      }
+      function startsWith(re, lexeme) {
+        const match = re && re.exec(lexeme);
+        return match && match.index === 0;
+      }
+      var BACKREF_RE = /\[(?:[^\\\]]|\\.)*\]|\(\??|\\([1-9][0-9]*)|\\./;
+      function _rewriteBackreferences(regexps, { joinWith }) {
+        let numCaptures = 0;
+        return regexps.map((regex) => {
+          numCaptures += 1;
+          const offset = numCaptures;
+          let re = source2(regex);
+          let out = "";
+          while (re.length > 0) {
+            const match = BACKREF_RE.exec(re);
+            if (!match) {
+              out += re;
+              break;
+            }
+            out += re.substring(0, match.index);
+            re = re.substring(match.index + match[0].length);
+            if (match[0][0] === "\\" && match[1]) {
+              out += "\\" + String(Number(match[1]) + offset);
+            } else {
+              out += match[0];
+              if (match[0] === "(") {
+                numCaptures++;
+              }
+            }
+          }
+          return out;
+        }).map((re) => `(${re})`).join(joinWith);
+      }
+      var MATCH_NOTHING_RE = /\b\B/;
+      var IDENT_RE3 = "[a-zA-Z]\\w*";
+      var UNDERSCORE_IDENT_RE = "[a-zA-Z_]\\w*";
+      var NUMBER_RE = "\\b\\d+(\\.\\d+)?";
+      var C_NUMBER_RE = "(-?)(\\b0[xX][a-fA-F0-9]+|(\\b\\d+(\\.\\d*)?|\\.\\d+)([eE][-+]?\\d+)?)";
+      var BINARY_NUMBER_RE = "\\b(0b[01]+)";
+      var RE_STARTERS_RE = "!|!=|!==|%|%=|&|&&|&=|\\*|\\*=|\\+|\\+=|,|-|-=|/=|/|:|;|<<|<<=|<=|<|===|==|=|>>>=|>>=|>=|>>>|>>|>|\\?|\\[|\\{|\\(|\\^|\\^=|\\||\\|=|\\|\\||~";
+      var SHEBANG = (opts = {}) => {
+        const beginShebang = /^#![ ]*\//;
+        if (opts.binary) {
+          opts.begin = concat2(
+            beginShebang,
+            /.*\b/,
+            opts.binary,
+            /\b.*/
+          );
+        }
+        return inherit$1({
+          scope: "meta",
+          begin: beginShebang,
+          end: /$/,
+          relevance: 0,
+          /** @type {ModeCallback} */
+          "on:begin": (m, resp) => {
+            if (m.index !== 0) resp.ignoreMatch();
+          }
+        }, opts);
+      };
+      var BACKSLASH_ESCAPE = {
+        begin: "\\\\[\\s\\S]",
+        relevance: 0
+      };
+      var APOS_STRING_MODE = {
+        scope: "string",
+        begin: "'",
+        end: "'",
+        illegal: "\\n",
+        contains: [BACKSLASH_ESCAPE]
+      };
+      var QUOTE_STRING_MODE = {
+        scope: "string",
+        begin: '"',
+        end: '"',
+        illegal: "\\n",
+        contains: [BACKSLASH_ESCAPE]
+      };
+      var PHRASAL_WORDS_MODE = {
+        begin: /\b(a|an|the|are|I'm|isn't|don't|doesn't|won't|but|just|should|pretty|simply|enough|gonna|going|wtf|so|such|will|you|your|they|like|more)\b/
+      };
+      var COMMENT = function(begin, end, modeOptions = {}) {
+        const mode = inherit$1(
+          {
+            scope: "comment",
+            begin,
+            end,
+            contains: []
+          },
+          modeOptions
+        );
+        mode.contains.push({
+          scope: "doctag",
+          // hack to avoid the space from being included. the space is necessary to
+          // match here to prevent the plain text rule below from gobbling up doctags
+          begin: "[ ]*(?=(TODO|FIXME|NOTE|BUG|OPTIMIZE|HACK|XXX):)",
+          end: /(TODO|FIXME|NOTE|BUG|OPTIMIZE|HACK|XXX):/,
+          excludeBegin: true,
+          relevance: 0
+        });
+        const ENGLISH_WORD = either2(
+          // list of common 1 and 2 letter words in English
+          "I",
+          "a",
+          "is",
+          "so",
+          "us",
+          "to",
+          "at",
+          "if",
+          "in",
+          "it",
+          "on",
+          // note: this is not an exhaustive list of contractions, just popular ones
+          /[A-Za-z]+['](d|ve|re|ll|t|s|n)/,
+          // contractions - can't we'd they're let's, etc
+          /[A-Za-z]+[-][a-z]+/,
+          // `no-way`, etc.
+          /[A-Za-z][a-z]{2,}/
+          // allow capitalized words at beginning of sentences
+        );
+        mode.contains.push(
+          {
+            // TODO: how to include ", (, ) without breaking grammars that use these for
+            // comment delimiters?
+            // begin: /[ ]+([()"]?([A-Za-z'-]{3,}|is|a|I|so|us|[tT][oO]|at|if|in|it|on)[.]?[()":]?([.][ ]|[ ]|\))){3}/
+            // ---
+            // this tries to find sequences of 3 english words in a row (without any
+            // "programming" type syntax) this gives us a strong signal that we've
+            // TRULY found a comment - vs perhaps scanning with the wrong language.
+            // It's possible to find something that LOOKS like the start of the
+            // comment - but then if there is no readable text - good chance it is a
+            // false match and not a comment.
+            //
+            // for a visual example please see:
+            // https://github.com/highlightjs/highlight.js/issues/2827
+            begin: concat2(
+              /[ ]+/,
+              // necessary to prevent us gobbling up doctags like /* @author Bob Mcgill */
+              "(",
+              ENGLISH_WORD,
+              /[.]?[:]?([.][ ]|[ ])/,
+              "){3}"
+            )
+            // look for 3 words in a row
+          }
+        );
+        return mode;
+      };
+      var C_LINE_COMMENT_MODE = COMMENT("//", "$");
+      var C_BLOCK_COMMENT_MODE = COMMENT("/\\*", "\\*/");
+      var HASH_COMMENT_MODE = COMMENT("#", "$");
+      var NUMBER_MODE = {
+        scope: "number",
+        begin: NUMBER_RE,
+        relevance: 0
+      };
+      var C_NUMBER_MODE = {
+        scope: "number",
+        begin: C_NUMBER_RE,
+        relevance: 0
+      };
+      var BINARY_NUMBER_MODE = {
+        scope: "number",
+        begin: BINARY_NUMBER_RE,
+        relevance: 0
+      };
+      var REGEXP_MODE = {
+        scope: "regexp",
+        begin: /\/(?=[^/\n]*\/)/,
+        end: /\/[gimuy]*/,
+        contains: [
+          BACKSLASH_ESCAPE,
+          {
+            begin: /\[/,
+            end: /\]/,
+            relevance: 0,
+            contains: [BACKSLASH_ESCAPE]
+          }
+        ]
+      };
+      var TITLE_MODE = {
+        scope: "title",
+        begin: IDENT_RE3,
+        relevance: 0
+      };
+      var UNDERSCORE_TITLE_MODE = {
+        scope: "title",
+        begin: UNDERSCORE_IDENT_RE,
+        relevance: 0
+      };
+      var METHOD_GUARD = {
+        // excludes method names from keyword processing
+        begin: "\\.\\s*" + UNDERSCORE_IDENT_RE,
+        relevance: 0
+      };
+      var END_SAME_AS_BEGIN = function(mode) {
+        return Object.assign(
+          mode,
+          {
+            /** @type {ModeCallback} */
+            "on:begin": (m, resp) => {
+              resp.data._beginMatch = m[1];
+            },
+            /** @type {ModeCallback} */
+            "on:end": (m, resp) => {
+              if (resp.data._beginMatch !== m[1]) resp.ignoreMatch();
+            }
+          }
+        );
+      };
+      var MODES = /* @__PURE__ */ Object.freeze({
+        __proto__: null,
+        APOS_STRING_MODE,
+        BACKSLASH_ESCAPE,
+        BINARY_NUMBER_MODE,
+        BINARY_NUMBER_RE,
+        COMMENT,
+        C_BLOCK_COMMENT_MODE,
+        C_LINE_COMMENT_MODE,
+        C_NUMBER_MODE,
+        C_NUMBER_RE,
+        END_SAME_AS_BEGIN,
+        HASH_COMMENT_MODE,
+        IDENT_RE: IDENT_RE3,
+        MATCH_NOTHING_RE,
+        METHOD_GUARD,
+        NUMBER_MODE,
+        NUMBER_RE,
+        PHRASAL_WORDS_MODE,
+        QUOTE_STRING_MODE,
+        REGEXP_MODE,
+        RE_STARTERS_RE,
+        SHEBANG,
+        TITLE_MODE,
+        UNDERSCORE_IDENT_RE,
+        UNDERSCORE_TITLE_MODE
+      });
+      function skipIfHasPrecedingDot(match, response) {
+        const before = match.input[match.index - 1];
+        if (before === ".") {
+          response.ignoreMatch();
+        }
+      }
+      function scopeClassName(mode, _parent) {
+        if (mode.className !== void 0) {
+          mode.scope = mode.className;
+          delete mode.className;
+        }
+      }
+      function beginKeywords(mode, parent) {
+        if (!parent) return;
+        if (!mode.beginKeywords) return;
+        mode.begin = "\\b(" + mode.beginKeywords.split(" ").join("|") + ")(?!\\.)(?=\\b|\\s)";
+        mode.__beforeBegin = skipIfHasPrecedingDot;
+        mode.keywords = mode.keywords || mode.beginKeywords;
+        delete mode.beginKeywords;
+        if (mode.relevance === void 0) mode.relevance = 0;
+      }
+      function compileIllegal(mode, _parent) {
+        if (!Array.isArray(mode.illegal)) return;
+        mode.illegal = either2(...mode.illegal);
+      }
+      function compileMatch(mode, _parent) {
+        if (!mode.match) return;
+        if (mode.begin || mode.end) throw new Error("begin & end are not supported with match");
+        mode.begin = mode.match;
+        delete mode.match;
+      }
+      function compileRelevance(mode, _parent) {
+        if (mode.relevance === void 0) mode.relevance = 1;
+      }
+      var beforeMatchExt = (mode, parent) => {
+        if (!mode.beforeMatch) return;
+        if (mode.starts) throw new Error("beforeMatch cannot be used with starts");
+        const originalMode = Object.assign({}, mode);
+        Object.keys(mode).forEach((key) => {
+          delete mode[key];
+        });
+        mode.keywords = originalMode.keywords;
+        mode.begin = concat2(originalMode.beforeMatch, lookahead2(originalMode.begin));
+        mode.starts = {
+          relevance: 0,
+          contains: [
+            Object.assign(originalMode, { endsParent: true })
+          ]
+        };
+        mode.relevance = 0;
+        delete originalMode.beforeMatch;
+      };
+      var COMMON_KEYWORDS = [
+        "of",
+        "and",
+        "for",
+        "in",
+        "not",
+        "or",
+        "if",
+        "then",
+        "parent",
+        // common variable name
+        "list",
+        // common variable name
+        "value"
+        // common variable name
+      ];
+      var DEFAULT_KEYWORD_SCOPE = "keyword";
+      function compileKeywords(rawKeywords, caseInsensitive, scopeName = DEFAULT_KEYWORD_SCOPE) {
+        const compiledKeywords = /* @__PURE__ */ Object.create(null);
+        if (typeof rawKeywords === "string") {
+          compileList(scopeName, rawKeywords.split(" "));
+        } else if (Array.isArray(rawKeywords)) {
+          compileList(scopeName, rawKeywords);
+        } else {
+          Object.keys(rawKeywords).forEach(function(scopeName2) {
+            Object.assign(
+              compiledKeywords,
+              compileKeywords(rawKeywords[scopeName2], caseInsensitive, scopeName2)
+            );
+          });
+        }
+        return compiledKeywords;
+        function compileList(scopeName2, keywordList) {
+          if (caseInsensitive) {
+            keywordList = keywordList.map((x) => x.toLowerCase());
+          }
+          keywordList.forEach(function(keyword) {
+            const pair = keyword.split("|");
+            compiledKeywords[pair[0]] = [scopeName2, scoreForKeyword(pair[0], pair[1])];
+          });
+        }
+      }
+      function scoreForKeyword(keyword, providedScore) {
+        if (providedScore) {
+          return Number(providedScore);
+        }
+        return commonKeyword(keyword) ? 0 : 1;
+      }
+      function commonKeyword(keyword) {
+        return COMMON_KEYWORDS.includes(keyword.toLowerCase());
+      }
+      var seenDeprecations = {};
+      var error = (message) => {
+        console.error(message);
+      };
+      var warn = (message, ...args) => {
+        console.log(`WARN: ${message}`, ...args);
+      };
+      var deprecated = (version2, message) => {
+        if (seenDeprecations[`${version2}/${message}`]) return;
+        console.log(`Deprecated as of ${version2}. ${message}`);
+        seenDeprecations[`${version2}/${message}`] = true;
+      };
+      var MultiClassError = new Error();
+      function remapScopeNames(mode, regexes, { key }) {
+        let offset = 0;
+        const scopeNames = mode[key];
+        const emit = {};
+        const positions = {};
+        for (let i = 1; i <= regexes.length; i++) {
+          positions[i + offset] = scopeNames[i];
+          emit[i + offset] = true;
+          offset += countMatchGroups(regexes[i - 1]);
+        }
+        mode[key] = positions;
+        mode[key]._emit = emit;
+        mode[key]._multi = true;
+      }
+      function beginMultiClass(mode) {
+        if (!Array.isArray(mode.begin)) return;
+        if (mode.skip || mode.excludeBegin || mode.returnBegin) {
+          error("skip, excludeBegin, returnBegin not compatible with beginScope: {}");
+          throw MultiClassError;
+        }
+        if (typeof mode.beginScope !== "object" || mode.beginScope === null) {
+          error("beginScope must be object");
+          throw MultiClassError;
+        }
+        remapScopeNames(mode, mode.begin, { key: "beginScope" });
+        mode.begin = _rewriteBackreferences(mode.begin, { joinWith: "" });
+      }
+      function endMultiClass(mode) {
+        if (!Array.isArray(mode.end)) return;
+        if (mode.skip || mode.excludeEnd || mode.returnEnd) {
+          error("skip, excludeEnd, returnEnd not compatible with endScope: {}");
+          throw MultiClassError;
+        }
+        if (typeof mode.endScope !== "object" || mode.endScope === null) {
+          error("endScope must be object");
+          throw MultiClassError;
+        }
+        remapScopeNames(mode, mode.end, { key: "endScope" });
+        mode.end = _rewriteBackreferences(mode.end, { joinWith: "" });
+      }
+      function scopeSugar(mode) {
+        if (mode.scope && typeof mode.scope === "object" && mode.scope !== null) {
+          mode.beginScope = mode.scope;
+          delete mode.scope;
+        }
+      }
+      function MultiClass(mode) {
+        scopeSugar(mode);
+        if (typeof mode.beginScope === "string") {
+          mode.beginScope = { _wrap: mode.beginScope };
+        }
+        if (typeof mode.endScope === "string") {
+          mode.endScope = { _wrap: mode.endScope };
+        }
+        beginMultiClass(mode);
+        endMultiClass(mode);
+      }
+      function compileLanguage(language) {
+        function langRe(value, global) {
+          return new RegExp(
+            source2(value),
+            "m" + (language.case_insensitive ? "i" : "") + (language.unicodeRegex ? "u" : "") + (global ? "g" : "")
+          );
+        }
+        class MultiRegex {
+          constructor() {
+            this.matchIndexes = {};
+            this.regexes = [];
+            this.matchAt = 1;
+            this.position = 0;
+          }
+          // @ts-ignore
+          addRule(re, opts) {
+            opts.position = this.position++;
+            this.matchIndexes[this.matchAt] = opts;
+            this.regexes.push([opts, re]);
+            this.matchAt += countMatchGroups(re) + 1;
+          }
+          compile() {
+            if (this.regexes.length === 0) {
+              this.exec = () => null;
+            }
+            const terminators = this.regexes.map((el) => el[1]);
+            this.matcherRe = langRe(_rewriteBackreferences(terminators, { joinWith: "|" }), true);
+            this.lastIndex = 0;
+          }
+          /** @param {string} s */
+          exec(s) {
+            this.matcherRe.lastIndex = this.lastIndex;
+            const match = this.matcherRe.exec(s);
+            if (!match) {
+              return null;
+            }
+            const i = match.findIndex((el, i2) => i2 > 0 && el !== void 0);
+            const matchData = this.matchIndexes[i];
+            match.splice(0, i);
+            return Object.assign(match, matchData);
+          }
+        }
+        class ResumableMultiRegex {
+          constructor() {
+            this.rules = [];
+            this.multiRegexes = [];
+            this.count = 0;
+            this.lastIndex = 0;
+            this.regexIndex = 0;
+          }
+          // @ts-ignore
+          getMatcher(index) {
+            if (this.multiRegexes[index]) return this.multiRegexes[index];
+            const matcher = new MultiRegex();
+            this.rules.slice(index).forEach(([re, opts]) => matcher.addRule(re, opts));
+            matcher.compile();
+            this.multiRegexes[index] = matcher;
+            return matcher;
+          }
+          resumingScanAtSamePosition() {
+            return this.regexIndex !== 0;
+          }
+          considerAll() {
+            this.regexIndex = 0;
+          }
+          // @ts-ignore
+          addRule(re, opts) {
+            this.rules.push([re, opts]);
+            if (opts.type === "begin") this.count++;
+          }
+          /** @param {string} s */
+          exec(s) {
+            const m = this.getMatcher(this.regexIndex);
+            m.lastIndex = this.lastIndex;
+            let result = m.exec(s);
+            if (this.resumingScanAtSamePosition()) {
+              if (result && result.index === this.lastIndex) ;
+              else {
+                const m2 = this.getMatcher(0);
+                m2.lastIndex = this.lastIndex + 1;
+                result = m2.exec(s);
+              }
+            }
+            if (result) {
+              this.regexIndex += result.position + 1;
+              if (this.regexIndex === this.count) {
+                this.considerAll();
+              }
+            }
+            return result;
+          }
+        }
+        function buildModeRegex(mode) {
+          const mm = new ResumableMultiRegex();
+          mode.contains.forEach((term) => mm.addRule(term.begin, { rule: term, type: "begin" }));
+          if (mode.terminatorEnd) {
+            mm.addRule(mode.terminatorEnd, { type: "end" });
+          }
+          if (mode.illegal) {
+            mm.addRule(mode.illegal, { type: "illegal" });
+          }
+          return mm;
+        }
+        function compileMode(mode, parent) {
+          const cmode = (
+            /** @type CompiledMode */
+            mode
+          );
+          if (mode.isCompiled) return cmode;
+          [
+            scopeClassName,
+            // do this early so compiler extensions generally don't have to worry about
+            // the distinction between match/begin
+            compileMatch,
+            MultiClass,
+            beforeMatchExt
+          ].forEach((ext) => ext(mode, parent));
+          language.compilerExtensions.forEach((ext) => ext(mode, parent));
+          mode.__beforeBegin = null;
+          [
+            beginKeywords,
+            // do this later so compiler extensions that come earlier have access to the
+            // raw array if they wanted to perhaps manipulate it, etc.
+            compileIllegal,
+            // default to 1 relevance if not specified
+            compileRelevance
+          ].forEach((ext) => ext(mode, parent));
+          mode.isCompiled = true;
+          let keywordPattern = null;
+          if (typeof mode.keywords === "object" && mode.keywords.$pattern) {
+            mode.keywords = Object.assign({}, mode.keywords);
+            keywordPattern = mode.keywords.$pattern;
+            delete mode.keywords.$pattern;
+          }
+          keywordPattern = keywordPattern || /\w+/;
+          if (mode.keywords) {
+            mode.keywords = compileKeywords(mode.keywords, language.case_insensitive);
+          }
+          cmode.keywordPatternRe = langRe(keywordPattern, true);
+          if (parent) {
+            if (!mode.begin) mode.begin = /\B|\b/;
+            cmode.beginRe = langRe(cmode.begin);
+            if (!mode.end && !mode.endsWithParent) mode.end = /\B|\b/;
+            if (mode.end) cmode.endRe = langRe(cmode.end);
+            cmode.terminatorEnd = source2(cmode.end) || "";
+            if (mode.endsWithParent && parent.terminatorEnd) {
+              cmode.terminatorEnd += (mode.end ? "|" : "") + parent.terminatorEnd;
+            }
+          }
+          if (mode.illegal) cmode.illegalRe = langRe(
+            /** @type {RegExp | string} */
+            mode.illegal
+          );
+          if (!mode.contains) mode.contains = [];
+          mode.contains = [].concat(...mode.contains.map(function(c) {
+            return expandOrCloneMode(c === "self" ? mode : c);
+          }));
+          mode.contains.forEach(function(c) {
+            compileMode(
+              /** @type Mode */
+              c,
+              cmode
+            );
+          });
+          if (mode.starts) {
+            compileMode(mode.starts, parent);
+          }
+          cmode.matcher = buildModeRegex(cmode);
+          return cmode;
+        }
+        if (!language.compilerExtensions) language.compilerExtensions = [];
+        if (language.contains && language.contains.includes("self")) {
+          throw new Error("ERR: contains `self` is not supported at the top-level of a language.  See documentation.");
+        }
+        language.classNameAliases = inherit$1(language.classNameAliases || {});
+        return compileMode(
+          /** @type Mode */
+          language
+        );
+      }
+      function dependencyOnParent(mode) {
+        if (!mode) return false;
+        return mode.endsWithParent || dependencyOnParent(mode.starts);
+      }
+      function expandOrCloneMode(mode) {
+        if (mode.variants && !mode.cachedVariants) {
+          mode.cachedVariants = mode.variants.map(function(variant) {
+            return inherit$1(mode, { variants: null }, variant);
+          });
+        }
+        if (mode.cachedVariants) {
+          return mode.cachedVariants;
+        }
+        if (dependencyOnParent(mode)) {
+          return inherit$1(mode, { starts: mode.starts ? inherit$1(mode.starts) : null });
+        }
+        if (Object.isFrozen(mode)) {
+          return inherit$1(mode);
+        }
+        return mode;
+      }
+      var version = "11.9.0";
+      var HTMLInjectionError = class extends Error {
+        constructor(reason, html) {
+          super(reason);
+          this.name = "HTMLInjectionError";
+          this.html = html;
+        }
+      };
+      var escape = escapeHTML;
+      var inherit = inherit$1;
+      var NO_MATCH = Symbol("nomatch");
+      var MAX_KEYWORD_HITS = 7;
+      var HLJS = function(hljs) {
+        const languages = /* @__PURE__ */ Object.create(null);
+        const aliases = /* @__PURE__ */ Object.create(null);
+        const plugins = [];
+        let SAFE_MODE = true;
+        const LANGUAGE_NOT_FOUND = "Could not find the language '{}', did you forget to load/include a language module?";
+        const PLAINTEXT_LANGUAGE = { disableAutodetect: true, name: "Plain text", contains: [] };
+        let options = {
+          ignoreUnescapedHTML: false,
+          throwUnescapedHTML: false,
+          noHighlightRe: /^(no-?highlight)$/i,
+          languageDetectRe: /\blang(?:uage)?-([\w-]+)\b/i,
+          classPrefix: "hljs-",
+          cssSelector: "pre code",
+          languages: null,
+          // beta configuration options, subject to change, welcome to discuss
+          // https://github.com/highlightjs/highlight.js/issues/1086
+          __emitter: TokenTreeEmitter
+        };
+        function shouldNotHighlight(languageName) {
+          return options.noHighlightRe.test(languageName);
+        }
+        function blockLanguage(block) {
+          let classes = block.className + " ";
+          classes += block.parentNode ? block.parentNode.className : "";
+          const match = options.languageDetectRe.exec(classes);
+          if (match) {
+            const language = getLanguage(match[1]);
+            if (!language) {
+              warn(LANGUAGE_NOT_FOUND.replace("{}", match[1]));
+              warn("Falling back to no-highlight mode for this block.", block);
+            }
+            return language ? match[1] : "no-highlight";
+          }
+          return classes.split(/\s+/).find((_class) => shouldNotHighlight(_class) || getLanguage(_class));
+        }
+        function highlight2(codeOrLanguageName, optionsOrCode, ignoreIllegals) {
+          let code = "";
+          let languageName = "";
+          if (typeof optionsOrCode === "object") {
+            code = codeOrLanguageName;
+            ignoreIllegals = optionsOrCode.ignoreIllegals;
+            languageName = optionsOrCode.language;
+          } else {
+            deprecated("10.7.0", "highlight(lang, code, ...args) has been deprecated.");
+            deprecated("10.7.0", "Please use highlight(code, options) instead.\nhttps://github.com/highlightjs/highlight.js/issues/2277");
+            languageName = codeOrLanguageName;
+            code = optionsOrCode;
+          }
+          if (ignoreIllegals === void 0) {
+            ignoreIllegals = true;
+          }
+          const context = {
+            code,
+            language: languageName
+          };
+          fire("before:highlight", context);
+          const result = context.result ? context.result : _highlight(context.language, context.code, ignoreIllegals);
+          result.code = context.code;
+          fire("after:highlight", result);
+          return result;
+        }
+        function _highlight(languageName, codeToHighlight, ignoreIllegals, continuation) {
+          const keywordHits = /* @__PURE__ */ Object.create(null);
+          function keywordData(mode, matchText) {
+            return mode.keywords[matchText];
+          }
+          function processKeywords() {
+            if (!top.keywords) {
+              emitter.addText(modeBuffer);
+              return;
+            }
+            let lastIndex = 0;
+            top.keywordPatternRe.lastIndex = 0;
+            let match = top.keywordPatternRe.exec(modeBuffer);
+            let buf = "";
+            while (match) {
+              buf += modeBuffer.substring(lastIndex, match.index);
+              const word = language.case_insensitive ? match[0].toLowerCase() : match[0];
+              const data = keywordData(top, word);
+              if (data) {
+                const [kind, keywordRelevance] = data;
+                emitter.addText(buf);
+                buf = "";
+                keywordHits[word] = (keywordHits[word] || 0) + 1;
+                if (keywordHits[word] <= MAX_KEYWORD_HITS) relevance += keywordRelevance;
+                if (kind.startsWith("_")) {
+                  buf += match[0];
+                } else {
+                  const cssClass = language.classNameAliases[kind] || kind;
+                  emitKeyword(match[0], cssClass);
+                }
+              } else {
+                buf += match[0];
+              }
+              lastIndex = top.keywordPatternRe.lastIndex;
+              match = top.keywordPatternRe.exec(modeBuffer);
+            }
+            buf += modeBuffer.substring(lastIndex);
+            emitter.addText(buf);
+          }
+          function processSubLanguage() {
+            if (modeBuffer === "") return;
+            let result2 = null;
+            if (typeof top.subLanguage === "string") {
+              if (!languages[top.subLanguage]) {
+                emitter.addText(modeBuffer);
+                return;
+              }
+              result2 = _highlight(top.subLanguage, modeBuffer, true, continuations[top.subLanguage]);
+              continuations[top.subLanguage] = /** @type {CompiledMode} */
+              result2._top;
+            } else {
+              result2 = highlightAuto(modeBuffer, top.subLanguage.length ? top.subLanguage : null);
+            }
+            if (top.relevance > 0) {
+              relevance += result2.relevance;
+            }
+            emitter.__addSublanguage(result2._emitter, result2.language);
+          }
+          function processBuffer() {
+            if (top.subLanguage != null) {
+              processSubLanguage();
+            } else {
+              processKeywords();
+            }
+            modeBuffer = "";
+          }
+          function emitKeyword(keyword, scope) {
+            if (keyword === "") return;
+            emitter.startScope(scope);
+            emitter.addText(keyword);
+            emitter.endScope();
+          }
+          function emitMultiClass(scope, match) {
+            let i = 1;
+            const max = match.length - 1;
+            while (i <= max) {
+              if (!scope._emit[i]) {
+                i++;
+                continue;
+              }
+              const klass = language.classNameAliases[scope[i]] || scope[i];
+              const text = match[i];
+              if (klass) {
+                emitKeyword(text, klass);
+              } else {
+                modeBuffer = text;
+                processKeywords();
+                modeBuffer = "";
+              }
+              i++;
+            }
+          }
+          function startNewMode(mode, match) {
+            if (mode.scope && typeof mode.scope === "string") {
+              emitter.openNode(language.classNameAliases[mode.scope] || mode.scope);
+            }
+            if (mode.beginScope) {
+              if (mode.beginScope._wrap) {
+                emitKeyword(modeBuffer, language.classNameAliases[mode.beginScope._wrap] || mode.beginScope._wrap);
+                modeBuffer = "";
+              } else if (mode.beginScope._multi) {
+                emitMultiClass(mode.beginScope, match);
+                modeBuffer = "";
+              }
+            }
+            top = Object.create(mode, { parent: { value: top } });
+            return top;
+          }
+          function endOfMode(mode, match, matchPlusRemainder) {
+            let matched = startsWith(mode.endRe, matchPlusRemainder);
+            if (matched) {
+              if (mode["on:end"]) {
+                const resp = new Response(mode);
+                mode["on:end"](match, resp);
+                if (resp.isMatchIgnored) matched = false;
+              }
+              if (matched) {
+                while (mode.endsParent && mode.parent) {
+                  mode = mode.parent;
+                }
+                return mode;
+              }
+            }
+            if (mode.endsWithParent) {
+              return endOfMode(mode.parent, match, matchPlusRemainder);
+            }
+          }
+          function doIgnore(lexeme) {
+            if (top.matcher.regexIndex === 0) {
+              modeBuffer += lexeme[0];
+              return 1;
+            } else {
+              resumeScanAtSamePosition = true;
+              return 0;
+            }
+          }
+          function doBeginMatch(match) {
+            const lexeme = match[0];
+            const newMode = match.rule;
+            const resp = new Response(newMode);
+            const beforeCallbacks = [newMode.__beforeBegin, newMode["on:begin"]];
+            for (const cb of beforeCallbacks) {
+              if (!cb) continue;
+              cb(match, resp);
+              if (resp.isMatchIgnored) return doIgnore(lexeme);
+            }
+            if (newMode.skip) {
+              modeBuffer += lexeme;
+            } else {
+              if (newMode.excludeBegin) {
+                modeBuffer += lexeme;
+              }
+              processBuffer();
+              if (!newMode.returnBegin && !newMode.excludeBegin) {
+                modeBuffer = lexeme;
+              }
+            }
+            startNewMode(newMode, match);
+            return newMode.returnBegin ? 0 : lexeme.length;
+          }
+          function doEndMatch(match) {
+            const lexeme = match[0];
+            const matchPlusRemainder = codeToHighlight.substring(match.index);
+            const endMode = endOfMode(top, match, matchPlusRemainder);
+            if (!endMode) {
+              return NO_MATCH;
+            }
+            const origin = top;
+            if (top.endScope && top.endScope._wrap) {
+              processBuffer();
+              emitKeyword(lexeme, top.endScope._wrap);
+            } else if (top.endScope && top.endScope._multi) {
+              processBuffer();
+              emitMultiClass(top.endScope, match);
+            } else if (origin.skip) {
+              modeBuffer += lexeme;
+            } else {
+              if (!(origin.returnEnd || origin.excludeEnd)) {
+                modeBuffer += lexeme;
+              }
+              processBuffer();
+              if (origin.excludeEnd) {
+                modeBuffer = lexeme;
+              }
+            }
+            do {
+              if (top.scope) {
+                emitter.closeNode();
+              }
+              if (!top.skip && !top.subLanguage) {
+                relevance += top.relevance;
+              }
+              top = top.parent;
+            } while (top !== endMode.parent);
+            if (endMode.starts) {
+              startNewMode(endMode.starts, match);
+            }
+            return origin.returnEnd ? 0 : lexeme.length;
+          }
+          function processContinuations() {
+            const list = [];
+            for (let current = top; current !== language; current = current.parent) {
+              if (current.scope) {
+                list.unshift(current.scope);
+              }
+            }
+            list.forEach((item) => emitter.openNode(item));
+          }
+          let lastMatch = {};
+          function processLexeme(textBeforeMatch, match) {
+            const lexeme = match && match[0];
+            modeBuffer += textBeforeMatch;
+            if (lexeme == null) {
+              processBuffer();
+              return 0;
+            }
+            if (lastMatch.type === "begin" && match.type === "end" && lastMatch.index === match.index && lexeme === "") {
+              modeBuffer += codeToHighlight.slice(match.index, match.index + 1);
+              if (!SAFE_MODE) {
+                const err = new Error(`0 width match regex (${languageName})`);
+                err.languageName = languageName;
+                err.badRule = lastMatch.rule;
+                throw err;
+              }
+              return 1;
+            }
+            lastMatch = match;
+            if (match.type === "begin") {
+              return doBeginMatch(match);
+            } else if (match.type === "illegal" && !ignoreIllegals) {
+              const err = new Error('Illegal lexeme "' + lexeme + '" for mode "' + (top.scope || "<unnamed>") + '"');
+              err.mode = top;
+              throw err;
+            } else if (match.type === "end") {
+              const processed = doEndMatch(match);
+              if (processed !== NO_MATCH) {
+                return processed;
+              }
+            }
+            if (match.type === "illegal" && lexeme === "") {
+              return 1;
+            }
+            if (iterations > 1e5 && iterations > match.index * 3) {
+              const err = new Error("potential infinite loop, way more iterations than matches");
+              throw err;
+            }
+            modeBuffer += lexeme;
+            return lexeme.length;
+          }
+          const language = getLanguage(languageName);
+          if (!language) {
+            error(LANGUAGE_NOT_FOUND.replace("{}", languageName));
+            throw new Error('Unknown language: "' + languageName + '"');
+          }
+          const md = compileLanguage(language);
+          let result = "";
+          let top = continuation || md;
+          const continuations = {};
+          const emitter = new options.__emitter(options);
+          processContinuations();
+          let modeBuffer = "";
+          let relevance = 0;
+          let index = 0;
+          let iterations = 0;
+          let resumeScanAtSamePosition = false;
+          try {
+            if (!language.__emitTokens) {
+              top.matcher.considerAll();
+              for (; ; ) {
+                iterations++;
+                if (resumeScanAtSamePosition) {
+                  resumeScanAtSamePosition = false;
+                } else {
+                  top.matcher.considerAll();
+                }
+                top.matcher.lastIndex = index;
+                const match = top.matcher.exec(codeToHighlight);
+                if (!match) break;
+                const beforeMatch = codeToHighlight.substring(index, match.index);
+                const processedCount = processLexeme(beforeMatch, match);
+                index = match.index + processedCount;
+              }
+              processLexeme(codeToHighlight.substring(index));
+            } else {
+              language.__emitTokens(codeToHighlight, emitter);
+            }
+            emitter.finalize();
+            result = emitter.toHTML();
+            return {
+              language: languageName,
+              value: result,
+              relevance,
+              illegal: false,
+              _emitter: emitter,
+              _top: top
+            };
+          } catch (err) {
+            if (err.message && err.message.includes("Illegal")) {
+              return {
+                language: languageName,
+                value: escape(codeToHighlight),
+                illegal: true,
+                relevance: 0,
+                _illegalBy: {
+                  message: err.message,
+                  index,
+                  context: codeToHighlight.slice(index - 100, index + 100),
+                  mode: err.mode,
+                  resultSoFar: result
+                },
+                _emitter: emitter
+              };
+            } else if (SAFE_MODE) {
+              return {
+                language: languageName,
+                value: escape(codeToHighlight),
+                illegal: false,
+                relevance: 0,
+                errorRaised: err,
+                _emitter: emitter,
+                _top: top
+              };
+            } else {
+              throw err;
+            }
+          }
+        }
+        function justTextHighlightResult(code) {
+          const result = {
+            value: escape(code),
+            illegal: false,
+            relevance: 0,
+            _top: PLAINTEXT_LANGUAGE,
+            _emitter: new options.__emitter(options)
+          };
+          result._emitter.addText(code);
+          return result;
+        }
+        function highlightAuto(code, languageSubset) {
+          languageSubset = languageSubset || options.languages || Object.keys(languages);
+          const plaintext = justTextHighlightResult(code);
+          const results = languageSubset.filter(getLanguage).filter(autoDetection).map(
+            (name) => _highlight(name, code, false)
+          );
+          results.unshift(plaintext);
+          const sorted = results.sort((a, b) => {
+            if (a.relevance !== b.relevance) return b.relevance - a.relevance;
+            if (a.language && b.language) {
+              if (getLanguage(a.language).supersetOf === b.language) {
+                return 1;
+              } else if (getLanguage(b.language).supersetOf === a.language) {
+                return -1;
+              }
+            }
+            return 0;
+          });
+          const [best, secondBest] = sorted;
+          const result = best;
+          result.secondBest = secondBest;
+          return result;
+        }
+        function updateClassName(element, currentLang, resultLang) {
+          const language = currentLang && aliases[currentLang] || resultLang;
+          element.classList.add("hljs");
+          element.classList.add(`language-${language}`);
+        }
+        function highlightElement(element) {
+          let node = null;
+          const language = blockLanguage(element);
+          if (shouldNotHighlight(language)) return;
+          fire(
+            "before:highlightElement",
+            { el: element, language }
+          );
+          if (element.dataset.highlighted) {
+            console.log("Element previously highlighted. To highlight again, first unset `dataset.highlighted`.", element);
+            return;
+          }
+          if (element.children.length > 0) {
+            if (!options.ignoreUnescapedHTML) {
+              console.warn("One of your code blocks includes unescaped HTML. This is a potentially serious security risk.");
+              console.warn("https://github.com/highlightjs/highlight.js/wiki/security");
+              console.warn("The element with unescaped HTML:");
+              console.warn(element);
+            }
+            if (options.throwUnescapedHTML) {
+              const err = new HTMLInjectionError(
+                "One of your code blocks includes unescaped HTML.",
+                element.innerHTML
+              );
+              throw err;
+            }
+          }
+          node = element;
+          const text = node.textContent;
+          const result = language ? highlight2(text, { language, ignoreIllegals: true }) : highlightAuto(text);
+          element.innerHTML = result.value;
+          element.dataset.highlighted = "yes";
+          updateClassName(element, language, result.language);
+          element.result = {
+            language: result.language,
+            // TODO: remove with version 11.0
+            re: result.relevance,
+            relevance: result.relevance
+          };
+          if (result.secondBest) {
+            element.secondBest = {
+              language: result.secondBest.language,
+              relevance: result.secondBest.relevance
+            };
+          }
+          fire("after:highlightElement", { el: element, result, text });
+        }
+        function configure(userOptions) {
+          options = inherit(options, userOptions);
+        }
+        const initHighlighting = () => {
+          highlightAll();
+          deprecated("10.6.0", "initHighlighting() deprecated.  Use highlightAll() now.");
+        };
+        function initHighlightingOnLoad() {
+          highlightAll();
+          deprecated("10.6.0", "initHighlightingOnLoad() deprecated.  Use highlightAll() now.");
+        }
+        let wantsHighlight = false;
+        function highlightAll() {
+          if (document.readyState === "loading") {
+            wantsHighlight = true;
+            return;
+          }
+          const blocks = document.querySelectorAll(options.cssSelector);
+          blocks.forEach(highlightElement);
+        }
+        function boot() {
+          if (wantsHighlight) highlightAll();
+        }
+        if (typeof window !== "undefined" && window.addEventListener) {
+          window.addEventListener("DOMContentLoaded", boot, false);
+        }
+        function registerLanguage(languageName, languageDefinition) {
+          let lang = null;
+          try {
+            lang = languageDefinition(hljs);
+          } catch (error$1) {
+            error("Language definition for '{}' could not be registered.".replace("{}", languageName));
+            if (!SAFE_MODE) {
+              throw error$1;
+            } else {
+              error(error$1);
+            }
+            lang = PLAINTEXT_LANGUAGE;
+          }
+          if (!lang.name) lang.name = languageName;
+          languages[languageName] = lang;
+          lang.rawDefinition = languageDefinition.bind(null, hljs);
+          if (lang.aliases) {
+            registerAliases(lang.aliases, { languageName });
+          }
+        }
+        function unregisterLanguage(languageName) {
+          delete languages[languageName];
+          for (const alias of Object.keys(aliases)) {
+            if (aliases[alias] === languageName) {
+              delete aliases[alias];
+            }
+          }
+        }
+        function listLanguages() {
+          return Object.keys(languages);
+        }
+        function getLanguage(name) {
+          name = (name || "").toLowerCase();
+          return languages[name] || languages[aliases[name]];
+        }
+        function registerAliases(aliasList, { languageName }) {
+          if (typeof aliasList === "string") {
+            aliasList = [aliasList];
+          }
+          aliasList.forEach((alias) => {
+            aliases[alias.toLowerCase()] = languageName;
+          });
+        }
+        function autoDetection(name) {
+          const lang = getLanguage(name);
+          return lang && !lang.disableAutodetect;
+        }
+        function upgradePluginAPI(plugin) {
+          if (plugin["before:highlightBlock"] && !plugin["before:highlightElement"]) {
+            plugin["before:highlightElement"] = (data) => {
+              plugin["before:highlightBlock"](
+                Object.assign({ block: data.el }, data)
+              );
+            };
+          }
+          if (plugin["after:highlightBlock"] && !plugin["after:highlightElement"]) {
+            plugin["after:highlightElement"] = (data) => {
+              plugin["after:highlightBlock"](
+                Object.assign({ block: data.el }, data)
+              );
+            };
+          }
+        }
+        function addPlugin(plugin) {
+          upgradePluginAPI(plugin);
+          plugins.push(plugin);
+        }
+        function removePlugin(plugin) {
+          const index = plugins.indexOf(plugin);
+          if (index !== -1) {
+            plugins.splice(index, 1);
+          }
+        }
+        function fire(event, args) {
+          const cb = event;
+          plugins.forEach(function(plugin) {
+            if (plugin[cb]) {
+              plugin[cb](args);
+            }
+          });
+        }
+        function deprecateHighlightBlock(el) {
+          deprecated("10.7.0", "highlightBlock will be removed entirely in v12.0");
+          deprecated("10.7.0", "Please use highlightElement now.");
+          return highlightElement(el);
+        }
+        Object.assign(hljs, {
+          highlight: highlight2,
+          highlightAuto,
+          highlightAll,
+          highlightElement,
+          // TODO: Remove with v12 API
+          highlightBlock: deprecateHighlightBlock,
+          configure,
+          initHighlighting,
+          initHighlightingOnLoad,
+          registerLanguage,
+          unregisterLanguage,
+          listLanguages,
+          getLanguage,
+          registerAliases,
+          autoDetection,
+          inherit,
+          addPlugin,
+          removePlugin
+        });
+        hljs.debugMode = function() {
+          SAFE_MODE = false;
+        };
+        hljs.safeMode = function() {
+          SAFE_MODE = true;
+        };
+        hljs.versionString = version;
+        hljs.regex = {
+          concat: concat2,
+          lookahead: lookahead2,
+          either: either2,
+          optional,
+          anyNumberOfTimes
+        };
+        for (const key in MODES) {
+          if (typeof MODES[key] === "object") {
+            deepFreeze(MODES[key]);
+          }
+        }
+        Object.assign(hljs, MODES);
+        return hljs;
+      };
+      var highlight = HLJS({});
+      highlight.newInstance = () => HLJS({});
+      module.exports = highlight;
+      highlight.HighlightJS = highlight;
+      highlight.default = highlight;
+    }
+  });
 
   // app/static/gitreader/modules/utils/url.ts
   function buildRepoParams(search) {
@@ -627,6 +2188,7 @@ ${secondPart}`;
       __publicField(this, "showExternalNodes", true);
       __publicField(this, "focusedNodeId", null);
       __publicField(this, "hoveredNodeId", null);
+      __publicField(this, "lastVisibilitySignature", null);
       __publicField(this, "nodeCapByScope", /* @__PURE__ */ new Map());
       __publicField(this, "nodeCap", 300);
       __publicField(this, "nodeCapStep", 200);
@@ -634,6 +2196,7 @@ ${secondPart}`;
     }
     // Renders the provided nodes/edges and rebuilds Cytoscape when needed.
     render(input) {
+      const previousLayout = this.layoutMode;
       this.layoutMode = input.layoutMode;
       if (input.nodes.length === 0) {
         this.deps.clearGraph();
@@ -646,27 +2209,30 @@ ${secondPart}`;
       }
       this.deps.setDisplayNodes(input.nodes);
       this.deps.setCanvasOverlay("", false);
+      const hadGraph = Boolean(this.graph);
       this.ensureGraph();
       if (!this.graph) {
         return;
       }
-      const selectedNodeId = this.deps.getSelectedNodeId();
+      const selectedNodeIds = this.graph.$("node:selected").map((node) => node.id());
       const positionCache = this.shouldUseManualClusterLayout() ? this.captureNodePositions() : null;
       const elements = this.buildGraphElements(input.nodes, input.edges, positionCache);
-      this.graph.elements().remove();
-      this.graph.add(elements);
-      if (selectedNodeId) {
-        const selected = this.graph.$id(selectedNodeId);
-        if (selected) {
-          selected.select();
-        }
-      }
-      if (!this.shouldUseManualClusterLayout()) {
+      const { added, removed } = this.syncGraphElements(elements);
+      const layoutChanged = previousLayout !== this.layoutMode;
+      const needsLayout = !this.shouldUseManualClusterLayout() && (!hadGraph || layoutChanged || added > 0 || removed > 0);
+      if (needsLayout) {
         this.runLayout();
       } else {
         this.deps.updateLabelVisibility();
       }
-      this.applyFilters();
+      selectedNodeIds.forEach((nodeId) => {
+        var _a;
+        const selected = (_a = this.graph) == null ? void 0 : _a.$id(nodeId);
+        if (selected && !selected.empty()) {
+          selected.select();
+        }
+      });
+      this.applyFilters({ forceVisibility: true });
     }
     // Updates the layout mode and reruns layout when graph data is already present.
     setLayout(mode) {
@@ -684,12 +2250,12 @@ ${secondPart}`;
     setFilters(filters) {
       this.edgeFilters = new Set(filters.edgeFilters);
       this.showExternalNodes = filters.showExternalNodes;
-      this.applyFilters();
+      this.applyFilters({ forceVisibility: true });
     }
     // Syncs focused node state from the orchestrator, then reapplies filters.
     setSelection(state) {
       this.focusedNodeId = state.focusedNodeId;
-      this.applyFilters();
+      this.applyFilters({ forceVisibility: true });
     }
     // Returns the current edge/node filter state so UI controls can reflect it.
     getFilterState() {
@@ -765,35 +2331,51 @@ ${secondPart}`;
       } else {
         this.edgeFilters.add(filter);
       }
-      this.applyFilters();
+      this.applyFilters({ forceVisibility: true });
     }
     // Toggles external-node visibility and returns the new state.
     toggleExternalNodes() {
       this.showExternalNodes = !this.showExternalNodes;
       return this.showExternalNodes;
     }
+    // Builds a signature of the current visibility-affecting state to detect changes.
+    buildVisibilitySignature() {
+      var _a;
+      const filters = Array.from(this.edgeFilters).sort().join("|");
+      const focus = (_a = this.focusedNodeId) != null ? _a : "";
+      const external = this.showExternalNodes ? "1" : "0";
+      const guided = this.deps.isTourActive() ? "1" : "0";
+      return `${filters}|${external}|${focus}|${guided}`;
+    }
     // Applies edge/node filters, guided filters, and focus trimming in one pass.
-    applyFilters() {
+    applyFilters(options) {
+      var _a;
       if (!this.graph) {
         return;
       }
       const cy = this.graph;
-      cy.elements().show();
-      if (!this.showExternalNodes) {
-        cy.nodes().filter('[kind = "external"]').hide();
+      const forceVisibility = (_a = options == null ? void 0 : options.forceVisibility) != null ? _a : false;
+      const signature = this.buildVisibilitySignature();
+      const shouldApplyVisibility = forceVisibility || this.lastVisibilitySignature !== signature;
+      if (shouldApplyVisibility) {
+        cy.elements().show();
+        if (!this.showExternalNodes) {
+          cy.nodes().filter('[kind = "external"]').hide();
+        }
+        cy.edges().forEach((edge) => {
+          if (!this.edgeFilters.has(edge.data("kind"))) {
+            edge.hide();
+          }
+        });
+        cy.edges().forEach((edge) => {
+          if (edge.source().hidden() || edge.target().hidden()) {
+            edge.hide();
+          }
+        });
+        this.deps.applyGuidedFilter();
+        this.applyFocus();
+        this.lastVisibilitySignature = signature;
       }
-      cy.edges().forEach((edge) => {
-        if (!this.edgeFilters.has(edge.data("kind"))) {
-          edge.hide();
-        }
-      });
-      cy.edges().forEach((edge) => {
-        if (edge.source().hidden() || edge.target().hidden()) {
-          edge.hide();
-        }
-      });
-      this.deps.applyGuidedFilter();
-      this.applyFocus();
       this.refreshEdgeHighlights();
       this.deps.updateLabelVisibility();
     }
@@ -862,12 +2444,12 @@ ${secondPart}`;
         return;
       }
       this.focusedNodeId = selected[0].id();
-      this.applyFilters();
+      this.applyFilters({ forceVisibility: true });
     }
     // Clears the focused node and restores the default visibility rules.
     resetFocus() {
       this.focusedNodeId = null;
-      this.applyFilters();
+      this.applyFilters({ forceVisibility: true });
     }
     // Creates the Cytoscape instance once and informs the app for event binding.
     ensureGraph() {
@@ -1031,6 +2613,42 @@ ${secondPart}`;
         }
       }));
       return [...nodeElements, ...edgeElements];
+    }
+    // Applies a diff between the current graph and the next element set.
+    syncGraphElements(elements) {
+      if (!this.graph) {
+        return { added: 0, removed: 0 };
+      }
+      const elementsById = /* @__PURE__ */ new Map();
+      elements.forEach((element) => {
+        elementsById.set(String(element.data.id), element);
+      });
+      const currentElements = this.graph.elements();
+      const currentIds = /* @__PURE__ */ new Set();
+      currentElements.forEach((element) => {
+        currentIds.add(element.id());
+      });
+      let removed = 0;
+      currentElements.forEach((element) => {
+        const next = elementsById.get(element.id());
+        if (!next) {
+          element.remove();
+          removed += 1;
+          return;
+        }
+        element.data(next.data);
+      });
+      const toAdd = [];
+      elements.forEach((element) => {
+        const id = String(element.data.id);
+        if (!currentIds.has(id)) {
+          toAdd.push(element);
+        }
+      });
+      if (toAdd.length > 0) {
+        this.graph.add(toAdd);
+      }
+      return { added: toAdd.length, removed };
     }
     // Captures the current node positions so manual cluster layout can preserve them across refreshes.
     captureNodePositions() {
@@ -1363,11 +2981,2753 @@ ${secondPart}`;
     }
   };
 
+  // node_modules/highlight.js/es/core.js
+  var import_core = __toESM(require_core(), 1);
+  var core_default = import_core.default;
+
+  // node_modules/highlight.js/es/languages/javascript.js
+  var IDENT_RE = "[A-Za-z$_][0-9A-Za-z$_]*";
+  var KEYWORDS = [
+    "as",
+    // for exports
+    "in",
+    "of",
+    "if",
+    "for",
+    "while",
+    "finally",
+    "var",
+    "new",
+    "function",
+    "do",
+    "return",
+    "void",
+    "else",
+    "break",
+    "catch",
+    "instanceof",
+    "with",
+    "throw",
+    "case",
+    "default",
+    "try",
+    "switch",
+    "continue",
+    "typeof",
+    "delete",
+    "let",
+    "yield",
+    "const",
+    "class",
+    // JS handles these with a special rule
+    // "get",
+    // "set",
+    "debugger",
+    "async",
+    "await",
+    "static",
+    "import",
+    "from",
+    "export",
+    "extends"
+  ];
+  var LITERALS = [
+    "true",
+    "false",
+    "null",
+    "undefined",
+    "NaN",
+    "Infinity"
+  ];
+  var TYPES = [
+    // Fundamental objects
+    "Object",
+    "Function",
+    "Boolean",
+    "Symbol",
+    // numbers and dates
+    "Math",
+    "Date",
+    "Number",
+    "BigInt",
+    // text
+    "String",
+    "RegExp",
+    // Indexed collections
+    "Array",
+    "Float32Array",
+    "Float64Array",
+    "Int8Array",
+    "Uint8Array",
+    "Uint8ClampedArray",
+    "Int16Array",
+    "Int32Array",
+    "Uint16Array",
+    "Uint32Array",
+    "BigInt64Array",
+    "BigUint64Array",
+    // Keyed collections
+    "Set",
+    "Map",
+    "WeakSet",
+    "WeakMap",
+    // Structured data
+    "ArrayBuffer",
+    "SharedArrayBuffer",
+    "Atomics",
+    "DataView",
+    "JSON",
+    // Control abstraction objects
+    "Promise",
+    "Generator",
+    "GeneratorFunction",
+    "AsyncFunction",
+    // Reflection
+    "Reflect",
+    "Proxy",
+    // Internationalization
+    "Intl",
+    // WebAssembly
+    "WebAssembly"
+  ];
+  var ERROR_TYPES = [
+    "Error",
+    "EvalError",
+    "InternalError",
+    "RangeError",
+    "ReferenceError",
+    "SyntaxError",
+    "TypeError",
+    "URIError"
+  ];
+  var BUILT_IN_GLOBALS = [
+    "setInterval",
+    "setTimeout",
+    "clearInterval",
+    "clearTimeout",
+    "require",
+    "exports",
+    "eval",
+    "isFinite",
+    "isNaN",
+    "parseFloat",
+    "parseInt",
+    "decodeURI",
+    "decodeURIComponent",
+    "encodeURI",
+    "encodeURIComponent",
+    "escape",
+    "unescape"
+  ];
+  var BUILT_IN_VARIABLES = [
+    "arguments",
+    "this",
+    "super",
+    "console",
+    "window",
+    "document",
+    "localStorage",
+    "sessionStorage",
+    "module",
+    "global"
+    // Node.js
+  ];
+  var BUILT_INS = [].concat(
+    BUILT_IN_GLOBALS,
+    TYPES,
+    ERROR_TYPES
+  );
+  function javascript(hljs) {
+    const regex = hljs.regex;
+    const hasClosingTag = (match, { after }) => {
+      const tag = "</" + match[0].slice(1);
+      const pos = match.input.indexOf(tag, after);
+      return pos !== -1;
+    };
+    const IDENT_RE$1 = IDENT_RE;
+    const FRAGMENT = {
+      begin: "<>",
+      end: "</>"
+    };
+    const XML_SELF_CLOSING = /<[A-Za-z0-9\\._:-]+\s*\/>/;
+    const XML_TAG = {
+      begin: /<[A-Za-z0-9\\._:-]+/,
+      end: /\/[A-Za-z0-9\\._:-]+>|\/>/,
+      /**
+       * @param {RegExpMatchArray} match
+       * @param {CallbackResponse} response
+       */
+      isTrulyOpeningTag: (match, response) => {
+        const afterMatchIndex = match[0].length + match.index;
+        const nextChar = match.input[afterMatchIndex];
+        if (
+          // HTML should not include another raw `<` inside a tag
+          // nested type?
+          // `<Array<Array<number>>`, etc.
+          nextChar === "<" || // the , gives away that this is not HTML
+          // `<T, A extends keyof T, V>`
+          nextChar === ","
+        ) {
+          response.ignoreMatch();
+          return;
+        }
+        if (nextChar === ">") {
+          if (!hasClosingTag(match, { after: afterMatchIndex })) {
+            response.ignoreMatch();
+          }
+        }
+        let m;
+        const afterMatch = match.input.substring(afterMatchIndex);
+        if (m = afterMatch.match(/^\s*=/)) {
+          response.ignoreMatch();
+          return;
+        }
+        if (m = afterMatch.match(/^\s+extends\s+/)) {
+          if (m.index === 0) {
+            response.ignoreMatch();
+            return;
+          }
+        }
+      }
+    };
+    const KEYWORDS$1 = {
+      $pattern: IDENT_RE,
+      keyword: KEYWORDS,
+      literal: LITERALS,
+      built_in: BUILT_INS,
+      "variable.language": BUILT_IN_VARIABLES
+    };
+    const decimalDigits = "[0-9](_?[0-9])*";
+    const frac = `\\.(${decimalDigits})`;
+    const decimalInteger = `0|[1-9](_?[0-9])*|0[0-7]*[89][0-9]*`;
+    const NUMBER = {
+      className: "number",
+      variants: [
+        // DecimalLiteral
+        { begin: `(\\b(${decimalInteger})((${frac})|\\.)?|(${frac}))[eE][+-]?(${decimalDigits})\\b` },
+        { begin: `\\b(${decimalInteger})\\b((${frac})\\b|\\.)?|(${frac})\\b` },
+        // DecimalBigIntegerLiteral
+        { begin: `\\b(0|[1-9](_?[0-9])*)n\\b` },
+        // NonDecimalIntegerLiteral
+        { begin: "\\b0[xX][0-9a-fA-F](_?[0-9a-fA-F])*n?\\b" },
+        { begin: "\\b0[bB][0-1](_?[0-1])*n?\\b" },
+        { begin: "\\b0[oO][0-7](_?[0-7])*n?\\b" },
+        // LegacyOctalIntegerLiteral (does not include underscore separators)
+        // https://tc39.es/ecma262/#sec-additional-syntax-numeric-literals
+        { begin: "\\b0[0-7]+n?\\b" }
+      ],
+      relevance: 0
+    };
+    const SUBST = {
+      className: "subst",
+      begin: "\\$\\{",
+      end: "\\}",
+      keywords: KEYWORDS$1,
+      contains: []
+      // defined later
+    };
+    const HTML_TEMPLATE = {
+      begin: "html`",
+      end: "",
+      starts: {
+        end: "`",
+        returnEnd: false,
+        contains: [
+          hljs.BACKSLASH_ESCAPE,
+          SUBST
+        ],
+        subLanguage: "xml"
+      }
+    };
+    const CSS_TEMPLATE = {
+      begin: "css`",
+      end: "",
+      starts: {
+        end: "`",
+        returnEnd: false,
+        contains: [
+          hljs.BACKSLASH_ESCAPE,
+          SUBST
+        ],
+        subLanguage: "css"
+      }
+    };
+    const GRAPHQL_TEMPLATE = {
+      begin: "gql`",
+      end: "",
+      starts: {
+        end: "`",
+        returnEnd: false,
+        contains: [
+          hljs.BACKSLASH_ESCAPE,
+          SUBST
+        ],
+        subLanguage: "graphql"
+      }
+    };
+    const TEMPLATE_STRING = {
+      className: "string",
+      begin: "`",
+      end: "`",
+      contains: [
+        hljs.BACKSLASH_ESCAPE,
+        SUBST
+      ]
+    };
+    const JSDOC_COMMENT = hljs.COMMENT(
+      /\/\*\*(?!\/)/,
+      "\\*/",
+      {
+        relevance: 0,
+        contains: [
+          {
+            begin: "(?=@[A-Za-z]+)",
+            relevance: 0,
+            contains: [
+              {
+                className: "doctag",
+                begin: "@[A-Za-z]+"
+              },
+              {
+                className: "type",
+                begin: "\\{",
+                end: "\\}",
+                excludeEnd: true,
+                excludeBegin: true,
+                relevance: 0
+              },
+              {
+                className: "variable",
+                begin: IDENT_RE$1 + "(?=\\s*(-)|$)",
+                endsParent: true,
+                relevance: 0
+              },
+              // eat spaces (not newlines) so we can find
+              // types or variables
+              {
+                begin: /(?=[^\n])\s/,
+                relevance: 0
+              }
+            ]
+          }
+        ]
+      }
+    );
+    const COMMENT = {
+      className: "comment",
+      variants: [
+        JSDOC_COMMENT,
+        hljs.C_BLOCK_COMMENT_MODE,
+        hljs.C_LINE_COMMENT_MODE
+      ]
+    };
+    const SUBST_INTERNALS = [
+      hljs.APOS_STRING_MODE,
+      hljs.QUOTE_STRING_MODE,
+      HTML_TEMPLATE,
+      CSS_TEMPLATE,
+      GRAPHQL_TEMPLATE,
+      TEMPLATE_STRING,
+      // Skip numbers when they are part of a variable name
+      { match: /\$\d+/ },
+      NUMBER
+      // This is intentional:
+      // See https://github.com/highlightjs/highlight.js/issues/3288
+      // hljs.REGEXP_MODE
+    ];
+    SUBST.contains = SUBST_INTERNALS.concat({
+      // we need to pair up {} inside our subst to prevent
+      // it from ending too early by matching another }
+      begin: /\{/,
+      end: /\}/,
+      keywords: KEYWORDS$1,
+      contains: [
+        "self"
+      ].concat(SUBST_INTERNALS)
+    });
+    const SUBST_AND_COMMENTS = [].concat(COMMENT, SUBST.contains);
+    const PARAMS_CONTAINS = SUBST_AND_COMMENTS.concat([
+      // eat recursive parens in sub expressions
+      {
+        begin: /\(/,
+        end: /\)/,
+        keywords: KEYWORDS$1,
+        contains: ["self"].concat(SUBST_AND_COMMENTS)
+      }
+    ]);
+    const PARAMS = {
+      className: "params",
+      begin: /\(/,
+      end: /\)/,
+      excludeBegin: true,
+      excludeEnd: true,
+      keywords: KEYWORDS$1,
+      contains: PARAMS_CONTAINS
+    };
+    const CLASS_OR_EXTENDS = {
+      variants: [
+        // class Car extends vehicle
+        {
+          match: [
+            /class/,
+            /\s+/,
+            IDENT_RE$1,
+            /\s+/,
+            /extends/,
+            /\s+/,
+            regex.concat(IDENT_RE$1, "(", regex.concat(/\./, IDENT_RE$1), ")*")
+          ],
+          scope: {
+            1: "keyword",
+            3: "title.class",
+            5: "keyword",
+            7: "title.class.inherited"
+          }
+        },
+        // class Car
+        {
+          match: [
+            /class/,
+            /\s+/,
+            IDENT_RE$1
+          ],
+          scope: {
+            1: "keyword",
+            3: "title.class"
+          }
+        }
+      ]
+    };
+    const CLASS_REFERENCE = {
+      relevance: 0,
+      match: regex.either(
+        // Hard coded exceptions
+        /\bJSON/,
+        // Float32Array, OutT
+        /\b[A-Z][a-z]+([A-Z][a-z]*|\d)*/,
+        // CSSFactory, CSSFactoryT
+        /\b[A-Z]{2,}([A-Z][a-z]+|\d)+([A-Z][a-z]*)*/,
+        // FPs, FPsT
+        /\b[A-Z]{2,}[a-z]+([A-Z][a-z]+|\d)*([A-Z][a-z]*)*/
+        // P
+        // single letters are not highlighted
+        // BLAH
+        // this will be flagged as a UPPER_CASE_CONSTANT instead
+      ),
+      className: "title.class",
+      keywords: {
+        _: [
+          // se we still get relevance credit for JS library classes
+          ...TYPES,
+          ...ERROR_TYPES
+        ]
+      }
+    };
+    const USE_STRICT = {
+      label: "use_strict",
+      className: "meta",
+      relevance: 10,
+      begin: /^\s*['"]use (strict|asm)['"]/
+    };
+    const FUNCTION_DEFINITION = {
+      variants: [
+        {
+          match: [
+            /function/,
+            /\s+/,
+            IDENT_RE$1,
+            /(?=\s*\()/
+          ]
+        },
+        // anonymous function
+        {
+          match: [
+            /function/,
+            /\s*(?=\()/
+          ]
+        }
+      ],
+      className: {
+        1: "keyword",
+        3: "title.function"
+      },
+      label: "func.def",
+      contains: [PARAMS],
+      illegal: /%/
+    };
+    const UPPER_CASE_CONSTANT = {
+      relevance: 0,
+      match: /\b[A-Z][A-Z_0-9]+\b/,
+      className: "variable.constant"
+    };
+    function noneOf(list) {
+      return regex.concat("(?!", list.join("|"), ")");
+    }
+    const FUNCTION_CALL = {
+      match: regex.concat(
+        /\b/,
+        noneOf([
+          ...BUILT_IN_GLOBALS,
+          "super",
+          "import"
+        ]),
+        IDENT_RE$1,
+        regex.lookahead(/\(/)
+      ),
+      className: "title.function",
+      relevance: 0
+    };
+    const PROPERTY_ACCESS = {
+      begin: regex.concat(/\./, regex.lookahead(
+        regex.concat(IDENT_RE$1, /(?![0-9A-Za-z$_(])/)
+      )),
+      end: IDENT_RE$1,
+      excludeBegin: true,
+      keywords: "prototype",
+      className: "property",
+      relevance: 0
+    };
+    const GETTER_OR_SETTER = {
+      match: [
+        /get|set/,
+        /\s+/,
+        IDENT_RE$1,
+        /(?=\()/
+      ],
+      className: {
+        1: "keyword",
+        3: "title.function"
+      },
+      contains: [
+        {
+          // eat to avoid empty params
+          begin: /\(\)/
+        },
+        PARAMS
+      ]
+    };
+    const FUNC_LEAD_IN_RE = "(\\([^()]*(\\([^()]*(\\([^()]*\\)[^()]*)*\\)[^()]*)*\\)|" + hljs.UNDERSCORE_IDENT_RE + ")\\s*=>";
+    const FUNCTION_VARIABLE = {
+      match: [
+        /const|var|let/,
+        /\s+/,
+        IDENT_RE$1,
+        /\s*/,
+        /=\s*/,
+        /(async\s*)?/,
+        // async is optional
+        regex.lookahead(FUNC_LEAD_IN_RE)
+      ],
+      keywords: "async",
+      className: {
+        1: "keyword",
+        3: "title.function"
+      },
+      contains: [
+        PARAMS
+      ]
+    };
+    return {
+      name: "JavaScript",
+      aliases: ["js", "jsx", "mjs", "cjs"],
+      keywords: KEYWORDS$1,
+      // this will be extended by TypeScript
+      exports: { PARAMS_CONTAINS, CLASS_REFERENCE },
+      illegal: /#(?![$_A-z])/,
+      contains: [
+        hljs.SHEBANG({
+          label: "shebang",
+          binary: "node",
+          relevance: 5
+        }),
+        USE_STRICT,
+        hljs.APOS_STRING_MODE,
+        hljs.QUOTE_STRING_MODE,
+        HTML_TEMPLATE,
+        CSS_TEMPLATE,
+        GRAPHQL_TEMPLATE,
+        TEMPLATE_STRING,
+        COMMENT,
+        // Skip numbers when they are part of a variable name
+        { match: /\$\d+/ },
+        NUMBER,
+        CLASS_REFERENCE,
+        {
+          className: "attr",
+          begin: IDENT_RE$1 + regex.lookahead(":"),
+          relevance: 0
+        },
+        FUNCTION_VARIABLE,
+        {
+          // "value" container
+          begin: "(" + hljs.RE_STARTERS_RE + "|\\b(case|return|throw)\\b)\\s*",
+          keywords: "return throw case",
+          relevance: 0,
+          contains: [
+            COMMENT,
+            hljs.REGEXP_MODE,
+            {
+              className: "function",
+              // we have to count the parens to make sure we actually have the
+              // correct bounding ( ) before the =>.  There could be any number of
+              // sub-expressions inside also surrounded by parens.
+              begin: FUNC_LEAD_IN_RE,
+              returnBegin: true,
+              end: "\\s*=>",
+              contains: [
+                {
+                  className: "params",
+                  variants: [
+                    {
+                      begin: hljs.UNDERSCORE_IDENT_RE,
+                      relevance: 0
+                    },
+                    {
+                      className: null,
+                      begin: /\(\s*\)/,
+                      skip: true
+                    },
+                    {
+                      begin: /\(/,
+                      end: /\)/,
+                      excludeBegin: true,
+                      excludeEnd: true,
+                      keywords: KEYWORDS$1,
+                      contains: PARAMS_CONTAINS
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              // could be a comma delimited list of params to a function call
+              begin: /,/,
+              relevance: 0
+            },
+            {
+              match: /\s+/,
+              relevance: 0
+            },
+            {
+              // JSX
+              variants: [
+                { begin: FRAGMENT.begin, end: FRAGMENT.end },
+                { match: XML_SELF_CLOSING },
+                {
+                  begin: XML_TAG.begin,
+                  // we carefully check the opening tag to see if it truly
+                  // is a tag and not a false positive
+                  "on:begin": XML_TAG.isTrulyOpeningTag,
+                  end: XML_TAG.end
+                }
+              ],
+              subLanguage: "xml",
+              contains: [
+                {
+                  begin: XML_TAG.begin,
+                  end: XML_TAG.end,
+                  skip: true,
+                  contains: ["self"]
+                }
+              ]
+            }
+          ]
+        },
+        FUNCTION_DEFINITION,
+        {
+          // prevent this from getting swallowed up by function
+          // since they appear "function like"
+          beginKeywords: "while if switch catch for"
+        },
+        {
+          // we have to count the parens to make sure we actually have the correct
+          // bounding ( ).  There could be any number of sub-expressions inside
+          // also surrounded by parens.
+          begin: "\\b(?!function)" + hljs.UNDERSCORE_IDENT_RE + "\\([^()]*(\\([^()]*(\\([^()]*\\)[^()]*)*\\)[^()]*)*\\)\\s*\\{",
+          // end parens
+          returnBegin: true,
+          label: "func.def",
+          contains: [
+            PARAMS,
+            hljs.inherit(hljs.TITLE_MODE, { begin: IDENT_RE$1, className: "title.function" })
+          ]
+        },
+        // catch ... so it won't trigger the property rule below
+        {
+          match: /\.\.\./,
+          relevance: 0
+        },
+        PROPERTY_ACCESS,
+        // hack: prevents detection of keywords in some circumstances
+        // .keyword()
+        // $keyword = x
+        {
+          match: "\\$" + IDENT_RE$1,
+          relevance: 0
+        },
+        {
+          match: [/\bconstructor(?=\s*\()/],
+          className: { 1: "title.function" },
+          contains: [PARAMS]
+        },
+        FUNCTION_CALL,
+        UPPER_CASE_CONSTANT,
+        CLASS_OR_EXTENDS,
+        GETTER_OR_SETTER,
+        {
+          match: /\$[(.]/
+          // relevance booster for a pattern common to JS libs: `$(something)` and `$.something`
+        }
+      ]
+    };
+  }
+
+  // node_modules/highlight.js/es/languages/typescript.js
+  var IDENT_RE2 = "[A-Za-z$_][0-9A-Za-z$_]*";
+  var KEYWORDS2 = [
+    "as",
+    // for exports
+    "in",
+    "of",
+    "if",
+    "for",
+    "while",
+    "finally",
+    "var",
+    "new",
+    "function",
+    "do",
+    "return",
+    "void",
+    "else",
+    "break",
+    "catch",
+    "instanceof",
+    "with",
+    "throw",
+    "case",
+    "default",
+    "try",
+    "switch",
+    "continue",
+    "typeof",
+    "delete",
+    "let",
+    "yield",
+    "const",
+    "class",
+    // JS handles these with a special rule
+    // "get",
+    // "set",
+    "debugger",
+    "async",
+    "await",
+    "static",
+    "import",
+    "from",
+    "export",
+    "extends"
+  ];
+  var LITERALS2 = [
+    "true",
+    "false",
+    "null",
+    "undefined",
+    "NaN",
+    "Infinity"
+  ];
+  var TYPES2 = [
+    // Fundamental objects
+    "Object",
+    "Function",
+    "Boolean",
+    "Symbol",
+    // numbers and dates
+    "Math",
+    "Date",
+    "Number",
+    "BigInt",
+    // text
+    "String",
+    "RegExp",
+    // Indexed collections
+    "Array",
+    "Float32Array",
+    "Float64Array",
+    "Int8Array",
+    "Uint8Array",
+    "Uint8ClampedArray",
+    "Int16Array",
+    "Int32Array",
+    "Uint16Array",
+    "Uint32Array",
+    "BigInt64Array",
+    "BigUint64Array",
+    // Keyed collections
+    "Set",
+    "Map",
+    "WeakSet",
+    "WeakMap",
+    // Structured data
+    "ArrayBuffer",
+    "SharedArrayBuffer",
+    "Atomics",
+    "DataView",
+    "JSON",
+    // Control abstraction objects
+    "Promise",
+    "Generator",
+    "GeneratorFunction",
+    "AsyncFunction",
+    // Reflection
+    "Reflect",
+    "Proxy",
+    // Internationalization
+    "Intl",
+    // WebAssembly
+    "WebAssembly"
+  ];
+  var ERROR_TYPES2 = [
+    "Error",
+    "EvalError",
+    "InternalError",
+    "RangeError",
+    "ReferenceError",
+    "SyntaxError",
+    "TypeError",
+    "URIError"
+  ];
+  var BUILT_IN_GLOBALS2 = [
+    "setInterval",
+    "setTimeout",
+    "clearInterval",
+    "clearTimeout",
+    "require",
+    "exports",
+    "eval",
+    "isFinite",
+    "isNaN",
+    "parseFloat",
+    "parseInt",
+    "decodeURI",
+    "decodeURIComponent",
+    "encodeURI",
+    "encodeURIComponent",
+    "escape",
+    "unescape"
+  ];
+  var BUILT_IN_VARIABLES2 = [
+    "arguments",
+    "this",
+    "super",
+    "console",
+    "window",
+    "document",
+    "localStorage",
+    "sessionStorage",
+    "module",
+    "global"
+    // Node.js
+  ];
+  var BUILT_INS2 = [].concat(
+    BUILT_IN_GLOBALS2,
+    TYPES2,
+    ERROR_TYPES2
+  );
+  function javascript2(hljs) {
+    const regex = hljs.regex;
+    const hasClosingTag = (match, { after }) => {
+      const tag = "</" + match[0].slice(1);
+      const pos = match.input.indexOf(tag, after);
+      return pos !== -1;
+    };
+    const IDENT_RE$1 = IDENT_RE2;
+    const FRAGMENT = {
+      begin: "<>",
+      end: "</>"
+    };
+    const XML_SELF_CLOSING = /<[A-Za-z0-9\\._:-]+\s*\/>/;
+    const XML_TAG = {
+      begin: /<[A-Za-z0-9\\._:-]+/,
+      end: /\/[A-Za-z0-9\\._:-]+>|\/>/,
+      /**
+       * @param {RegExpMatchArray} match
+       * @param {CallbackResponse} response
+       */
+      isTrulyOpeningTag: (match, response) => {
+        const afterMatchIndex = match[0].length + match.index;
+        const nextChar = match.input[afterMatchIndex];
+        if (
+          // HTML should not include another raw `<` inside a tag
+          // nested type?
+          // `<Array<Array<number>>`, etc.
+          nextChar === "<" || // the , gives away that this is not HTML
+          // `<T, A extends keyof T, V>`
+          nextChar === ","
+        ) {
+          response.ignoreMatch();
+          return;
+        }
+        if (nextChar === ">") {
+          if (!hasClosingTag(match, { after: afterMatchIndex })) {
+            response.ignoreMatch();
+          }
+        }
+        let m;
+        const afterMatch = match.input.substring(afterMatchIndex);
+        if (m = afterMatch.match(/^\s*=/)) {
+          response.ignoreMatch();
+          return;
+        }
+        if (m = afterMatch.match(/^\s+extends\s+/)) {
+          if (m.index === 0) {
+            response.ignoreMatch();
+            return;
+          }
+        }
+      }
+    };
+    const KEYWORDS$1 = {
+      $pattern: IDENT_RE2,
+      keyword: KEYWORDS2,
+      literal: LITERALS2,
+      built_in: BUILT_INS2,
+      "variable.language": BUILT_IN_VARIABLES2
+    };
+    const decimalDigits = "[0-9](_?[0-9])*";
+    const frac = `\\.(${decimalDigits})`;
+    const decimalInteger = `0|[1-9](_?[0-9])*|0[0-7]*[89][0-9]*`;
+    const NUMBER = {
+      className: "number",
+      variants: [
+        // DecimalLiteral
+        { begin: `(\\b(${decimalInteger})((${frac})|\\.)?|(${frac}))[eE][+-]?(${decimalDigits})\\b` },
+        { begin: `\\b(${decimalInteger})\\b((${frac})\\b|\\.)?|(${frac})\\b` },
+        // DecimalBigIntegerLiteral
+        { begin: `\\b(0|[1-9](_?[0-9])*)n\\b` },
+        // NonDecimalIntegerLiteral
+        { begin: "\\b0[xX][0-9a-fA-F](_?[0-9a-fA-F])*n?\\b" },
+        { begin: "\\b0[bB][0-1](_?[0-1])*n?\\b" },
+        { begin: "\\b0[oO][0-7](_?[0-7])*n?\\b" },
+        // LegacyOctalIntegerLiteral (does not include underscore separators)
+        // https://tc39.es/ecma262/#sec-additional-syntax-numeric-literals
+        { begin: "\\b0[0-7]+n?\\b" }
+      ],
+      relevance: 0
+    };
+    const SUBST = {
+      className: "subst",
+      begin: "\\$\\{",
+      end: "\\}",
+      keywords: KEYWORDS$1,
+      contains: []
+      // defined later
+    };
+    const HTML_TEMPLATE = {
+      begin: "html`",
+      end: "",
+      starts: {
+        end: "`",
+        returnEnd: false,
+        contains: [
+          hljs.BACKSLASH_ESCAPE,
+          SUBST
+        ],
+        subLanguage: "xml"
+      }
+    };
+    const CSS_TEMPLATE = {
+      begin: "css`",
+      end: "",
+      starts: {
+        end: "`",
+        returnEnd: false,
+        contains: [
+          hljs.BACKSLASH_ESCAPE,
+          SUBST
+        ],
+        subLanguage: "css"
+      }
+    };
+    const GRAPHQL_TEMPLATE = {
+      begin: "gql`",
+      end: "",
+      starts: {
+        end: "`",
+        returnEnd: false,
+        contains: [
+          hljs.BACKSLASH_ESCAPE,
+          SUBST
+        ],
+        subLanguage: "graphql"
+      }
+    };
+    const TEMPLATE_STRING = {
+      className: "string",
+      begin: "`",
+      end: "`",
+      contains: [
+        hljs.BACKSLASH_ESCAPE,
+        SUBST
+      ]
+    };
+    const JSDOC_COMMENT = hljs.COMMENT(
+      /\/\*\*(?!\/)/,
+      "\\*/",
+      {
+        relevance: 0,
+        contains: [
+          {
+            begin: "(?=@[A-Za-z]+)",
+            relevance: 0,
+            contains: [
+              {
+                className: "doctag",
+                begin: "@[A-Za-z]+"
+              },
+              {
+                className: "type",
+                begin: "\\{",
+                end: "\\}",
+                excludeEnd: true,
+                excludeBegin: true,
+                relevance: 0
+              },
+              {
+                className: "variable",
+                begin: IDENT_RE$1 + "(?=\\s*(-)|$)",
+                endsParent: true,
+                relevance: 0
+              },
+              // eat spaces (not newlines) so we can find
+              // types or variables
+              {
+                begin: /(?=[^\n])\s/,
+                relevance: 0
+              }
+            ]
+          }
+        ]
+      }
+    );
+    const COMMENT = {
+      className: "comment",
+      variants: [
+        JSDOC_COMMENT,
+        hljs.C_BLOCK_COMMENT_MODE,
+        hljs.C_LINE_COMMENT_MODE
+      ]
+    };
+    const SUBST_INTERNALS = [
+      hljs.APOS_STRING_MODE,
+      hljs.QUOTE_STRING_MODE,
+      HTML_TEMPLATE,
+      CSS_TEMPLATE,
+      GRAPHQL_TEMPLATE,
+      TEMPLATE_STRING,
+      // Skip numbers when they are part of a variable name
+      { match: /\$\d+/ },
+      NUMBER
+      // This is intentional:
+      // See https://github.com/highlightjs/highlight.js/issues/3288
+      // hljs.REGEXP_MODE
+    ];
+    SUBST.contains = SUBST_INTERNALS.concat({
+      // we need to pair up {} inside our subst to prevent
+      // it from ending too early by matching another }
+      begin: /\{/,
+      end: /\}/,
+      keywords: KEYWORDS$1,
+      contains: [
+        "self"
+      ].concat(SUBST_INTERNALS)
+    });
+    const SUBST_AND_COMMENTS = [].concat(COMMENT, SUBST.contains);
+    const PARAMS_CONTAINS = SUBST_AND_COMMENTS.concat([
+      // eat recursive parens in sub expressions
+      {
+        begin: /\(/,
+        end: /\)/,
+        keywords: KEYWORDS$1,
+        contains: ["self"].concat(SUBST_AND_COMMENTS)
+      }
+    ]);
+    const PARAMS = {
+      className: "params",
+      begin: /\(/,
+      end: /\)/,
+      excludeBegin: true,
+      excludeEnd: true,
+      keywords: KEYWORDS$1,
+      contains: PARAMS_CONTAINS
+    };
+    const CLASS_OR_EXTENDS = {
+      variants: [
+        // class Car extends vehicle
+        {
+          match: [
+            /class/,
+            /\s+/,
+            IDENT_RE$1,
+            /\s+/,
+            /extends/,
+            /\s+/,
+            regex.concat(IDENT_RE$1, "(", regex.concat(/\./, IDENT_RE$1), ")*")
+          ],
+          scope: {
+            1: "keyword",
+            3: "title.class",
+            5: "keyword",
+            7: "title.class.inherited"
+          }
+        },
+        // class Car
+        {
+          match: [
+            /class/,
+            /\s+/,
+            IDENT_RE$1
+          ],
+          scope: {
+            1: "keyword",
+            3: "title.class"
+          }
+        }
+      ]
+    };
+    const CLASS_REFERENCE = {
+      relevance: 0,
+      match: regex.either(
+        // Hard coded exceptions
+        /\bJSON/,
+        // Float32Array, OutT
+        /\b[A-Z][a-z]+([A-Z][a-z]*|\d)*/,
+        // CSSFactory, CSSFactoryT
+        /\b[A-Z]{2,}([A-Z][a-z]+|\d)+([A-Z][a-z]*)*/,
+        // FPs, FPsT
+        /\b[A-Z]{2,}[a-z]+([A-Z][a-z]+|\d)*([A-Z][a-z]*)*/
+        // P
+        // single letters are not highlighted
+        // BLAH
+        // this will be flagged as a UPPER_CASE_CONSTANT instead
+      ),
+      className: "title.class",
+      keywords: {
+        _: [
+          // se we still get relevance credit for JS library classes
+          ...TYPES2,
+          ...ERROR_TYPES2
+        ]
+      }
+    };
+    const USE_STRICT = {
+      label: "use_strict",
+      className: "meta",
+      relevance: 10,
+      begin: /^\s*['"]use (strict|asm)['"]/
+    };
+    const FUNCTION_DEFINITION = {
+      variants: [
+        {
+          match: [
+            /function/,
+            /\s+/,
+            IDENT_RE$1,
+            /(?=\s*\()/
+          ]
+        },
+        // anonymous function
+        {
+          match: [
+            /function/,
+            /\s*(?=\()/
+          ]
+        }
+      ],
+      className: {
+        1: "keyword",
+        3: "title.function"
+      },
+      label: "func.def",
+      contains: [PARAMS],
+      illegal: /%/
+    };
+    const UPPER_CASE_CONSTANT = {
+      relevance: 0,
+      match: /\b[A-Z][A-Z_0-9]+\b/,
+      className: "variable.constant"
+    };
+    function noneOf(list) {
+      return regex.concat("(?!", list.join("|"), ")");
+    }
+    const FUNCTION_CALL = {
+      match: regex.concat(
+        /\b/,
+        noneOf([
+          ...BUILT_IN_GLOBALS2,
+          "super",
+          "import"
+        ]),
+        IDENT_RE$1,
+        regex.lookahead(/\(/)
+      ),
+      className: "title.function",
+      relevance: 0
+    };
+    const PROPERTY_ACCESS = {
+      begin: regex.concat(/\./, regex.lookahead(
+        regex.concat(IDENT_RE$1, /(?![0-9A-Za-z$_(])/)
+      )),
+      end: IDENT_RE$1,
+      excludeBegin: true,
+      keywords: "prototype",
+      className: "property",
+      relevance: 0
+    };
+    const GETTER_OR_SETTER = {
+      match: [
+        /get|set/,
+        /\s+/,
+        IDENT_RE$1,
+        /(?=\()/
+      ],
+      className: {
+        1: "keyword",
+        3: "title.function"
+      },
+      contains: [
+        {
+          // eat to avoid empty params
+          begin: /\(\)/
+        },
+        PARAMS
+      ]
+    };
+    const FUNC_LEAD_IN_RE = "(\\([^()]*(\\([^()]*(\\([^()]*\\)[^()]*)*\\)[^()]*)*\\)|" + hljs.UNDERSCORE_IDENT_RE + ")\\s*=>";
+    const FUNCTION_VARIABLE = {
+      match: [
+        /const|var|let/,
+        /\s+/,
+        IDENT_RE$1,
+        /\s*/,
+        /=\s*/,
+        /(async\s*)?/,
+        // async is optional
+        regex.lookahead(FUNC_LEAD_IN_RE)
+      ],
+      keywords: "async",
+      className: {
+        1: "keyword",
+        3: "title.function"
+      },
+      contains: [
+        PARAMS
+      ]
+    };
+    return {
+      name: "JavaScript",
+      aliases: ["js", "jsx", "mjs", "cjs"],
+      keywords: KEYWORDS$1,
+      // this will be extended by TypeScript
+      exports: { PARAMS_CONTAINS, CLASS_REFERENCE },
+      illegal: /#(?![$_A-z])/,
+      contains: [
+        hljs.SHEBANG({
+          label: "shebang",
+          binary: "node",
+          relevance: 5
+        }),
+        USE_STRICT,
+        hljs.APOS_STRING_MODE,
+        hljs.QUOTE_STRING_MODE,
+        HTML_TEMPLATE,
+        CSS_TEMPLATE,
+        GRAPHQL_TEMPLATE,
+        TEMPLATE_STRING,
+        COMMENT,
+        // Skip numbers when they are part of a variable name
+        { match: /\$\d+/ },
+        NUMBER,
+        CLASS_REFERENCE,
+        {
+          className: "attr",
+          begin: IDENT_RE$1 + regex.lookahead(":"),
+          relevance: 0
+        },
+        FUNCTION_VARIABLE,
+        {
+          // "value" container
+          begin: "(" + hljs.RE_STARTERS_RE + "|\\b(case|return|throw)\\b)\\s*",
+          keywords: "return throw case",
+          relevance: 0,
+          contains: [
+            COMMENT,
+            hljs.REGEXP_MODE,
+            {
+              className: "function",
+              // we have to count the parens to make sure we actually have the
+              // correct bounding ( ) before the =>.  There could be any number of
+              // sub-expressions inside also surrounded by parens.
+              begin: FUNC_LEAD_IN_RE,
+              returnBegin: true,
+              end: "\\s*=>",
+              contains: [
+                {
+                  className: "params",
+                  variants: [
+                    {
+                      begin: hljs.UNDERSCORE_IDENT_RE,
+                      relevance: 0
+                    },
+                    {
+                      className: null,
+                      begin: /\(\s*\)/,
+                      skip: true
+                    },
+                    {
+                      begin: /\(/,
+                      end: /\)/,
+                      excludeBegin: true,
+                      excludeEnd: true,
+                      keywords: KEYWORDS$1,
+                      contains: PARAMS_CONTAINS
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              // could be a comma delimited list of params to a function call
+              begin: /,/,
+              relevance: 0
+            },
+            {
+              match: /\s+/,
+              relevance: 0
+            },
+            {
+              // JSX
+              variants: [
+                { begin: FRAGMENT.begin, end: FRAGMENT.end },
+                { match: XML_SELF_CLOSING },
+                {
+                  begin: XML_TAG.begin,
+                  // we carefully check the opening tag to see if it truly
+                  // is a tag and not a false positive
+                  "on:begin": XML_TAG.isTrulyOpeningTag,
+                  end: XML_TAG.end
+                }
+              ],
+              subLanguage: "xml",
+              contains: [
+                {
+                  begin: XML_TAG.begin,
+                  end: XML_TAG.end,
+                  skip: true,
+                  contains: ["self"]
+                }
+              ]
+            }
+          ]
+        },
+        FUNCTION_DEFINITION,
+        {
+          // prevent this from getting swallowed up by function
+          // since they appear "function like"
+          beginKeywords: "while if switch catch for"
+        },
+        {
+          // we have to count the parens to make sure we actually have the correct
+          // bounding ( ).  There could be any number of sub-expressions inside
+          // also surrounded by parens.
+          begin: "\\b(?!function)" + hljs.UNDERSCORE_IDENT_RE + "\\([^()]*(\\([^()]*(\\([^()]*\\)[^()]*)*\\)[^()]*)*\\)\\s*\\{",
+          // end parens
+          returnBegin: true,
+          label: "func.def",
+          contains: [
+            PARAMS,
+            hljs.inherit(hljs.TITLE_MODE, { begin: IDENT_RE$1, className: "title.function" })
+          ]
+        },
+        // catch ... so it won't trigger the property rule below
+        {
+          match: /\.\.\./,
+          relevance: 0
+        },
+        PROPERTY_ACCESS,
+        // hack: prevents detection of keywords in some circumstances
+        // .keyword()
+        // $keyword = x
+        {
+          match: "\\$" + IDENT_RE$1,
+          relevance: 0
+        },
+        {
+          match: [/\bconstructor(?=\s*\()/],
+          className: { 1: "title.function" },
+          contains: [PARAMS]
+        },
+        FUNCTION_CALL,
+        UPPER_CASE_CONSTANT,
+        CLASS_OR_EXTENDS,
+        GETTER_OR_SETTER,
+        {
+          match: /\$[(.]/
+          // relevance booster for a pattern common to JS libs: `$(something)` and `$.something`
+        }
+      ]
+    };
+  }
+  function typescript(hljs) {
+    const tsLanguage = javascript2(hljs);
+    const IDENT_RE$1 = IDENT_RE2;
+    const TYPES3 = [
+      "any",
+      "void",
+      "number",
+      "boolean",
+      "string",
+      "object",
+      "never",
+      "symbol",
+      "bigint",
+      "unknown"
+    ];
+    const NAMESPACE = {
+      beginKeywords: "namespace",
+      end: /\{/,
+      excludeEnd: true,
+      contains: [tsLanguage.exports.CLASS_REFERENCE]
+    };
+    const INTERFACE = {
+      beginKeywords: "interface",
+      end: /\{/,
+      excludeEnd: true,
+      keywords: {
+        keyword: "interface extends",
+        built_in: TYPES3
+      },
+      contains: [tsLanguage.exports.CLASS_REFERENCE]
+    };
+    const USE_STRICT = {
+      className: "meta",
+      relevance: 10,
+      begin: /^\s*['"]use strict['"]/
+    };
+    const TS_SPECIFIC_KEYWORDS = [
+      "type",
+      "namespace",
+      "interface",
+      "public",
+      "private",
+      "protected",
+      "implements",
+      "declare",
+      "abstract",
+      "readonly",
+      "enum",
+      "override"
+    ];
+    const KEYWORDS$1 = {
+      $pattern: IDENT_RE2,
+      keyword: KEYWORDS2.concat(TS_SPECIFIC_KEYWORDS),
+      literal: LITERALS2,
+      built_in: BUILT_INS2.concat(TYPES3),
+      "variable.language": BUILT_IN_VARIABLES2
+    };
+    const DECORATOR = {
+      className: "meta",
+      begin: "@" + IDENT_RE$1
+    };
+    const swapMode = (mode, label, replacement) => {
+      const indx = mode.contains.findIndex((m) => m.label === label);
+      if (indx === -1) {
+        throw new Error("can not find mode to replace");
+      }
+      mode.contains.splice(indx, 1, replacement);
+    };
+    Object.assign(tsLanguage.keywords, KEYWORDS$1);
+    tsLanguage.exports.PARAMS_CONTAINS.push(DECORATOR);
+    tsLanguage.contains = tsLanguage.contains.concat([
+      DECORATOR,
+      NAMESPACE,
+      INTERFACE
+    ]);
+    swapMode(tsLanguage, "shebang", hljs.SHEBANG());
+    swapMode(tsLanguage, "use_strict", USE_STRICT);
+    const functionDeclaration = tsLanguage.contains.find((m) => m.label === "func.def");
+    functionDeclaration.relevance = 0;
+    Object.assign(tsLanguage, {
+      name: "TypeScript",
+      aliases: [
+        "ts",
+        "tsx",
+        "mts",
+        "cts"
+      ]
+    });
+    return tsLanguage;
+  }
+
+  // node_modules/highlight.js/es/languages/python.js
+  function python(hljs) {
+    const regex = hljs.regex;
+    const IDENT_RE3 = /[\p{XID_Start}_]\p{XID_Continue}*/u;
+    const RESERVED_WORDS = [
+      "and",
+      "as",
+      "assert",
+      "async",
+      "await",
+      "break",
+      "case",
+      "class",
+      "continue",
+      "def",
+      "del",
+      "elif",
+      "else",
+      "except",
+      "finally",
+      "for",
+      "from",
+      "global",
+      "if",
+      "import",
+      "in",
+      "is",
+      "lambda",
+      "match",
+      "nonlocal|10",
+      "not",
+      "or",
+      "pass",
+      "raise",
+      "return",
+      "try",
+      "while",
+      "with",
+      "yield"
+    ];
+    const BUILT_INS3 = [
+      "__import__",
+      "abs",
+      "all",
+      "any",
+      "ascii",
+      "bin",
+      "bool",
+      "breakpoint",
+      "bytearray",
+      "bytes",
+      "callable",
+      "chr",
+      "classmethod",
+      "compile",
+      "complex",
+      "delattr",
+      "dict",
+      "dir",
+      "divmod",
+      "enumerate",
+      "eval",
+      "exec",
+      "filter",
+      "float",
+      "format",
+      "frozenset",
+      "getattr",
+      "globals",
+      "hasattr",
+      "hash",
+      "help",
+      "hex",
+      "id",
+      "input",
+      "int",
+      "isinstance",
+      "issubclass",
+      "iter",
+      "len",
+      "list",
+      "locals",
+      "map",
+      "max",
+      "memoryview",
+      "min",
+      "next",
+      "object",
+      "oct",
+      "open",
+      "ord",
+      "pow",
+      "print",
+      "property",
+      "range",
+      "repr",
+      "reversed",
+      "round",
+      "set",
+      "setattr",
+      "slice",
+      "sorted",
+      "staticmethod",
+      "str",
+      "sum",
+      "super",
+      "tuple",
+      "type",
+      "vars",
+      "zip"
+    ];
+    const LITERALS3 = [
+      "__debug__",
+      "Ellipsis",
+      "False",
+      "None",
+      "NotImplemented",
+      "True"
+    ];
+    const TYPES3 = [
+      "Any",
+      "Callable",
+      "Coroutine",
+      "Dict",
+      "List",
+      "Literal",
+      "Generic",
+      "Optional",
+      "Sequence",
+      "Set",
+      "Tuple",
+      "Type",
+      "Union"
+    ];
+    const KEYWORDS3 = {
+      $pattern: /[A-Za-z]\w+|__\w+__/,
+      keyword: RESERVED_WORDS,
+      built_in: BUILT_INS3,
+      literal: LITERALS3,
+      type: TYPES3
+    };
+    const PROMPT = {
+      className: "meta",
+      begin: /^(>>>|\.\.\.) /
+    };
+    const SUBST = {
+      className: "subst",
+      begin: /\{/,
+      end: /\}/,
+      keywords: KEYWORDS3,
+      illegal: /#/
+    };
+    const LITERAL_BRACKET = {
+      begin: /\{\{/,
+      relevance: 0
+    };
+    const STRING = {
+      className: "string",
+      contains: [hljs.BACKSLASH_ESCAPE],
+      variants: [
+        {
+          begin: /([uU]|[bB]|[rR]|[bB][rR]|[rR][bB])?'''/,
+          end: /'''/,
+          contains: [
+            hljs.BACKSLASH_ESCAPE,
+            PROMPT
+          ],
+          relevance: 10
+        },
+        {
+          begin: /([uU]|[bB]|[rR]|[bB][rR]|[rR][bB])?"""/,
+          end: /"""/,
+          contains: [
+            hljs.BACKSLASH_ESCAPE,
+            PROMPT
+          ],
+          relevance: 10
+        },
+        {
+          begin: /([fF][rR]|[rR][fF]|[fF])'''/,
+          end: /'''/,
+          contains: [
+            hljs.BACKSLASH_ESCAPE,
+            PROMPT,
+            LITERAL_BRACKET,
+            SUBST
+          ]
+        },
+        {
+          begin: /([fF][rR]|[rR][fF]|[fF])"""/,
+          end: /"""/,
+          contains: [
+            hljs.BACKSLASH_ESCAPE,
+            PROMPT,
+            LITERAL_BRACKET,
+            SUBST
+          ]
+        },
+        {
+          begin: /([uU]|[rR])'/,
+          end: /'/,
+          relevance: 10
+        },
+        {
+          begin: /([uU]|[rR])"/,
+          end: /"/,
+          relevance: 10
+        },
+        {
+          begin: /([bB]|[bB][rR]|[rR][bB])'/,
+          end: /'/
+        },
+        {
+          begin: /([bB]|[bB][rR]|[rR][bB])"/,
+          end: /"/
+        },
+        {
+          begin: /([fF][rR]|[rR][fF]|[fF])'/,
+          end: /'/,
+          contains: [
+            hljs.BACKSLASH_ESCAPE,
+            LITERAL_BRACKET,
+            SUBST
+          ]
+        },
+        {
+          begin: /([fF][rR]|[rR][fF]|[fF])"/,
+          end: /"/,
+          contains: [
+            hljs.BACKSLASH_ESCAPE,
+            LITERAL_BRACKET,
+            SUBST
+          ]
+        },
+        hljs.APOS_STRING_MODE,
+        hljs.QUOTE_STRING_MODE
+      ]
+    };
+    const digitpart = "[0-9](_?[0-9])*";
+    const pointfloat = `(\\b(${digitpart}))?\\.(${digitpart})|\\b(${digitpart})\\.`;
+    const lookahead2 = `\\b|${RESERVED_WORDS.join("|")}`;
+    const NUMBER = {
+      className: "number",
+      relevance: 0,
+      variants: [
+        // exponentfloat, pointfloat
+        // https://docs.python.org/3.9/reference/lexical_analysis.html#floating-point-literals
+        // optionally imaginary
+        // https://docs.python.org/3.9/reference/lexical_analysis.html#imaginary-literals
+        // Note: no leading \b because floats can start with a decimal point
+        // and we don't want to mishandle e.g. `fn(.5)`,
+        // no trailing \b for pointfloat because it can end with a decimal point
+        // and we don't want to mishandle e.g. `0..hex()`; this should be safe
+        // because both MUST contain a decimal point and so cannot be confused with
+        // the interior part of an identifier
+        {
+          begin: `(\\b(${digitpart})|(${pointfloat}))[eE][+-]?(${digitpart})[jJ]?(?=${lookahead2})`
+        },
+        {
+          begin: `(${pointfloat})[jJ]?`
+        },
+        // decinteger, bininteger, octinteger, hexinteger
+        // https://docs.python.org/3.9/reference/lexical_analysis.html#integer-literals
+        // optionally "long" in Python 2
+        // https://docs.python.org/2.7/reference/lexical_analysis.html#integer-and-long-integer-literals
+        // decinteger is optionally imaginary
+        // https://docs.python.org/3.9/reference/lexical_analysis.html#imaginary-literals
+        {
+          begin: `\\b([1-9](_?[0-9])*|0+(_?0)*)[lLjJ]?(?=${lookahead2})`
+        },
+        {
+          begin: `\\b0[bB](_?[01])+[lL]?(?=${lookahead2})`
+        },
+        {
+          begin: `\\b0[oO](_?[0-7])+[lL]?(?=${lookahead2})`
+        },
+        {
+          begin: `\\b0[xX](_?[0-9a-fA-F])+[lL]?(?=${lookahead2})`
+        },
+        // imagnumber (digitpart-based)
+        // https://docs.python.org/3.9/reference/lexical_analysis.html#imaginary-literals
+        {
+          begin: `\\b(${digitpart})[jJ](?=${lookahead2})`
+        }
+      ]
+    };
+    const COMMENT_TYPE = {
+      className: "comment",
+      begin: regex.lookahead(/# type:/),
+      end: /$/,
+      keywords: KEYWORDS3,
+      contains: [
+        {
+          // prevent keywords from coloring `type`
+          begin: /# type:/
+        },
+        // comment within a datatype comment includes no keywords
+        {
+          begin: /#/,
+          end: /\b\B/,
+          endsWithParent: true
+        }
+      ]
+    };
+    const PARAMS = {
+      className: "params",
+      variants: [
+        // Exclude params in functions without params
+        {
+          className: "",
+          begin: /\(\s*\)/,
+          skip: true
+        },
+        {
+          begin: /\(/,
+          end: /\)/,
+          excludeBegin: true,
+          excludeEnd: true,
+          keywords: KEYWORDS3,
+          contains: [
+            "self",
+            PROMPT,
+            NUMBER,
+            STRING,
+            hljs.HASH_COMMENT_MODE
+          ]
+        }
+      ]
+    };
+    SUBST.contains = [
+      STRING,
+      NUMBER,
+      PROMPT
+    ];
+    return {
+      name: "Python",
+      aliases: [
+        "py",
+        "gyp",
+        "ipython"
+      ],
+      unicodeRegex: true,
+      keywords: KEYWORDS3,
+      illegal: /(<\/|\?)|=>/,
+      contains: [
+        PROMPT,
+        NUMBER,
+        {
+          // very common convention
+          begin: /\bself\b/
+        },
+        {
+          // eat "if" prior to string so that it won't accidentally be
+          // labeled as an f-string
+          beginKeywords: "if",
+          relevance: 0
+        },
+        STRING,
+        COMMENT_TYPE,
+        hljs.HASH_COMMENT_MODE,
+        {
+          match: [
+            /\bdef/,
+            /\s+/,
+            IDENT_RE3
+          ],
+          scope: {
+            1: "keyword",
+            3: "title.function"
+          },
+          contains: [PARAMS]
+        },
+        {
+          variants: [
+            {
+              match: [
+                /\bclass/,
+                /\s+/,
+                IDENT_RE3,
+                /\s*/,
+                /\(\s*/,
+                IDENT_RE3,
+                /\s*\)/
+              ]
+            },
+            {
+              match: [
+                /\bclass/,
+                /\s+/,
+                IDENT_RE3
+              ]
+            }
+          ],
+          scope: {
+            1: "keyword",
+            3: "title.class",
+            6: "title.class.inherited"
+          }
+        },
+        {
+          className: "meta",
+          begin: /^[\t ]*@/,
+          end: /(?=#)|$/,
+          contains: [
+            NUMBER,
+            PARAMS,
+            STRING
+          ]
+        }
+      ]
+    };
+  }
+
+  // node_modules/highlight.js/es/languages/swift.js
+  function source(re) {
+    if (!re) return null;
+    if (typeof re === "string") return re;
+    return re.source;
+  }
+  function lookahead(re) {
+    return concat("(?=", re, ")");
+  }
+  function concat(...args) {
+    const joined = args.map((x) => source(x)).join("");
+    return joined;
+  }
+  function stripOptionsFromArgs(args) {
+    const opts = args[args.length - 1];
+    if (typeof opts === "object" && opts.constructor === Object) {
+      args.splice(args.length - 1, 1);
+      return opts;
+    } else {
+      return {};
+    }
+  }
+  function either(...args) {
+    const opts = stripOptionsFromArgs(args);
+    const joined = "(" + (opts.capture ? "" : "?:") + args.map((x) => source(x)).join("|") + ")";
+    return joined;
+  }
+  var keywordWrapper = (keyword) => concat(
+    /\b/,
+    keyword,
+    /\w$/.test(keyword) ? /\b/ : /\B/
+  );
+  var dotKeywords = [
+    "Protocol",
+    // contextual
+    "Type"
+    // contextual
+  ].map(keywordWrapper);
+  var optionalDotKeywords = [
+    "init",
+    "self"
+  ].map(keywordWrapper);
+  var keywordTypes = [
+    "Any",
+    "Self"
+  ];
+  var keywords = [
+    // strings below will be fed into the regular `keywords` engine while regex
+    // will result in additional modes being created to scan for those keywords to
+    // avoid conflicts with other rules
+    "actor",
+    "any",
+    // contextual
+    "associatedtype",
+    "async",
+    "await",
+    /as\?/,
+    // operator
+    /as!/,
+    // operator
+    "as",
+    // operator
+    "borrowing",
+    // contextual
+    "break",
+    "case",
+    "catch",
+    "class",
+    "consume",
+    // contextual
+    "consuming",
+    // contextual
+    "continue",
+    "convenience",
+    // contextual
+    "copy",
+    // contextual
+    "default",
+    "defer",
+    "deinit",
+    "didSet",
+    // contextual
+    "distributed",
+    "do",
+    "dynamic",
+    // contextual
+    "each",
+    "else",
+    "enum",
+    "extension",
+    "fallthrough",
+    /fileprivate\(set\)/,
+    "fileprivate",
+    "final",
+    // contextual
+    "for",
+    "func",
+    "get",
+    // contextual
+    "guard",
+    "if",
+    "import",
+    "indirect",
+    // contextual
+    "infix",
+    // contextual
+    /init\?/,
+    /init!/,
+    "inout",
+    /internal\(set\)/,
+    "internal",
+    "in",
+    "is",
+    // operator
+    "isolated",
+    // contextual
+    "nonisolated",
+    // contextual
+    "lazy",
+    // contextual
+    "let",
+    "macro",
+    "mutating",
+    // contextual
+    "nonmutating",
+    // contextual
+    /open\(set\)/,
+    // contextual
+    "open",
+    // contextual
+    "operator",
+    "optional",
+    // contextual
+    "override",
+    // contextual
+    "postfix",
+    // contextual
+    "precedencegroup",
+    "prefix",
+    // contextual
+    /private\(set\)/,
+    "private",
+    "protocol",
+    /public\(set\)/,
+    "public",
+    "repeat",
+    "required",
+    // contextual
+    "rethrows",
+    "return",
+    "set",
+    // contextual
+    "some",
+    // contextual
+    "static",
+    "struct",
+    "subscript",
+    "super",
+    "switch",
+    "throws",
+    "throw",
+    /try\?/,
+    // operator
+    /try!/,
+    // operator
+    "try",
+    // operator
+    "typealias",
+    /unowned\(safe\)/,
+    // contextual
+    /unowned\(unsafe\)/,
+    // contextual
+    "unowned",
+    // contextual
+    "var",
+    "weak",
+    // contextual
+    "where",
+    "while",
+    "willSet"
+    // contextual
+  ];
+  var literals = [
+    "false",
+    "nil",
+    "true"
+  ];
+  var precedencegroupKeywords = [
+    "assignment",
+    "associativity",
+    "higherThan",
+    "left",
+    "lowerThan",
+    "none",
+    "right"
+  ];
+  var numberSignKeywords = [
+    "#colorLiteral",
+    "#column",
+    "#dsohandle",
+    "#else",
+    "#elseif",
+    "#endif",
+    "#error",
+    "#file",
+    "#fileID",
+    "#fileLiteral",
+    "#filePath",
+    "#function",
+    "#if",
+    "#imageLiteral",
+    "#keyPath",
+    "#line",
+    "#selector",
+    "#sourceLocation",
+    "#warning"
+  ];
+  var builtIns = [
+    "abs",
+    "all",
+    "any",
+    "assert",
+    "assertionFailure",
+    "debugPrint",
+    "dump",
+    "fatalError",
+    "getVaList",
+    "isKnownUniquelyReferenced",
+    "max",
+    "min",
+    "numericCast",
+    "pointwiseMax",
+    "pointwiseMin",
+    "precondition",
+    "preconditionFailure",
+    "print",
+    "readLine",
+    "repeatElement",
+    "sequence",
+    "stride",
+    "swap",
+    "swift_unboxFromSwiftValueWithType",
+    "transcode",
+    "type",
+    "unsafeBitCast",
+    "unsafeDowncast",
+    "withExtendedLifetime",
+    "withUnsafeMutablePointer",
+    "withUnsafePointer",
+    "withVaList",
+    "withoutActuallyEscaping",
+    "zip"
+  ];
+  var operatorHead = either(
+    /[/=\-+!*%<>&|^~?]/,
+    /[\u00A1-\u00A7]/,
+    /[\u00A9\u00AB]/,
+    /[\u00AC\u00AE]/,
+    /[\u00B0\u00B1]/,
+    /[\u00B6\u00BB\u00BF\u00D7\u00F7]/,
+    /[\u2016-\u2017]/,
+    /[\u2020-\u2027]/,
+    /[\u2030-\u203E]/,
+    /[\u2041-\u2053]/,
+    /[\u2055-\u205E]/,
+    /[\u2190-\u23FF]/,
+    /[\u2500-\u2775]/,
+    /[\u2794-\u2BFF]/,
+    /[\u2E00-\u2E7F]/,
+    /[\u3001-\u3003]/,
+    /[\u3008-\u3020]/,
+    /[\u3030]/
+  );
+  var operatorCharacter = either(
+    operatorHead,
+    /[\u0300-\u036F]/,
+    /[\u1DC0-\u1DFF]/,
+    /[\u20D0-\u20FF]/,
+    /[\uFE00-\uFE0F]/,
+    /[\uFE20-\uFE2F]/
+    // TODO: The following characters are also allowed, but the regex isn't supported yet.
+    // /[\u{E0100}-\u{E01EF}]/u
+  );
+  var operator = concat(operatorHead, operatorCharacter, "*");
+  var identifierHead = either(
+    /[a-zA-Z_]/,
+    /[\u00A8\u00AA\u00AD\u00AF\u00B2-\u00B5\u00B7-\u00BA]/,
+    /[\u00BC-\u00BE\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF]/,
+    /[\u0100-\u02FF\u0370-\u167F\u1681-\u180D\u180F-\u1DBF]/,
+    /[\u1E00-\u1FFF]/,
+    /[\u200B-\u200D\u202A-\u202E\u203F-\u2040\u2054\u2060-\u206F]/,
+    /[\u2070-\u20CF\u2100-\u218F\u2460-\u24FF\u2776-\u2793]/,
+    /[\u2C00-\u2DFF\u2E80-\u2FFF]/,
+    /[\u3004-\u3007\u3021-\u302F\u3031-\u303F\u3040-\uD7FF]/,
+    /[\uF900-\uFD3D\uFD40-\uFDCF\uFDF0-\uFE1F\uFE30-\uFE44]/,
+    /[\uFE47-\uFEFE\uFF00-\uFFFD]/
+    // Should be /[\uFE47-\uFFFD]/, but we have to exclude FEFF.
+    // The following characters are also allowed, but the regexes aren't supported yet.
+    // /[\u{10000}-\u{1FFFD}\u{20000-\u{2FFFD}\u{30000}-\u{3FFFD}\u{40000}-\u{4FFFD}]/u,
+    // /[\u{50000}-\u{5FFFD}\u{60000-\u{6FFFD}\u{70000}-\u{7FFFD}\u{80000}-\u{8FFFD}]/u,
+    // /[\u{90000}-\u{9FFFD}\u{A0000-\u{AFFFD}\u{B0000}-\u{BFFFD}\u{C0000}-\u{CFFFD}]/u,
+    // /[\u{D0000}-\u{DFFFD}\u{E0000-\u{EFFFD}]/u
+  );
+  var identifierCharacter = either(
+    identifierHead,
+    /\d/,
+    /[\u0300-\u036F\u1DC0-\u1DFF\u20D0-\u20FF\uFE20-\uFE2F]/
+  );
+  var identifier = concat(identifierHead, identifierCharacter, "*");
+  var typeIdentifier = concat(/[A-Z]/, identifierCharacter, "*");
+  var keywordAttributes = [
+    "attached",
+    "autoclosure",
+    concat(/convention\(/, either("swift", "block", "c"), /\)/),
+    "discardableResult",
+    "dynamicCallable",
+    "dynamicMemberLookup",
+    "escaping",
+    "freestanding",
+    "frozen",
+    "GKInspectable",
+    "IBAction",
+    "IBDesignable",
+    "IBInspectable",
+    "IBOutlet",
+    "IBSegueAction",
+    "inlinable",
+    "main",
+    "nonobjc",
+    "NSApplicationMain",
+    "NSCopying",
+    "NSManaged",
+    concat(/objc\(/, identifier, /\)/),
+    "objc",
+    "objcMembers",
+    "propertyWrapper",
+    "requires_stored_property_inits",
+    "resultBuilder",
+    "Sendable",
+    "testable",
+    "UIApplicationMain",
+    "unchecked",
+    "unknown",
+    "usableFromInline",
+    "warn_unqualified_access"
+  ];
+  var availabilityKeywords = [
+    "iOS",
+    "iOSApplicationExtension",
+    "macOS",
+    "macOSApplicationExtension",
+    "macCatalyst",
+    "macCatalystApplicationExtension",
+    "watchOS",
+    "watchOSApplicationExtension",
+    "tvOS",
+    "tvOSApplicationExtension",
+    "swift"
+  ];
+  function swift(hljs) {
+    const WHITESPACE = {
+      match: /\s+/,
+      relevance: 0
+    };
+    const BLOCK_COMMENT = hljs.COMMENT(
+      "/\\*",
+      "\\*/",
+      { contains: ["self"] }
+    );
+    const COMMENTS = [
+      hljs.C_LINE_COMMENT_MODE,
+      BLOCK_COMMENT
+    ];
+    const DOT_KEYWORD = {
+      match: [
+        /\./,
+        either(...dotKeywords, ...optionalDotKeywords)
+      ],
+      className: { 2: "keyword" }
+    };
+    const KEYWORD_GUARD = {
+      // Consume .keyword to prevent highlighting properties and methods as keywords.
+      match: concat(/\./, either(...keywords)),
+      relevance: 0
+    };
+    const PLAIN_KEYWORDS = keywords.filter((kw) => typeof kw === "string").concat(["_|0"]);
+    const REGEX_KEYWORDS = keywords.filter((kw) => typeof kw !== "string").concat(keywordTypes).map(keywordWrapper);
+    const KEYWORD = { variants: [
+      {
+        className: "keyword",
+        match: either(...REGEX_KEYWORDS, ...optionalDotKeywords)
+      }
+    ] };
+    const KEYWORDS3 = {
+      $pattern: either(
+        /\b\w+/,
+        // regular keywords
+        /#\w+/
+        // number keywords
+      ),
+      keyword: PLAIN_KEYWORDS.concat(numberSignKeywords),
+      literal: literals
+    };
+    const KEYWORD_MODES = [
+      DOT_KEYWORD,
+      KEYWORD_GUARD,
+      KEYWORD
+    ];
+    const BUILT_IN_GUARD = {
+      // Consume .built_in to prevent highlighting properties and methods.
+      match: concat(/\./, either(...builtIns)),
+      relevance: 0
+    };
+    const BUILT_IN = {
+      className: "built_in",
+      match: concat(/\b/, either(...builtIns), /(?=\()/)
+    };
+    const BUILT_INS3 = [
+      BUILT_IN_GUARD,
+      BUILT_IN
+    ];
+    const OPERATOR_GUARD = {
+      // Prevent -> from being highlighting as an operator.
+      match: /->/,
+      relevance: 0
+    };
+    const OPERATOR = {
+      className: "operator",
+      relevance: 0,
+      variants: [
+        { match: operator },
+        {
+          // dot-operator: only operators that start with a dot are allowed to use dots as
+          // characters (..., ...<, .*, etc). So there rule here is: a dot followed by one or more
+          // characters that may also include dots.
+          match: `\\.(\\.|${operatorCharacter})+`
+        }
+      ]
+    };
+    const OPERATORS = [
+      OPERATOR_GUARD,
+      OPERATOR
+    ];
+    const decimalDigits = "([0-9]_*)+";
+    const hexDigits = "([0-9a-fA-F]_*)+";
+    const NUMBER = {
+      className: "number",
+      relevance: 0,
+      variants: [
+        // decimal floating-point-literal (subsumes decimal-literal)
+        { match: `\\b(${decimalDigits})(\\.(${decimalDigits}))?([eE][+-]?(${decimalDigits}))?\\b` },
+        // hexadecimal floating-point-literal (subsumes hexadecimal-literal)
+        { match: `\\b0x(${hexDigits})(\\.(${hexDigits}))?([pP][+-]?(${decimalDigits}))?\\b` },
+        // octal-literal
+        { match: /\b0o([0-7]_*)+\b/ },
+        // binary-literal
+        { match: /\b0b([01]_*)+\b/ }
+      ]
+    };
+    const ESCAPED_CHARACTER = (rawDelimiter = "") => ({
+      className: "subst",
+      variants: [
+        { match: concat(/\\/, rawDelimiter, /[0\\tnr"']/) },
+        { match: concat(/\\/, rawDelimiter, /u\{[0-9a-fA-F]{1,8}\}/) }
+      ]
+    });
+    const ESCAPED_NEWLINE = (rawDelimiter = "") => ({
+      className: "subst",
+      match: concat(/\\/, rawDelimiter, /[\t ]*(?:[\r\n]|\r\n)/)
+    });
+    const INTERPOLATION = (rawDelimiter = "") => ({
+      className: "subst",
+      label: "interpol",
+      begin: concat(/\\/, rawDelimiter, /\(/),
+      end: /\)/
+    });
+    const MULTILINE_STRING = (rawDelimiter = "") => ({
+      begin: concat(rawDelimiter, /"""/),
+      end: concat(/"""/, rawDelimiter),
+      contains: [
+        ESCAPED_CHARACTER(rawDelimiter),
+        ESCAPED_NEWLINE(rawDelimiter),
+        INTERPOLATION(rawDelimiter)
+      ]
+    });
+    const SINGLE_LINE_STRING = (rawDelimiter = "") => ({
+      begin: concat(rawDelimiter, /"/),
+      end: concat(/"/, rawDelimiter),
+      contains: [
+        ESCAPED_CHARACTER(rawDelimiter),
+        INTERPOLATION(rawDelimiter)
+      ]
+    });
+    const STRING = {
+      className: "string",
+      variants: [
+        MULTILINE_STRING(),
+        MULTILINE_STRING("#"),
+        MULTILINE_STRING("##"),
+        MULTILINE_STRING("###"),
+        SINGLE_LINE_STRING(),
+        SINGLE_LINE_STRING("#"),
+        SINGLE_LINE_STRING("##"),
+        SINGLE_LINE_STRING("###")
+      ]
+    };
+    const REGEXP_CONTENTS = [
+      hljs.BACKSLASH_ESCAPE,
+      {
+        begin: /\[/,
+        end: /\]/,
+        relevance: 0,
+        contains: [hljs.BACKSLASH_ESCAPE]
+      }
+    ];
+    const BARE_REGEXP_LITERAL = {
+      begin: /\/[^\s](?=[^/\n]*\/)/,
+      end: /\//,
+      contains: REGEXP_CONTENTS
+    };
+    const EXTENDED_REGEXP_LITERAL = (rawDelimiter) => {
+      const begin = concat(rawDelimiter, /\//);
+      const end = concat(/\//, rawDelimiter);
+      return {
+        begin,
+        end,
+        contains: [
+          ...REGEXP_CONTENTS,
+          {
+            scope: "comment",
+            begin: `#(?!.*${end})`,
+            end: /$/
+          }
+        ]
+      };
+    };
+    const REGEXP = {
+      scope: "regexp",
+      variants: [
+        EXTENDED_REGEXP_LITERAL("###"),
+        EXTENDED_REGEXP_LITERAL("##"),
+        EXTENDED_REGEXP_LITERAL("#"),
+        BARE_REGEXP_LITERAL
+      ]
+    };
+    const QUOTED_IDENTIFIER = { match: concat(/`/, identifier, /`/) };
+    const IMPLICIT_PARAMETER = {
+      className: "variable",
+      match: /\$\d+/
+    };
+    const PROPERTY_WRAPPER_PROJECTION = {
+      className: "variable",
+      match: `\\$${identifierCharacter}+`
+    };
+    const IDENTIFIERS = [
+      QUOTED_IDENTIFIER,
+      IMPLICIT_PARAMETER,
+      PROPERTY_WRAPPER_PROJECTION
+    ];
+    const AVAILABLE_ATTRIBUTE = {
+      match: /(@|#(un)?)available/,
+      scope: "keyword",
+      starts: { contains: [
+        {
+          begin: /\(/,
+          end: /\)/,
+          keywords: availabilityKeywords,
+          contains: [
+            ...OPERATORS,
+            NUMBER,
+            STRING
+          ]
+        }
+      ] }
+    };
+    const KEYWORD_ATTRIBUTE = {
+      scope: "keyword",
+      match: concat(/@/, either(...keywordAttributes))
+    };
+    const USER_DEFINED_ATTRIBUTE = {
+      scope: "meta",
+      match: concat(/@/, identifier)
+    };
+    const ATTRIBUTES = [
+      AVAILABLE_ATTRIBUTE,
+      KEYWORD_ATTRIBUTE,
+      USER_DEFINED_ATTRIBUTE
+    ];
+    const TYPE = {
+      match: lookahead(/\b[A-Z]/),
+      relevance: 0,
+      contains: [
+        {
+          // Common Apple frameworks, for relevance boost
+          className: "type",
+          match: concat(/(AV|CA|CF|CG|CI|CL|CM|CN|CT|MK|MP|MTK|MTL|NS|SCN|SK|UI|WK|XC)/, identifierCharacter, "+")
+        },
+        {
+          // Type identifier
+          className: "type",
+          match: typeIdentifier,
+          relevance: 0
+        },
+        {
+          // Optional type
+          match: /[?!]+/,
+          relevance: 0
+        },
+        {
+          // Variadic parameter
+          match: /\.\.\./,
+          relevance: 0
+        },
+        {
+          // Protocol composition
+          match: concat(/\s+&\s+/, lookahead(typeIdentifier)),
+          relevance: 0
+        }
+      ]
+    };
+    const GENERIC_ARGUMENTS = {
+      begin: /</,
+      end: />/,
+      keywords: KEYWORDS3,
+      contains: [
+        ...COMMENTS,
+        ...KEYWORD_MODES,
+        ...ATTRIBUTES,
+        OPERATOR_GUARD,
+        TYPE
+      ]
+    };
+    TYPE.contains.push(GENERIC_ARGUMENTS);
+    const TUPLE_ELEMENT_NAME = {
+      match: concat(identifier, /\s*:/),
+      keywords: "_|0",
+      relevance: 0
+    };
+    const TUPLE = {
+      begin: /\(/,
+      end: /\)/,
+      relevance: 0,
+      keywords: KEYWORDS3,
+      contains: [
+        "self",
+        TUPLE_ELEMENT_NAME,
+        ...COMMENTS,
+        REGEXP,
+        ...KEYWORD_MODES,
+        ...BUILT_INS3,
+        ...OPERATORS,
+        NUMBER,
+        STRING,
+        ...IDENTIFIERS,
+        ...ATTRIBUTES,
+        TYPE
+      ]
+    };
+    const GENERIC_PARAMETERS = {
+      begin: /</,
+      end: />/,
+      keywords: "repeat each",
+      contains: [
+        ...COMMENTS,
+        TYPE
+      ]
+    };
+    const FUNCTION_PARAMETER_NAME = {
+      begin: either(
+        lookahead(concat(identifier, /\s*:/)),
+        lookahead(concat(identifier, /\s+/, identifier, /\s*:/))
+      ),
+      end: /:/,
+      relevance: 0,
+      contains: [
+        {
+          className: "keyword",
+          match: /\b_\b/
+        },
+        {
+          className: "params",
+          match: identifier
+        }
+      ]
+    };
+    const FUNCTION_PARAMETERS = {
+      begin: /\(/,
+      end: /\)/,
+      keywords: KEYWORDS3,
+      contains: [
+        FUNCTION_PARAMETER_NAME,
+        ...COMMENTS,
+        ...KEYWORD_MODES,
+        ...OPERATORS,
+        NUMBER,
+        STRING,
+        ...ATTRIBUTES,
+        TYPE,
+        TUPLE
+      ],
+      endsParent: true,
+      illegal: /["']/
+    };
+    const FUNCTION_OR_MACRO = {
+      match: [
+        /(func|macro)/,
+        /\s+/,
+        either(QUOTED_IDENTIFIER.match, identifier, operator)
+      ],
+      className: {
+        1: "keyword",
+        3: "title.function"
+      },
+      contains: [
+        GENERIC_PARAMETERS,
+        FUNCTION_PARAMETERS,
+        WHITESPACE
+      ],
+      illegal: [
+        /\[/,
+        /%/
+      ]
+    };
+    const INIT_SUBSCRIPT = {
+      match: [
+        /\b(?:subscript|init[?!]?)/,
+        /\s*(?=[<(])/
+      ],
+      className: { 1: "keyword" },
+      contains: [
+        GENERIC_PARAMETERS,
+        FUNCTION_PARAMETERS,
+        WHITESPACE
+      ],
+      illegal: /\[|%/
+    };
+    const OPERATOR_DECLARATION = {
+      match: [
+        /operator/,
+        /\s+/,
+        operator
+      ],
+      className: {
+        1: "keyword",
+        3: "title"
+      }
+    };
+    const PRECEDENCEGROUP = {
+      begin: [
+        /precedencegroup/,
+        /\s+/,
+        typeIdentifier
+      ],
+      className: {
+        1: "keyword",
+        3: "title"
+      },
+      contains: [TYPE],
+      keywords: [
+        ...precedencegroupKeywords,
+        ...literals
+      ],
+      end: /}/
+    };
+    for (const variant of STRING.variants) {
+      const interpolation = variant.contains.find((mode) => mode.label === "interpol");
+      interpolation.keywords = KEYWORDS3;
+      const submodes = [
+        ...KEYWORD_MODES,
+        ...BUILT_INS3,
+        ...OPERATORS,
+        NUMBER,
+        STRING,
+        ...IDENTIFIERS
+      ];
+      interpolation.contains = [
+        ...submodes,
+        {
+          begin: /\(/,
+          end: /\)/,
+          contains: [
+            "self",
+            ...submodes
+          ]
+        }
+      ];
+    }
+    return {
+      name: "Swift",
+      keywords: KEYWORDS3,
+      contains: [
+        ...COMMENTS,
+        FUNCTION_OR_MACRO,
+        INIT_SUBSCRIPT,
+        {
+          beginKeywords: "struct protocol class extension enum actor",
+          end: "\\{",
+          excludeEnd: true,
+          keywords: KEYWORDS3,
+          contains: [
+            hljs.inherit(hljs.TITLE_MODE, {
+              className: "title.class",
+              begin: /[A-Za-z$_][\u00C0-\u02B80-9A-Za-z$_]*/
+            }),
+            ...KEYWORD_MODES
+          ]
+        },
+        OPERATOR_DECLARATION,
+        PRECEDENCEGROUP,
+        {
+          beginKeywords: "import",
+          end: /$/,
+          contains: [...COMMENTS],
+          relevance: 0
+        },
+        REGEXP,
+        ...KEYWORD_MODES,
+        ...BUILT_INS3,
+        ...OPERATORS,
+        NUMBER,
+        STRING,
+        ...IDENTIFIERS,
+        ...ATTRIBUTES,
+        TYPE,
+        TUPLE
+      ]
+    };
+  }
+
+  // app/static/gitreader/modules/utils/highlight.ts
+  core_default.registerLanguage("javascript", javascript);
+  core_default.registerLanguage("typescript", typescript);
+  core_default.registerLanguage("python", python);
+  core_default.registerLanguage("swift", swift);
+  if (core_default.registerAliases) {
+    core_default.registerAliases(["js", "jsx"], { languageName: "javascript" });
+    core_default.registerAliases(["ts", "tsx"], { languageName: "typescript" });
+  }
+  var hasHighlightSupport = () => typeof core_default.highlight === "function";
+
   // app/static/gitreader/modules/ui/reader.ts
   var ReaderView = class {
     constructor(deps) {
       this.deps = deps;
       __publicField(this, "snippetMode", "body");
+      __publicField(this, "maxHighlightLines", 800);
     }
     // Exposes the current snippet mode so GitReaderApp can choose which section to fetch.
     getSnippetMode() {
@@ -1384,7 +5744,7 @@ ${secondPart}`;
       const language = this.deps.getHighlightLanguage((_e = symbol.location) == null ? void 0 : _e.path);
       const snippetHtml = this.renderSnippetLines(snippet, language);
       const revealLabel = (snippet == null ? void 0 : snippet.section) === "body" ? "Show body" : "Show code";
-      const codeClass = this.deps.hasHighlightSupport() && language ? `hljs language-${language}` : "";
+      const codeClass = this.deps.hasHighlightSupport() ? `hljs${language ? ` language-${language}` : ""}` : "";
       const breadcrumbHtml = this.deps.renderImportBreadcrumbs((_f = symbol.location) == null ? void 0 : _f.path);
       this.deps.setReaderState({
         currentSymbol: symbol,
@@ -1458,7 +5818,8 @@ ${secondPart}`;
       const body = rawBody.trim().length > 0 ? rawBody : "# body not loaded yet";
       const startLine = (_b = snippet == null ? void 0 : snippet.start_line) != null ? _b : 1;
       const highlightSet = this.buildHighlightSet((_c = snippet == null ? void 0 : snippet.highlights) != null ? _c : []);
-      const rendered = this.highlightSnippet(body, language);
+      const lineCount = body.split("\n").length;
+      const rendered = this.highlightSnippet(body, language, lineCount);
       const lines = rendered.replace(/\n$/, "").split("\n");
       return lines.map((line, index) => {
         const lineNumber = startLine + index;
@@ -1468,14 +5829,17 @@ ${secondPart}`;
       }).join("");
     }
     // Applies highlight.js (if available) or falls back to escaped text.
-    highlightSnippet(body, language) {
+    highlightSnippet(body, language, lineCount) {
+      if (lineCount && lineCount > this.maxHighlightLines) {
+        return this.deps.escapeHtml(body);
+      }
       if (!this.deps.hasHighlightSupport()) {
         return this.deps.escapeHtml(body);
       }
-      if (language && hljs.getLanguage && hljs.getLanguage(language)) {
-        return hljs.highlight(body, { language }).value;
+      if (language && core_default.getLanguage && core_default.getLanguage(language)) {
+        return core_default.highlight(body, { language }).value;
       }
-      return hljs.highlightAuto(body).value;
+      return core_default.highlightAuto(body).value;
     }
     // Handles snippet mode switching and triggers re-fetch when needed.
     async setSnippetMode(mode) {
@@ -2186,31 +6550,31 @@ ${secondPart}`;
       const match = importMatch != null ? importMatch : exportMatch;
       if (match) {
         const binding = match[1];
-        const source = match[2];
+        const source2 = match[2];
         const nameMap = this.parseJsImportBindingsMap(binding);
         if (nameMap.has(importName)) {
-          return { source, importedName: nameMap.get(importName) };
+          return { source: source2, importedName: nameMap.get(importName) };
         }
-        return { source };
+        return { source: source2 };
       }
       const importEqualsMatch = lineText.match(/^import\s+([A-Za-z_$][\w$]*)\s*=\s*require\s*\(\s*['"]([^'"]+)['"]\s*\)/);
       if (importEqualsMatch) {
         const local = importEqualsMatch[1];
-        const source = importEqualsMatch[2];
+        const source2 = importEqualsMatch[2];
         if (local === importName) {
-          return { source, importedName: local };
+          return { source: source2, importedName: local };
         }
-        return { source };
+        return { source: source2 };
       }
       const requireMatch = lineText.match(/^(?:const|let|var)\s+(.+?)\s*=\s*require\s*\(\s*['"]([^'"]+)['"]\s*\)/);
       if (requireMatch) {
         const binding = requireMatch[1];
-        const source = requireMatch[2];
+        const source2 = requireMatch[2];
         const nameMap = this.parseJsRequireBindingMap(binding);
         if (nameMap.has(importName)) {
-          return { source, importedName: nameMap.get(importName) };
+          return { source: source2, importedName: nameMap.get(importName) };
         }
-        return { source };
+        return { source: source2 };
       }
       return null;
     }
@@ -2573,13 +6937,13 @@ ${secondPart}`;
       if (target.closest(".code-import")) {
         return false;
       }
-      const identifier = this.getIdentifierAtClick(event);
-      if (!identifier) {
+      const identifier2 = this.getIdentifierAtClick(event);
+      if (!identifier2) {
         return false;
       }
-      const symbol = this.resolveDefinitionSymbol(identifier, this.deps.state.getCurrentSymbol().location.path);
+      const symbol = this.resolveDefinitionSymbol(identifier2, this.deps.state.getCurrentSymbol().location.path);
       if (!symbol) {
-        this.deps.setCodeStatus(`No definition found for ${identifier}.`);
+        this.deps.setCodeStatus(`No definition found for ${identifier2}.`);
         return true;
       }
       this.navigateToSymbolDefinition(symbol, this.deps.state.getCurrentSymbol().location.path);
@@ -2645,7 +7009,7 @@ ${secondPart}`;
       return null;
     }
     // Resolves a clicked identifier to a hint symbol using graph metadata.
-    resolveDefinitionSymbol(identifier, currentPath) {
+    resolveDefinitionSymbol(identifier2, currentPath) {
       const normalizedCurrent = normalizePath(currentPath);
       const kinds = /* @__PURE__ */ new Set(["function", "method", "class"]);
       const matches = this.deps.state.getGraphNodes().filter((node) => {
@@ -2656,7 +7020,7 @@ ${secondPart}`;
         if (!kinds.has(node.kind)) {
           return false;
         }
-        return node.name === identifier;
+        return node.name === identifier2;
       });
       if (matches.length === 0) {
         return null;
@@ -3305,6 +7669,9 @@ ${secondPart}`;
       __publicField(this, "currentFoldPath", null);
       __publicField(this, "pendingSymbol", null);
       __publicField(this, "pendingSnippet", null);
+      __publicField(this, "labelVisibilityRaf", null);
+      __publicField(this, "lastLabelZoomBucket", null);
+      __publicField(this, "lastForcedLabelIds", /* @__PURE__ */ new Set());
       this.tocList = this.getElement("toc-list");
       this.codeSurface = this.getElement("code-surface");
       this.codePane = this.getElement("code-view");
@@ -3635,7 +8002,7 @@ ${secondPart}`;
             if (this.graphLayoutMode === "cluster") {
               this.refreshGraphView();
             } else {
-              this.graphView.applyFilters();
+              this.graphView.applyFilters({ forceVisibility: true });
             }
           }
         });
@@ -4061,6 +8428,7 @@ ${secondPart}`;
       const edges = this.filterEdgesForNodes(nodes);
       const graphView = this.buildGraphView(nodes, edges, scope);
       const focus = this.pickFocusNode(graphView.nodes);
+      this.resetLabelVisibilityCache();
       this.graphView.render({
         nodes: graphView.nodes,
         edges: graphView.edges,
@@ -4110,6 +8478,7 @@ ${secondPart}`;
       const nodes = this.graphNodes;
       const edges = this.filterEdgesForNodes(nodes);
       const graphView = this.buildGraphView(nodes, edges, "full");
+      this.resetLabelVisibilityCache();
       this.graphView.render({
         nodes: graphView.nodes,
         edges: graphView.edges,
@@ -4336,9 +8705,9 @@ ${secondPart}`;
         visibleNodes.push(node);
         visibleNodeIds.add(node.id);
       };
-      const addFolderEdge = (source, target) => {
+      const addFolderEdge = (source2, target) => {
         folderEdges.push({
-          source,
+          source: source2,
           target,
           kind: "contains",
           confidence: "low"
@@ -4436,11 +8805,11 @@ ${secondPart}`;
       });
       const edgeMap = /* @__PURE__ */ new Map();
       const confidenceRank = { low: 0, medium: 1, high: 2 };
-      const addEdge = (source, target, kind, confidence) => {
-        const key = `${source}:${target}:${kind}`;
+      const addEdge = (source2, target, kind, confidence) => {
+        const key = `${source2}:${target}:${kind}`;
         const existing = edgeMap.get(key);
         if (!existing) {
-          edgeMap.set(key, { source, target, kind, confidence });
+          edgeMap.set(key, { source: source2, target, kind, confidence });
           return;
         }
         if (confidenceRank[confidence] > confidenceRank[existing.confidence]) {
@@ -4520,6 +8889,7 @@ ${secondPart}`;
       const nodes = this.filterNodesForChapter(this.currentChapterId);
       const edges = this.filterEdgesForNodes(nodes);
       const graphView = this.buildGraphView(nodes, edges, this.currentScope);
+      this.resetLabelVisibilityCache();
       this.graphView.render({
         nodes: graphView.nodes,
         edges: graphView.edges,
@@ -5915,13 +10285,75 @@ ${secondPart}`;
       if (!this.graphInstance) {
         return;
       }
+      if (this.labelVisibilityRaf !== null) {
+        return;
+      }
+      this.labelVisibilityRaf = window.requestAnimationFrame(() => {
+        this.labelVisibilityRaf = null;
+        this.updateLabelVisibilityNow();
+      });
+    }
+    updateLabelVisibilityNow() {
+      if (!this.graphInstance) {
+        return;
+      }
       const zoom = this.graphInstance.zoom();
       const showAll = zoom >= this.labelZoomThreshold;
       const guidedAllowed = this.tourActive && this.guidedAllowedNodeIds ? this.guidedAllowedNodeIds : null;
-      this.graphInstance.nodes().forEach((node) => {
-        const shouldShow = showAll || node.selected() || node.hasClass("is-hovered") || (guidedAllowed ? guidedAllowed.has(node.id()) : false);
-        node.data("labelVisible", shouldShow ? "true" : "false");
+      if (showAll) {
+        if (this.lastLabelZoomBucket === true) {
+          return;
+        }
+        this.graphInstance.nodes().forEach((node) => {
+          node.data("labelVisible", "true");
+        });
+        this.lastLabelZoomBucket = true;
+        this.lastForcedLabelIds.clear();
+        return;
+      }
+      const forcedIds = /* @__PURE__ */ new Set();
+      this.graphInstance.$("node:selected").forEach((node) => {
+        forcedIds.add(node.id());
       });
+      this.graphInstance.$("node.is-hovered").forEach((node) => {
+        forcedIds.add(node.id());
+      });
+      if (guidedAllowed) {
+        guidedAllowed.forEach((id) => forcedIds.add(id));
+      }
+      if (this.lastLabelZoomBucket !== false) {
+        this.graphInstance.nodes().forEach((node) => {
+          node.data("labelVisible", "false");
+        });
+      }
+      this.lastForcedLabelIds.forEach((id) => {
+        var _a;
+        if (!forcedIds.has(id)) {
+          const node = (_a = this.graphInstance) == null ? void 0 : _a.$id(id);
+          if (node && !node.empty()) {
+            node.data("labelVisible", "false");
+          }
+        }
+      });
+      forcedIds.forEach((id) => {
+        var _a;
+        if (!this.lastForcedLabelIds.has(id)) {
+          const node = (_a = this.graphInstance) == null ? void 0 : _a.$id(id);
+          if (node && !node.empty()) {
+            node.data("labelVisible", "true");
+          }
+        }
+      });
+      this.lastLabelZoomBucket = false;
+      this.lastForcedLabelIds = forcedIds;
+    }
+    resetLabelVisibilityCache() {
+      this.lastLabelZoomBucket = null;
+      this.lastForcedLabelIds.clear();
+      if (this.labelVisibilityRaf !== null) {
+        window.cancelAnimationFrame(this.labelVisibilityRaf);
+        this.labelVisibilityRaf = null;
+      }
     }
     async updateNarrator(symbol) {
       if (symbol.kind === "folder") {
@@ -6209,6 +10641,7 @@ ${secondPart}`;
           visibleNodes: nodes.length,
           isCapped: false
         };
+        this.resetLabelVisibilityCache();
         this.graphView.render({
           nodes: graphView.nodes,
           edges: graphView.edges,
@@ -6349,7 +10782,7 @@ ${secondPart}`;
         this.guidedAllowedNodeIds = null;
         this.applyGuidedToc();
         this.applyGuidedCodeFocus();
-        this.graphView.applyFilters();
+        this.graphView.applyFilters({ forceVisibility: true });
         this.fileTreeController.render(null);
         return;
       }
@@ -6364,7 +10797,7 @@ ${secondPart}`;
       }
       this.guidedAllowedNodeIds = allowed.size > 0 ? allowed : null;
       this.applyGuidedToc();
-      this.graphView.applyFilters();
+      this.graphView.applyFilters({ forceVisibility: true });
       this.applyGuidedCodeFocus();
       this.fileTreeController.render((_d = (_c = this.tourStep.focus) == null ? void 0 : _c.file_path) != null ? _d : null);
     }
@@ -6449,7 +10882,7 @@ ${secondPart}`;
       this.updateLabelVisibility();
     }
     hasHighlightSupport() {
-      return typeof hljs !== "undefined" && typeof hljs.highlight === "function";
+      return hasHighlightSupport();
     }
     getHighlightLanguage(path) {
       if (!path) {

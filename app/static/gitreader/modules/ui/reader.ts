@@ -1,6 +1,5 @@
 import type { HighlightRange, SnippetMode, SourceLocation, StoryArc, SymbolNode, SymbolSnippetResponse, TourStep } from '../types';
-
-declare const hljs: any;
+import { hljs } from '../utils/highlight';
 
 // Reader state updates pushed back into GitReaderApp so the orchestrator stays authoritative.
 export interface ReaderStateUpdate {
@@ -71,6 +70,7 @@ export interface ReaderViewDependencies {
 // Reader renderer that owns snippet mode state and generates the code card HTML.
 export class ReaderView {
     private snippetMode: SnippetMode = 'body';
+    private maxHighlightLines = 800;
 
     constructor(private deps: ReaderViewDependencies) {}
 
@@ -89,7 +89,9 @@ export class ReaderView {
         const language = this.deps.getHighlightLanguage(symbol.location?.path);
         const snippetHtml = this.renderSnippetLines(snippet, language);
         const revealLabel = snippet?.section === 'body' ? 'Show body' : 'Show code';
-        const codeClass = this.deps.hasHighlightSupport() && language ? `hljs language-${language}` : '';
+        const codeClass = this.deps.hasHighlightSupport()
+            ? `hljs${language ? ` language-${language}` : ''}`
+            : '';
         const breadcrumbHtml = this.deps.renderImportBreadcrumbs(symbol.location?.path);
         this.deps.setReaderState({
             currentSymbol: symbol,
@@ -176,7 +178,8 @@ export class ReaderView {
         const body = rawBody.trim().length > 0 ? rawBody : '# body not loaded yet';
         const startLine = snippet?.start_line ?? 1;
         const highlightSet = this.buildHighlightSet(snippet?.highlights ?? []);
-        const rendered = this.highlightSnippet(body, language);
+        const lineCount = body.split('\n').length;
+        const rendered = this.highlightSnippet(body, language, lineCount);
         const lines = rendered.replace(/\n$/, '').split('\n');
         return lines
             .map((line, index) => {
@@ -189,7 +192,10 @@ export class ReaderView {
     }
 
     // Applies highlight.js (if available) or falls back to escaped text.
-    highlightSnippet(body: string, language?: string): string {
+    highlightSnippet(body: string, language?: string, lineCount?: number): string {
+        if (lineCount && lineCount > this.maxHighlightLines) {
+            return this.deps.escapeHtml(body);
+        }
         if (!this.deps.hasHighlightSupport()) {
             return this.deps.escapeHtml(body);
         }
