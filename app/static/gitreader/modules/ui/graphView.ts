@@ -337,7 +337,11 @@ export class GraphViewController {
             minZoom: 0.2,
             maxZoom: 2.5,
             wheelSensitivity: 0.2,
+            selectionType: 'additive',
         });
+        if (typeof this.graph.selectionType === 'function') {
+            this.graph.selectionType('additive');
+        }
         this.deps.onGraphReady(this.graph);
     }
 

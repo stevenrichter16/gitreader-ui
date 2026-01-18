@@ -42,9 +42,7 @@ Add cmd/ctrl-click multi-select on graph nodes so users can highlight multiple n
    - If tour mode disallows a node, block cmd/ctrl-click selection and show the guided message.
 
 ## Known Interaction Decision
-Cmd/ctrl-click is currently used for file-focus jump in `handleFileFocusClick`. Decide whether to:
-- Replace it with multi-select (recommended for consistency), or
-- Move file-focus jump to a different modifier (e.g., `cmd+shift`) so both behaviors can coexist.
+File-focus jump now uses **double click** on function/method nodes (handled by `handleFileFocusClick`), so cmd/ctrl-click is reserved for multi-select.
 
 ## Manual Verification Checklist
 - Cmd/ctrl-click toggles node selection without opening Reader.

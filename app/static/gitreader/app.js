@@ -296,15 +296,12 @@
       return false;
     }
     graph.on("tap", "node", (event) => {
+      var _a;
       const nodeId = event.target.id();
       const node = handlers.resolveNode(nodeId);
       if (!node) {
         return;
       }
-      const now = Date.now();
-      const isDoubleTap = state.getLastTapNodeId() === nodeId && now - state.getLastTapAt() < state.doubleTapDelay;
-      state.setLastTapNodeId(nodeId);
-      state.setLastTapAt(now);
       if (handlers.isTourActive()) {
         if (!handlers.isGuidedNodeAllowed(nodeId)) {
           handlers.flashGuidedMessage("Follow the guide to unlock this step.");
@@ -313,17 +310,27 @@
         void handlers.advanceTour("jump", nodeId);
         return;
       }
+      const modifierEvent = (_a = event.originalEvent) != null ? _a : event;
+      if (handlers.isModifierClick(modifierEvent)) {
+        state.setLastTapNodeId(null);
+        state.setLastTapAt(0);
+        return;
+      }
+      const now = Date.now();
+      const isDoubleTap = state.getLastTapNodeId() === nodeId && now - state.getLastTapAt() < state.doubleTapDelay;
+      state.setLastTapNodeId(nodeId);
+      state.setLastTapAt(now);
       if (handlers.getGraphLayoutMode() === "cluster" && isDoubleTap && handlers.handleClusterNodeToggle(node, event.originalEvent)) {
         return;
       }
       if (handlers.getGraphLayoutMode() === "cluster" && handlers.handleClusterFolderSingleClick(node)) {
-        event.target.select();
+        graph.$("node:selected").not(event.target).unselect();
         return;
       }
-      if (handlers.handleFileFocusClick(node, event.originalEvent)) {
+      if (isDoubleTap && handlers.handleFileFocusClick(node, event.originalEvent)) {
         return;
       }
-      event.target.select();
+      graph.$("node:selected").not(event.target).unselect();
       handlers.loadSymbolSnippet(node).catch(() => {
         handlers.renderCode(node);
         handlers.updateNarrator(node);
@@ -709,8 +716,12 @@ ${secondPart}`;
         layout: { name: "cose", animate: false, fit: true, padding: 24 },
         minZoom: 0.2,
         maxZoom: 2.5,
-        wheelSensitivity: 0.2
+        wheelSensitivity: 0.2,
+        selectionType: "additive"
       });
+      if (typeof this.graph.selectionType === "function") {
+        this.graph.selectionType("additive");
+      }
       this.deps.onGraphReady(this.graph);
     }
     // Applies focus trimming to the current graph to isolate a focused node.
@@ -4388,7 +4399,13 @@ ${secondPart}`;
       if (!event) {
         return false;
       }
-      return Boolean(event.metaKey || event.ctrlKey);
+      const anyEvent = event;
+      if (typeof anyEvent.getModifierState === "function") {
+        if (anyEvent.getModifierState("Meta") || anyEvent.getModifierState("Control")) {
+          return true;
+        }
+      }
+      return Boolean(anyEvent.metaKey || anyEvent.ctrlKey);
     }
     isFileNodeActive(fileNode) {
       var _a, _b;
@@ -4420,9 +4437,6 @@ ${secondPart}`;
       this.applyFocusHighlight(symbol);
     }
     handleFileFocusClick(symbol, event) {
-      if (!this.isModifierClick(event)) {
-        return false;
-      }
       if (symbol.kind !== "function" && symbol.kind !== "method") {
         return false;
       }
@@ -4431,6 +4445,7 @@ ${secondPart}`;
         return false;
       }
       if (this.graphInstance) {
+        this.graphInstance.$("node:selected").unselect();
         this.graphInstance.$id(fileNode.id).select();
         this.graphInstance.$id(symbol.id).select();
       }
@@ -4617,6 +4632,7 @@ ${secondPart}`;
           loadSymbolSnippet: (node) => this.loadSymbolSnippet(node),
           renderCode: (node) => this.readerController.render(node),
           updateNarrator: (node) => this.updateNarrator(node),
+          isModifierClick: (event) => this.isModifierClick(event),
           refreshEdgeHighlights: () => this.graphView.refreshEdgeHighlights(),
           updateLabelVisibility: () => this.updateLabelVisibility(),
           setHoveredNode: (nodeId) => this.graphView.setHoveredNode(nodeId),
@@ -5292,5 +5308,6 @@ ${secondPart}`;
   document.addEventListener("DOMContentLoaded", () => {
     const app = new GitReaderApp();
     app.init();
+    window.graphApp = app;
   });
 })();

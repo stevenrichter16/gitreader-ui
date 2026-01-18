@@ -30,7 +30,7 @@ export interface GraphEventHandlers {
     handleClusterNodeToggle(node: any, event?: MouseEvent): boolean;
     // Shows the folder file system when a cluster folder is single-clicked.
     handleClusterFolderSingleClick(node: any): boolean;
-    // Handles cmd/ctrl-click file focus within the graph canvas.
+    // Handles double-click file focus within the graph canvas.
     handleFileFocusClick(node: any, event?: MouseEvent): boolean;
     // Loads the snippet for a node so the reader view stays in sync with graph selection.
     loadSymbolSnippet(node: any): Promise<void>;
@@ -38,6 +38,8 @@ export interface GraphEventHandlers {
     renderCode(node: any): void;
     // Updates the narrator panel for the selected node after a click.
     updateNarrator(node: any): void;
+    // Detects cmd/ctrl clicks for multi-select toggling.
+    isModifierClick(event?: MouseEvent): boolean;
     // Refreshes edge emphasis when selection state changes.
     refreshEdgeHighlights(): void;
     // Recalculates label visibility to match zoom, hover, and selection states.
@@ -70,16 +72,12 @@ export function bindGraphEvents(bindings: GraphEventBindings): boolean {
     if (isBound || !graph) {
         return false;
     }
-    graph.on('tap', 'node', (event: { target: { id: () => string; select: () => void }; originalEvent?: MouseEvent }) => {
+    graph.on('tap', 'node', (event: { target: any; originalEvent?: MouseEvent }) => {
         const nodeId = event.target.id();
         const node = handlers.resolveNode(nodeId);
         if (!node) {
             return;
         }
-        const now = Date.now();
-        const isDoubleTap = state.getLastTapNodeId() === nodeId && (now - state.getLastTapAt()) < state.doubleTapDelay;
-        state.setLastTapNodeId(nodeId);
-        state.setLastTapAt(now);
         if (handlers.isTourActive()) {
             if (!handlers.isGuidedNodeAllowed(nodeId)) {
                 handlers.flashGuidedMessage('Follow the guide to unlock this step.');
@@ -88,6 +86,16 @@ export function bindGraphEvents(bindings: GraphEventBindings): boolean {
             void handlers.advanceTour('jump', nodeId);
             return;
         }
+        const modifierEvent = event.originalEvent ?? event;
+        if (handlers.isModifierClick(modifierEvent as MouseEvent)) {
+            state.setLastTapNodeId(null);
+            state.setLastTapAt(0);
+            return;
+        }
+        const now = Date.now();
+        const isDoubleTap = state.getLastTapNodeId() === nodeId && (now - state.getLastTapAt()) < state.doubleTapDelay;
+        state.setLastTapNodeId(nodeId);
+        state.setLastTapAt(now);
         if (handlers.getGraphLayoutMode() === 'cluster'
             && isDoubleTap
             && handlers.handleClusterNodeToggle(node, event.originalEvent)) {
@@ -95,13 +103,13 @@ export function bindGraphEvents(bindings: GraphEventBindings): boolean {
         }
         if (handlers.getGraphLayoutMode() === 'cluster'
             && handlers.handleClusterFolderSingleClick(node)) {
-            event.target.select();
+            graph.$('node:selected').not(event.target).unselect();
             return;
         }
-        if (handlers.handleFileFocusClick(node, event.originalEvent)) {
+        if (isDoubleTap && handlers.handleFileFocusClick(node, event.originalEvent)) {
             return;
         }
-        event.target.select();
+        graph.$('node:selected').not(event.target).unselect();
         handlers.loadSymbolSnippet(node).catch(() => {
             handlers.renderCode(node);
             handlers.updateNarrator(node);
