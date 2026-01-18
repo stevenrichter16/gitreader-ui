@@ -630,6 +630,7 @@ ${secondPart}`;
       __publicField(this, "nodeCapByScope", /* @__PURE__ */ new Map());
       __publicField(this, "nodeCap", 300);
       __publicField(this, "nodeCapStep", 200);
+      __publicField(this, "clusterManualLayout", false);
     }
     // Renders the provided nodes/edges and rebuilds Cytoscape when needed.
     render(input) {
@@ -650,7 +651,8 @@ ${secondPart}`;
         return;
       }
       const selectedNodeId = this.deps.getSelectedNodeId();
-      const elements = this.buildGraphElements(input.nodes, input.edges);
+      const positionCache = this.shouldUseManualClusterLayout() ? this.captureNodePositions() : null;
+      const elements = this.buildGraphElements(input.nodes, input.edges, positionCache);
       this.graph.elements().remove();
       this.graph.add(elements);
       if (selectedNodeId) {
@@ -659,13 +661,24 @@ ${secondPart}`;
           selected.select();
         }
       }
-      this.runLayout();
+      if (!this.shouldUseManualClusterLayout()) {
+        this.runLayout();
+      } else {
+        this.deps.updateLabelVisibility();
+      }
       this.applyFilters();
     }
     // Updates the layout mode and reruns layout when graph data is already present.
     setLayout(mode) {
       this.layoutMode = mode;
+      if (mode !== "cluster") {
+        this.clusterManualLayout = false;
+      }
       this.runLayout();
+    }
+    // Enables or disables manual cluster layout so child organization remains stable across refreshes.
+    setClusterManualLayout(enabled) {
+      this.clusterManualLayout = enabled;
     }
     // Updates edge/node filters wholesale when app state restores or resets.
     setFilters(filters) {
@@ -904,6 +917,10 @@ ${secondPart}`;
       if (!this.graph) {
         return;
       }
+      if (this.shouldUseManualClusterLayout()) {
+        this.deps.updateLabelVisibility();
+        return;
+      }
       const layout = this.graph.layout(this.getLayoutOptions());
       layout.run();
       this.deps.updateLabelVisibility();
@@ -964,10 +981,25 @@ ${secondPart}`;
       };
     }
     // Builds Cytoscape element data for nodes and edges using shared label formatting.
-    buildGraphElements(nodes, edges) {
+    buildGraphElements(nodes, edges, positionCache) {
+      const useManualLayout = this.shouldUseManualClusterLayout() && positionCache;
+      const parentByChild = /* @__PURE__ */ new Map();
+      const childrenByParent = /* @__PURE__ */ new Map();
+      if (useManualLayout) {
+        edges.forEach((edge) => {
+          var _a;
+          if (edge.kind !== "contains") {
+            return;
+          }
+          parentByChild.set(edge.target, edge.source);
+          const siblings = (_a = childrenByParent.get(edge.source)) != null ? _a : [];
+          siblings.push(edge.target);
+          childrenByParent.set(edge.source, siblings);
+        });
+      }
       const nodeElements = nodes.map((node) => {
         const labelData = this.deps.formatLabel(node);
-        return {
+        const element = {
           data: {
             id: node.id,
             label: labelData.label,
@@ -979,6 +1011,15 @@ ${secondPart}`;
             labelVisible: "true"
           }
         };
+        if (useManualLayout) {
+          const cached = positionCache.get(node.id);
+          const fallback = cached ? null : this.getManualFallbackPosition(node.id, parentByChild, childrenByParent, positionCache);
+          const position = cached != null ? cached : fallback;
+          if (position) {
+            element.position = position;
+          }
+        }
+        return element;
       });
       const edgeElements = edges.map((edge, index) => ({
         data: {
@@ -990,6 +1031,46 @@ ${secondPart}`;
         }
       }));
       return [...nodeElements, ...edgeElements];
+    }
+    // Captures the current node positions so manual cluster layout can preserve them across refreshes.
+    captureNodePositions() {
+      const positions = /* @__PURE__ */ new Map();
+      if (!this.graph) {
+        return positions;
+      }
+      this.graph.nodes().forEach((node) => {
+        const position = node.position();
+        positions.set(node.id(), { x: position.x, y: position.y });
+      });
+      return positions;
+    }
+    // Computes a fallback position near the parent when a new node appears in manual layout.
+    getManualFallbackPosition(nodeId, parentByChild, childrenByParent, positionCache) {
+      var _a;
+      const parentId = parentByChild.get(nodeId);
+      if (!parentId) {
+        return null;
+      }
+      const parentPosition = positionCache.get(parentId);
+      if (!parentPosition) {
+        return null;
+      }
+      const siblings = (_a = childrenByParent.get(parentId)) != null ? _a : [];
+      const index = Math.max(0, siblings.indexOf(nodeId));
+      const radius = this.getManualChildSpacing();
+      const angle = 2 * Math.PI * index / Math.max(1, siblings.length);
+      return {
+        x: parentPosition.x + radius * Math.cos(angle),
+        y: parentPosition.y + radius * Math.sin(angle)
+      };
+    }
+    // Returns true when cluster layout should stay manual to preserve user-arranged positions.
+    shouldUseManualClusterLayout() {
+      return this.layoutMode === "cluster" && this.clusterManualLayout;
+    }
+    // Provides the default spacing for placing new children near their parent in manual mode.
+    getManualChildSpacing() {
+      return 120;
     }
     // Supplies the Cytoscape stylesheet that defines node/edge appearance and state styling.
     getGraphStyles() {
@@ -5080,6 +5161,9 @@ ${secondPart}`;
       if (!this.graphInstance) {
         return;
       }
+      if (this.graphLayoutMode === "cluster") {
+        this.graphView.setClusterManualLayout(true);
+      }
       const parentElement = this.graphInstance.$id(symbol.id);
       const children = this.getVisibleChildren(symbol);
       if (!parentElement || parentElement.empty() || !children || children.empty()) {
@@ -6365,6 +6449,9 @@ ${secondPart}`;
       this.graphLayoutMode = mode;
       window.localStorage.setItem("gitreader.graphLayoutMode", mode);
       this.updateGraphControls();
+      if (mode !== "cluster") {
+        this.graphView.setClusterManualLayout(false);
+      }
       if (mode !== "cluster") {
         this.clearOrganizedCircleOverlay();
       }

@@ -72,6 +72,7 @@ export class GraphViewController {
     private nodeCapByScope: Map<string, number> = new Map();
     private nodeCap = 300;
     private nodeCapStep = 200;
+    private clusterManualLayout = false;
 
     // Holds dependency references so GraphViewController can orchestrate graph rendering later.
     constructor(private deps: GraphViewDependencies) {}
@@ -95,7 +96,10 @@ export class GraphViewController {
             return;
         }
         const selectedNodeId = this.deps.getSelectedNodeId();
-        const elements = this.buildGraphElements(input.nodes, input.edges);
+        const positionCache = this.shouldUseManualClusterLayout()
+            ? this.captureNodePositions()
+            : null;
+        const elements = this.buildGraphElements(input.nodes, input.edges, positionCache);
         this.graph.elements().remove();
         this.graph.add(elements);
         if (selectedNodeId) {
@@ -104,14 +108,26 @@ export class GraphViewController {
                 selected.select();
             }
         }
-        this.runLayout();
+        if (!this.shouldUseManualClusterLayout()) {
+            this.runLayout();
+        } else {
+            this.deps.updateLabelVisibility();
+        }
         this.applyFilters();
     }
 
     // Updates the layout mode and reruns layout when graph data is already present.
     setLayout(mode: GraphLayoutMode): void {
         this.layoutMode = mode;
+        if (mode !== 'cluster') {
+            this.clusterManualLayout = false;
+        }
         this.runLayout();
+    }
+
+    // Enables or disables manual cluster layout so child organization remains stable across refreshes.
+    setClusterManualLayout(enabled: boolean): void {
+        this.clusterManualLayout = enabled;
     }
 
     // Updates edge/node filters wholesale when app state restores or resets.
@@ -372,6 +388,10 @@ export class GraphViewController {
         if (!this.graph) {
             return;
         }
+        if (this.shouldUseManualClusterLayout()) {
+            this.deps.updateLabelVisibility();
+            return;
+        }
         const layout = this.graph.layout(this.getLayoutOptions());
         layout.run();
         this.deps.updateLabelVisibility();
@@ -446,10 +466,28 @@ export class GraphViewController {
     }
 
     // Builds Cytoscape element data for nodes and edges using shared label formatting.
-    private buildGraphElements(nodes: SymbolNode[], edges: GraphEdge[]): Array<{ data: Record<string, unknown> }> {
+    private buildGraphElements(
+        nodes: SymbolNode[],
+        edges: GraphEdge[],
+        positionCache: Map<string, { x: number; y: number }> | null,
+    ): Array<{ data: Record<string, unknown>; position?: { x: number; y: number } }> {
+        const useManualLayout = this.shouldUseManualClusterLayout() && positionCache;
+        const parentByChild = new Map<string, string>();
+        const childrenByParent = new Map<string, string[]>();
+        if (useManualLayout) {
+            edges.forEach((edge) => {
+                if (edge.kind !== 'contains') {
+                    return;
+                }
+                parentByChild.set(edge.target, edge.source);
+                const siblings = childrenByParent.get(edge.source) ?? [];
+                siblings.push(edge.target);
+                childrenByParent.set(edge.source, siblings);
+            });
+        }
         const nodeElements = nodes.map((node) => {
             const labelData = this.deps.formatLabel(node);
-            return {
+            const element: { data: Record<string, unknown>; position?: { x: number; y: number } } = {
                 data: {
                     id: node.id,
                     label: labelData.label,
@@ -461,6 +499,15 @@ export class GraphViewController {
                     labelVisible: 'true',
                 },
             };
+            if (useManualLayout) {
+                const cached = positionCache.get(node.id);
+                const fallback = cached ? null : this.getManualFallbackPosition(node.id, parentByChild, childrenByParent, positionCache);
+                const position = cached ?? fallback;
+                if (position) {
+                    element.position = position;
+                }
+            }
+            return element;
         });
         const edgeElements = edges.map((edge, index) => ({
             data: {
@@ -472,6 +519,54 @@ export class GraphViewController {
             },
         }));
         return [...nodeElements, ...edgeElements];
+    }
+
+    // Captures the current node positions so manual cluster layout can preserve them across refreshes.
+    private captureNodePositions(): Map<string, { x: number; y: number }> {
+        const positions = new Map<string, { x: number; y: number }>();
+        if (!this.graph) {
+            return positions;
+        }
+        this.graph.nodes().forEach((node: any) => {
+            const position = node.position();
+            positions.set(node.id(), { x: position.x, y: position.y });
+        });
+        return positions;
+    }
+
+    // Computes a fallback position near the parent when a new node appears in manual layout.
+    private getManualFallbackPosition(
+        nodeId: string,
+        parentByChild: Map<string, string>,
+        childrenByParent: Map<string, string[]>,
+        positionCache: Map<string, { x: number; y: number }>,
+    ): { x: number; y: number } | null {
+        const parentId = parentByChild.get(nodeId);
+        if (!parentId) {
+            return null;
+        }
+        const parentPosition = positionCache.get(parentId);
+        if (!parentPosition) {
+            return null;
+        }
+        const siblings = childrenByParent.get(parentId) ?? [];
+        const index = Math.max(0, siblings.indexOf(nodeId));
+        const radius = this.getManualChildSpacing();
+        const angle = (2 * Math.PI * index) / Math.max(1, siblings.length);
+        return {
+            x: parentPosition.x + radius * Math.cos(angle),
+            y: parentPosition.y + radius * Math.sin(angle),
+        };
+    }
+
+    // Returns true when cluster layout should stay manual to preserve user-arranged positions.
+    private shouldUseManualClusterLayout(): boolean {
+        return this.layoutMode === 'cluster' && this.clusterManualLayout;
+    }
+
+    // Provides the default spacing for placing new children near their parent in manual mode.
+    private getManualChildSpacing(): number {
+        return 120;
     }
 
     // Supplies the Cytoscape stylesheet that defines node/edge appearance and state styling.

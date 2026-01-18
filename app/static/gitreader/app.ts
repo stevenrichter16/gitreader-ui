@@ -2137,6 +2137,9 @@ class GitReaderApp {
         if (!this.graphInstance) {
             return;
         }
+        if (this.graphLayoutMode === 'cluster') {
+            this.graphView.setClusterManualLayout(true);
+        }
         const parentElement = this.graphInstance.$id(symbol.id);
         const children = this.getVisibleChildren(symbol);
         if (!parentElement || parentElement.empty() || !children || children.empty()) {
@@ -3507,6 +3510,9 @@ class GitReaderApp {
         this.graphLayoutMode = mode;
         window.localStorage.setItem('gitreader.graphLayoutMode', mode);
         this.updateGraphControls();
+        if (mode !== 'cluster') {
+            this.graphView.setClusterManualLayout(false);
+        }
         if (mode !== 'cluster') {
             this.clearOrganizedCircleOverlay();
         }
